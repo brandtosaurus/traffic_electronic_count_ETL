@@ -3,8 +3,9 @@ import pandas as pd
 from datetime import datetime, timedelta, date
 import uuid
 import re
+from typing import List
 
-def headers(df):
+def headers(df: pd.DataFrame) -> pd.DataFrame:
 	dfh = pd.DataFrame(df.loc[(df[0].isin(['H0','S0','I0','S1','D0','D1','D3','L0','L1']))|
 						  ((df[0].isin(['21','70','30','13','60']))&(~df[1].isin(['0','1','2','3','4'])))|
 						  ((df[0].isin(['10']))&(df[1].isin(['1','8','5','01','08','05'])))
