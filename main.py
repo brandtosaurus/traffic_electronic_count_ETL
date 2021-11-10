@@ -1,10 +1,13 @@
 import csv
 import os
+import zipfile
 import traceback
 import tqdm
 import pandas as pd
 from pandasql import sqldf
 import multiprocessing as mp
+
+from io import StringIO
 
 import rsa_data as rd
 import rsa_headers as rh
@@ -21,6 +24,11 @@ def gui():
     f = filedialog.askdirectory()
     root.destroy()
     return str(f)
+
+
+def is_zip(path: str) -> bool:
+    for filename in path:
+        return zipfile.is_zipfile(filename)
 
 
 def getfiles(path: str) -> List[str]:
@@ -128,6 +136,7 @@ def push_to_db(df: pd.DataFrame, table: str, subset: List[str]) -> None:
             schema="trafc",
             if_exists="append",
             index=False,
+            method=psql_insert_copy,
         )
     except Exception:
         df = df.drop_duplicates(subset=subset)
@@ -137,7 +146,38 @@ def push_to_db(df: pd.DataFrame, table: str, subset: List[str]) -> None:
             schema="trafc",
             if_exists="append",
             index=False,
+            method=psql_insert_copy,
         )
+
+
+def psql_insert_copy(table, conn, keys, data_iter):
+    """
+    Execute SQL statement inserting data
+
+    Parameters
+    ----------
+    table : pandas.io.sql.SQLTable
+    conn : sqlalchemy.engine.Engine or sqlalchemy.engine.Connection
+    keys : list of str
+        Column names
+    data_iter : Iterable that iterates the values to be inserted
+    """
+    # gets a DBAPI connection that can provide a cursor
+    dbapi_conn = conn.connection
+    with dbapi_conn.cursor() as cur:
+        s_buf = StringIO()
+        writer = csv.writer(s_buf)
+        writer.writerows(data_iter)
+        s_buf.seek(0)
+
+        columns = ", ".join('"{}"'.format(k) for k in keys)
+        if table.schema:
+            table_name = "{}.{}".format(table.schema, table.name)
+        else:
+            table_name = table.name
+
+        sql = "COPY {} ({}) FROM STDIN WITH CSV".format(table_name, columns)
+        cur.copy_expert(sql=sql, file=s_buf)
 
 
 ##################################################################################################################################
@@ -226,12 +266,12 @@ def main(files: str):
 
 
 if __name__ == "__main__":
-    # fileIncomplete = os.path.expanduser('~'+ r'\Desktop\Temp\rsa_traffic_counts\RSA_COUNT_PROBLEM_FILES - Copy.csv')
-    # fileIncomplete = pd.read_csv(fileIncomplete, header=None, sep='\n')
-    # files = fileIncomplete[0].tolist()
 
     filesToDo = gui()
-    filesToDo = getfiles(filesToDo)
+    if is_zip(filesToDo) == False:
+        filesToDo = getfiles(filesToDo)
+    else:
+        raise SystemExit
 
     if not os.path.exists(os.path.expanduser(config.FILES_COMPLETE)):
         with open(
