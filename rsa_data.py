@@ -229,6 +229,7 @@ class Data(object):
             ddf["site_id"] = str(t1[0])
 
             ddf = ddf.drop_duplicates()
+            ddf["start_datetime"] = ddf["start_datetime"].astype("datetime64[ns]")
 
             return ddf
 
@@ -271,7 +272,7 @@ class Data(object):
                 ]
                 ddf["heavy_vehicle"] = 0
 
-            elif data[1].all() == "0":
+            elif data[1].isin(["0", "2"]).any():
                 ddf = data.iloc[:, 2:]
                 ddf = pd.DataFrame(ddf).dropna(axis=1, how="all")
                 if ddf.shape[1] == 7:
@@ -342,7 +343,7 @@ class Data(object):
                 subset=[
                     "unknown_vehicle_error_class",
                     "light_motor_vehicles",
-                    "heavy_vehicle" "motorcycle",
+                    "motorcycle",
                     "light_motor_vehicles",
                     "light_motor_vehicles_towing",
                     "two_axle_busses",
@@ -530,6 +531,7 @@ class Data(object):
             ddf["site_id"] = str(t1[0])
 
             ddf = ddf.drop_duplicates()
+            ddf["start_datetime"] = ddf["start_datetime"].astype("datetime64[ns]")
 
             return ddf
 
@@ -722,6 +724,7 @@ class Data(object):
             ddf["site_id"] = ddf["site_id"].astype(str)
 
             ddf = ddf.drop_duplicates()
+            ddf["start_datetime"] = ddf["start_datetime"].astype("datetime64[ns]")
 
             return ddf
 
@@ -914,9 +917,10 @@ class Data(object):
             ddf = ddf.drop(["departure_time"], axis=1)
 
             ddf = ddf.drop_duplicates()
+            ddf["start_datetime"] = ddf["start_datetime"].astype("datetime64[ns]")
             return ddf
 
-    def type60(df: pd.DataFrame) -> pd.DataFrame:
+    def dtype60(df: pd.DataFrame) -> pd.DataFrame:
         data = df.loc[(df[0] == "60") & (df[1].isin(["15", "17", "19"]))].dropna(
             axis=1, how="all"
         )
@@ -930,7 +934,7 @@ class Data(object):
             axis=1, how="all"
         )
         lengthBinCode = dfh[2]
-        numberOfBins = dfh[3].max()()
+        numberOfBins = dfh[3].max()
         if data.empty:
             pass
         else:
@@ -1033,5 +1037,6 @@ class Data(object):
             ) - pd.to_timedelta(ddf["duration_min"].astype(int), unit="m")
             # ddf['year'] = ddf['start_datetime'].dt.year
             ddf = ddf.drop_duplicates()
+            ddf["start_datetime"] = ddf["start_datetime"].astype("datetime64[ns]")
 
             return ddf

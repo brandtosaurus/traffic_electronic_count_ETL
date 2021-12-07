@@ -22,7 +22,7 @@ from typing import List
 def gui():
     root = Tk().withdraw()
     f = filedialog.askdirectory()
-    root.destroy()
+    # root.destroy()
     return str(f)
 
 
@@ -187,56 +187,68 @@ def main(files: str):
     global finalheaders, finaldata
     try:
         df = to_df(files)
+        H = rh.Headers(df)
+        DATA = rd.Data(df)
 
-        header = rh.Headers(df)
-        header = pd.DataFrame(header)
+        header = H.header
         header["document_url"] = str(files)
+
+        data = DATA.dtype21
+        data = main.data_join(data, header)
+        data.drop("station_name", axis=1, inplace=True)
+
+        d2 = DATA.dtype30
+        if d2 is None:
+            pass
+        else:
+            d2 = main.data_join(d2, header)
+            data = data.merge(
+                d2, how="outer", on=["site_id", "start_datetime", "lane_number"]
+            )
+
+        d2 = DATA.dtype70
+        if d2 is None:
+            pass
+        else:
+            data = main.data_join(d2, header)
+            data.drop("station_name", axis=1, inplace=True)
+            data["start_datetime"] = data["start_datetime"].astype("datetime64[ns]")
+            d2["start_datetime"] = d2["start_datetime"].astype("datetime64[ns]")
+            data = data.merge(
+                d2, how="outer", on=["site_id", "start_datetime", "lane_number"]
+            )
+
+        d2 = DATA.dtype10
+        if d2 is None:
+            pass
+        else:
+            data = main.data_join(d2, header)
+            data.drop("station_name", axis=1, inplace=True)
+            data = data.merge(
+                d2, how="outer", on=["site_id", "start_datetime", "lane_number"]
+            )
+
+        d2 = DATA.dtype60
+        if d2 is None:
+            pass
+        else:
+            data = main.data_join(d2, header)
+            data.drop("station_name", axis=1, inplace=True)
+            data = data.merge(
+                d2, how="outer", on=["site_id", "start_datetime", "lane_number"]
+            )
+
+        push_to_db(
+            data,
+            "electronic_count_data_partitioned",
+            ["site_id", "start_datetime", "lane_number"],
+        )
+
         push_to_db(
             header,
-            "v_electronic_count_header_import",
+            "electronic_count_header",
             ["site_id", "start_datetime", "end_datetime"],
         )
-
-        data = rd.Data.dtype21(df)
-        data = data_join(data, header)
-        push_to_db(
-            data,
-            "v_electronic_count_data_import",
-            ["site_id", "start_datetime", "lane_number"],
-        )
-
-        data = rd.Data.dtype30(df)
-        data = data_join(data, header)
-        push_to_db(
-            data,
-            "v_electronic_count_data_import",
-            ["site_id", "start_datetime", "lane_number"],
-        )
-
-        data = rd.Data.dtype70(df)
-        data = data_join(data, header)
-        push_to_db(
-            data,
-            "v_electronic_count_data_import",
-            ["site_id", "start_datetime", "lane_number"],
-        )
-
-        data = rd.Data.dtype10(df)
-        data = data_join(data, header)
-        push_to_db(
-            data,
-            "v_electronic_count_data_import",
-            ["site_id", "start_datetime", "lane_number"],
-        )
-
-        ############ before uncommenting this, make sure that the appropriate changes are made to the database import table.
-        # 	data = rd.Data.dtype60(df)
-        # if data is None:
-        # 	pass
-        # else:
-        # 	data = pd.DataFrame(data)
-        # 	data = join(header,data)
-        # 	data.to_sql('v_electronic_count_data_import',con=config.ENGINE,schema='trafc',if_exists='append',index=False)#, chunksize=5000)
 
         with open(
             os.path.expanduser(config.FILES_COMPLETE),
@@ -322,10 +334,10 @@ if __name__ == "__main__":
     ########################################################################################################################################################
     #### POST PROCESSING
 
-    with config.ENGINE.connect() as con:
-        con.execute(
-            "VACUUM (FULL, VERBOSE, ANALYZE) trafc.electronic_count_data_partitioned;"
-        )
-        con.execute("VACUUM (FULL, VERBOSE, ANALYZE) trafc.electronic_count_header;")
+    # with config.ENGINE.connect() as con:
+    #     con.execute(
+    #         "VACUUM (FULL, VERBOSE, ANALYZE) trafc.electronic_count_data_partitioned;"
+    #     )
+    #     con.execute("VACUUM (FULL, VERBOSE, ANALYZE) trafc.electronic_count_header;")
 
     print("COMPLETE")

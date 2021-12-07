@@ -4,10 +4,9 @@ import uuid
 
 
 class Headers(object):
-    def __init__(self, df) -> None:
+    def __init__(self, df):
         self.get_head = Headers.get_head(df)
-        self.headers = Headers.headers(self.get_head)
-        return self.headers
+        self.header = Headers.headers(self.get_head)
 
     def get_head(df) -> pd.DataFrame:
         dfh = pd.DataFrame(
