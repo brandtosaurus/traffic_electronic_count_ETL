@@ -194,14 +194,14 @@ def main(files: str):
         header["document_url"] = str(files)
 
         data = DATA.dtype21
-        data = main.data_join(data, header)
+        data = data_join(data, header)
         data.drop("station_name", axis=1, inplace=True)
 
         d2 = DATA.dtype30
         if d2 is None:
             pass
         else:
-            d2 = main.data_join(d2, header)
+            d2 = data_join(d2, header)
             data = data.merge(
                 d2, how="outer", on=["site_id", "start_datetime", "lane_number"]
             )
@@ -210,7 +210,7 @@ def main(files: str):
         if d2 is None:
             pass
         else:
-            data = main.data_join(d2, header)
+            data = data_join(d2, header)
             data.drop("station_name", axis=1, inplace=True)
             data["start_datetime"] = data["start_datetime"].astype("datetime64[ns]")
             d2["start_datetime"] = d2["start_datetime"].astype("datetime64[ns]")
@@ -222,7 +222,7 @@ def main(files: str):
         if d2 is None:
             pass
         else:
-            data = main.data_join(d2, header)
+            data = data_join(d2, header)
             data.drop("station_name", axis=1, inplace=True)
             data = data.merge(
                 d2, how="outer", on=["site_id", "start_datetime", "lane_number"]
@@ -232,7 +232,7 @@ def main(files: str):
         if d2 is None:
             pass
         else:
-            data = main.data_join(d2, header)
+            data = data_join(d2, header)
             data.drop("station_name", axis=1, inplace=True)
             data = data.merge(
                 d2, how="outer", on=["site_id", "start_datetime", "lane_number"]
@@ -249,6 +249,9 @@ def main(files: str):
             "electronic_count_header",
             ["site_id", "start_datetime", "end_datetime"],
         )
+
+        # data.to_csv(r"C:\Users\MB2705851\Desktop\Temp\rsa_traffic_counts\data.csv", index=False, mode='a')
+        # header.to_csv(r"C:\Users\MB2705851\Desktop\Temp\rsa_traffic_counts\header.csv", index=False, mode='a')
 
         with open(
             os.path.expanduser(config.FILES_COMPLETE),
