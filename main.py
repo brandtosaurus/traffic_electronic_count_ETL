@@ -203,7 +203,7 @@ def main(files: str):
         else:
             d2 = data_join(d2, header)
             data = data.merge(
-                d2, how="outer", on=["site_id", "start_datetime", "lane_number"]
+                d2, how="left", on=["site_id", "start_datetime", "lane_number"]
             )
 
         d2 = DATA.dtype70
@@ -215,7 +215,7 @@ def main(files: str):
             data["start_datetime"] = data["start_datetime"].astype("datetime64[ns]")
             d2["start_datetime"] = d2["start_datetime"].astype("datetime64[ns]")
             data = data.merge(
-                d2, how="outer", on=["site_id", "start_datetime", "lane_number"]
+                d2, how="left", on=["site_id", "start_datetime", "lane_number"]
             )
 
         d2 = DATA.dtype10
@@ -225,7 +225,7 @@ def main(files: str):
             data = data_join(d2, header)
             data.drop("station_name", axis=1, inplace=True)
             data = data.merge(
-                d2, how="outer", on=["site_id", "start_datetime", "lane_number"]
+                d2, how="left", on=["site_id", "start_datetime", "lane_number"]
             )
 
         d2 = DATA.dtype60
@@ -235,8 +235,14 @@ def main(files: str):
             data = data_join(d2, header)
             data.drop("station_name", axis=1, inplace=True)
             data = data.merge(
-                d2, how="outer", on=["site_id", "start_datetime", "lane_number"]
+                d2, how="left", on=["site_id", "start_datetime", "lane_number"]
             )
+
+        data = data.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
+        header = header.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
+
+        data = data[data.columns.intersection(config.DATA_COLUMN_NAMES)]
+        header = header[header.columns.intersection(config.HEADER_COLUMN_NAMES)]
 
         push_to_db(
             data,
