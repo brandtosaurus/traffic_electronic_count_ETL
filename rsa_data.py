@@ -363,13 +363,14 @@ class Data(object):
                 ],
             )
 
-            # ddf=ddf.fillna(0)
+            ddf=ddf.fillna(0)
             ddf["duration_min"] = ddf["duration_min"].astype(int)
             ddf["lane_number"] = ddf["lane_number"].astype(int)
             ddf["unknown_vehicle_error_class"] = ddf[
                 "unknown_vehicle_error_class"
             ].astype(int)
             ddf["light_motor_vehicles"] = ddf["light_motor_vehicles"].astype(int)
+            ddf["heavy_vehicle"] = ddf["heavy_vehicle"].astype(int)
             ddf["light_motor_vehicles_towing"] = ddf[
                 "light_motor_vehicles_towing"
             ].astype(int)
