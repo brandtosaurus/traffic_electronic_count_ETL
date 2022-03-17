@@ -2,27 +2,23 @@ import sqlalchemy as sa
 
 #### DB CONNECTION
 
-# ENGINE_URL = sa.engine.url.URL(
-#     "postgresql",
-#     username="postgres",
-#     password="Lin3@r1in3!431",
-#     host="linearline.dedicated.co.za",
-#     port=5432,
-#     database="gauteng",
-# )
-
-# ENGINE = sa.create_engine(
-#     ENGINE_URL
-# )
-
 ENGINE_URL = sa.engine.url.URL(
     "postgresql",
     username="postgres",
     password="Lin3@r1in3!431",
-    host="localhost",
+    host="linearline.dedicated.co.za",
     port=5432,
     database="gauteng",
 )
+
+# ENGINE_URL = sa.engine.url.URL(
+#     "postgresql",
+#     username="postgres",
+#     password="Lin3@r1in3!431",
+#     host="localhost",
+#     port=5432,
+#     database="gauteng",
+# )
 
 ENGINE = sa.create_engine(
     ENGINE_URL
@@ -216,8 +212,8 @@ HEADER_COLUMN_NAMES = [
     "adtt_positive_direction",
     "adtt_negative_direction",
     "adtt_total",
-    "highest_volume_per_hour_positive_direciton",
-    "highest_volume_per_hour_negative_direciton",
+    "highest_volume_per_hour_positive_direction",
+    "highest_volume_per_hour_negative_direction",
     "highest_volume_per_hour_total",
     "15th_highest_volume_per_hour_positive_direction",
     "15th_highest_volume_per_hour_negative_direction",
@@ -232,4 +228,10 @@ HEADER_COLUMN_NAMES = [
     "85th_percentile_speed_negative_direction",
     "85th_percentile_speed_total",
     "year",
+]
+
+TYPE10_DATA_COLUMN_NAMES = ['id', 'site_id', 'header_id', "year", 'number_of_fields_associated_with_the_basic_vehicle_data', 'data_source_code', 'edit_code', 'departure_date', 'departure_time', 'assigned_lane_number', 'physical_lane_number', 'forward_reverse_code', 'vehicle_category', 'vehicle_class_code_primary_scheme', 'vehicle_class_code_secondary_scheme', 'vehicle_speed', 'vehicle_length', 'site_occupancy_time_in_milliseconds', 'chassis_height_code', 'vehicle_following_code', 'vehicle_tag_code', 'trailer_count', 'axle_count', 'bumper_to_1st_axle_spacing', 'tyre_type', 'sub_data_type_code_vx', 'vehicle_registration_number', 'number_of_images', 'image_name_1', 'image_name_2', 'image_name_3', 'sub_data_type_code_sx', 'number_of_axles_spacings_counted', 'axle_spacing_1_between_individual_axles_cm', 'axle_spacing_2_between_individual_axles_cm', 'axle_spacing_3_between_individual_axles_cm', 'axle_spacing_4_between_individual_axles_cm', 'axle_spacing_5_between_individual_axles_cm', 'axle_spacing_6_between_individual_axles_cm', 'axle_spacing_7_between_individual_axles_cm', 'axle_spacing_8_between_individual_axles_cm'
+]
+
+TYPE10_HEADER_COLUMN_NAMES = ['header_id', 'data_description', 'vehicle_classification_scheme_primary', 'vehicle_classification_scheme_secondary', 'maximum_gap_milliseconds', 'maximum_differential_speed'
 ]

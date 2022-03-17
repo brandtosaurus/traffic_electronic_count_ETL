@@ -130,68 +130,85 @@ class Headers(object):
                 headers["end_datetime"] = dfh.loc[dfh[0] == "D1", 3].astype(str)
                 headers["end_time"] = dfh.loc[dfh[0] == "D1", 4].astype(str)
 
-            headers["end_datetime"] = headers.apply(
-                lambda x: pd.to_datetime(
-                    x["end_datetime"] + x["end_time"], format="%y%m%d%H%M%S"
-                )
-                if (
-                    x["end_time"] != "240000"
-                    and len(x["end_datetime"]) == 6
-                    and len(x["end_time"]) == 6
-                )
-                else (
-                    pd.to_datetime(
-                        x["end_datetime"] + x["end_time"], format="%y%m%d%H%M%S%f"
+            try:
+
+                for idx, row in headers.iterrows():
+                    if len(row['start_datetime']) == 6 and len(row['start_time']) == 6:
+                        row['start_datetime'] = pd.to_datetime(row['start_datetime'] + row['start_time'], format='%y%m%d%H%M%S')
+                    elif len(row['start_datetime']) == 8 and len(row['start_time']) == 6:
+                        row['start_datetime'] = pd.to_datetime(row['start_datetime'] + row['start_time'], format='%Y%m%d%H%M%S')
+                    elif len(row['start_datetime']) == 6 and len(row['start_time']) == 8:
+                        row['start_datetime'] = pd.to_datetime(row['start_datetime'] + row['start_time'], format='%y%m%d%H%M%S%f')
+                    elif len(row['start_datetime']) == 8 and len(row['start_time']) == 8:
+                        row['start_datetime'] = pd.to_datetime(row['start_datetime'] + row['start_time'], format='%Y%m%d%H%M%S%f')
+
+                    if len(row['end_datetime']) == 6 and row['end_time'].strip('0') == '24':
+                        row['end_datetime'] = pd.to_datetime(row['end_datetime'], format='%y%m%d')+timedelta(days=1)
+                    elif len(row['end_datetime']) ==8 and row['end_time'].strip('0') == '24':
+                        row['end_datetime'] = pd.to_datetime(row['end_datetime'], format='%Y%m%d')+timedelta(days=1)
+                    elif len(row['end_datetime']) == 6 and len(row['end_time']) == 6:
+                        row['start_datetime'] = pd.to_datetime(row['end_datetime'] + row['end_time'], format='%y%m%d%H%M%S')
+                    elif len(row['end_datetime']) == 8 and len(row['end_time']) == 6:
+                        row['start_datetime'] = pd.to_datetime(row['end_datetime'] + row['end_time'], format='%Y%m%d%H%M%S')
+                    elif len(row['end_datetime']) == 6 and len(row['end_time']) == 8:
+                        row['start_datetime'] = pd.to_datetime(row['end_datetime'] + row['end_time'], format='%y%m%d%H%M%S%f')
+                    elif len(row['end_datetime']) == 8 and len(row['end_time']) == 8:
+                        row['start_datetime'] = pd.to_datetime(row['end_datetime'] + row['end_time'], format='%Y%m%d%H%M%S%f')
+
+            except:
+            
+                headers["end_datetime"] = headers.apply(
+                    lambda x: pd.to_datetime(
+                        x["end_datetime"] + x["end_time"], format="%y%m%d%H%M%S"
                     )
                     if (
-                        x["end_time"] != "24000000"
+                        x["end_time"] != "240000"
                         and len(x["end_datetime"]) == 6
-                        and len(x["end_time"]) == 8
+                        and len(x["end_time"]) == 6
                     )
                     else (
                         pd.to_datetime(
-                            x["end_datetime"] + x["end_time"], format="%Y%m%d%H%M%S"
+                            x["end_datetime"] + x["end_time"], format="%y%m%d%H%M%S%f"
                         )
                         if (
-                            x["end_time"] != "240000"
-                            and len(x["end_datetime"]) == 8
-                            and len(x["end_time"]) == 6
+                            x["end_time"] != "24000000"
+                            and len(x["end_datetime"]) == 6
+                            and len(x["end_time"]) == 8
                         )
                         else (
                             pd.to_datetime(
-                                x["end_datetime"] + x["end_time"],
-                                format="%Y%m%d%H%M%S%f",
+                                x["end_datetime"] + x["end_time"], format="%Y%m%d%H%M%S"
                             )
                             if (
-                                x["end_time"] != "24000000"
+                                x["end_time"] != "240000"
                                 and len(x["end_datetime"]) == 8
-                                and len(x["end_time"]) == 8
+                                and len(x["end_time"]) == 6
                             )
                             else (
-                                pd.to_datetime(x["end_datetime"], format="%y%m%d")
-                                + timedelta(days=1)
+                                pd.to_datetime(
+                                    x["end_datetime"] + x["end_time"],
+                                    format="%Y%m%d%H%M%S%f",
+                                )
                                 if (
-                                    x["end_time"] == "240000"
-                                    and len(x["end_datetime"]) == 6
-                                    and len(x["end_time"]) == 6
+                                    x["end_time"] != "24000000"
+                                    and len(x["end_datetime"]) == 8
+                                    and len(x["end_time"]) == 8
                                 )
                                 else (
                                     pd.to_datetime(x["end_datetime"], format="%y%m%d")
                                     + timedelta(days=1)
                                     if (
-                                        x["end_time"] == "24000000"
+                                        x["end_time"] == "240000"
                                         and len(x["end_datetime"]) == 6
-                                        and len(x["end_time"]) == 8
+                                        and len(x["end_time"]) == 6
                                     )
                                     else (
-                                        pd.to_datetime(
-                                            x["end_datetime"], format="%Y%m%d"
-                                        )
+                                        pd.to_datetime(x["end_datetime"], format="%y%m%d")
                                         + timedelta(days=1)
                                         if (
-                                            x["end_time"] == "240000"
-                                            and len(x["end_datetime"]) == 8
-                                            and len(x["end_time"]) == 6
+                                            x["end_time"] == "24000000"
+                                            and len(x["end_datetime"]) == 6
+                                            and len(x["end_time"]) == 8
                                         )
                                         else (
                                             pd.to_datetime(
@@ -199,24 +216,34 @@ class Headers(object):
                                             )
                                             + timedelta(days=1)
                                             if (
-                                                x["end_time"] == "24000000"
+                                                x["end_time"] == "240000"
                                                 and len(x["end_datetime"]) == 8
-                                                and len(x["end_time"]) == 8
+                                                and len(x["end_time"]) == 6
                                             )
-                                            else pd.to_datetime(
-                                                x["end_datetime"] + x["end_time"]
+                                            else (
+                                                pd.to_datetime(
+                                                    x["end_datetime"], format="%Y%m%d"
+                                                )
+                                                + timedelta(days=1)
+                                                if (
+                                                    x["end_time"] == "24000000"
+                                                    and len(x["end_datetime"]) == 8
+                                                    and len(x["end_time"]) == 8
+                                                )
+                                                else pd.to_datetime(
+                                                    x["end_datetime"] + x["end_time"]
+                                                )
                                             )
                                         )
                                     )
                                 )
                             )
                         )
-                    )
-                ),
-                axis=1,
-            )
+                    ),
+                    axis=1,
+                )
 
-            headers["start_datetime"] = headers.apply(
+                headers["start_datetime"] = headers.apply(
                 lambda x: pd.to_datetime(
                     x["start_datetime"] + x["start_time"], format="%y%m%d%H%M%S"
                 )

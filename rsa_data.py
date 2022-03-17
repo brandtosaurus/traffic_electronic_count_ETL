@@ -1,18 +1,22 @@
 import pandas as pd
+from pandasql import sqldf
+import numpy as np
+
 from datetime import timedelta
+import uuid
 
 #################################################################################################################################################################################################################################
-#################################################################################################################################################################################################################################
-##########################################################################				  DATA RECORDSS BELOW									 #############################################################################
-#################################################################################################################################################################################################################################
+##########################################################################				  DATA RECORDS BELOW									 #############################################################################
 #################################################################################################################################################################################################################################
 class Data(object):
     def __init__(self, df):
-        self.dtype21 = Data.dtype21(df)
-        self.dtype30 = Data.dtype30(df)
-        self.dtype70 = Data.dtype70(df)
-        self.dtype10 = Data.dtype10(df)
-        self.dtype60 = Data.dtype60(df)
+        self.dtype21 = Data.join_header_id(Data.dtype21(df), self.header)
+        self.dtype30 = Data.join_header_id(Data.dtype30(df), self.header)
+        self.dtype70 = Data.join_header_id(Data.dtype70(df), self.header)
+        self.dtype10 = Data.join_header_id(Data.dtype10(df), self.header)
+        self.dtype60 = Data.join_header_id(Data.dtype60(df), self.header)
+        self.type10_separate_table = Data.type10_separate_table(df)
+        pass
 
     def get_direction(lane_number, df: pd.DataFrame) -> pd.DataFrame:
         filt = df[1] == lane_number
@@ -28,7 +32,46 @@ class Data(object):
         df = str(df)
         return df
 
-    #### CREATE DATA FOR TYPE 21 TRAFFIC COUNTS
+    def join_header_id(d2, header):
+        if d2 is None:
+            pass
+        else:
+            data = data_join(d2, header)
+            data.drop("station_name", axis=1, inplace=True)
+            data["start_datetime"] = data["start_datetime"].astype("datetime64[ns]")
+            d2["start_datetime"] = d2["start_datetime"].astype("datetime64[ns]")
+            data = data.merge(
+                d2, how="outer", on=["site_id", "start_datetime", "lane_number"]
+            )
+        return data
+
+    def data_join(data: pd.DataFrame, header: pd.DataFrame) -> pd.DataFrame:
+        if data is None:
+            pass
+        elif data.empty:
+            pass
+        else:
+            data = pd.DataFrame(data)
+            data = join(header, data)
+        return data
+    
+    def join(header: pd.DataFrame, data: pd.DataFrame) -> pd.DataFrame:
+        if data.empty:
+            df = pd.DataFrame()
+        else:
+            q = """
+            SELECT header.header_id, header.station_name, data.*
+            FROM header
+            LEFT JOIN data ON data.start_datetime WHERE data.start_datetime >= header.start_datetime AND data.end_datetime <= header.end_datetime;
+            """
+            q2 = """UPDATE data set header_id = (SELECT header_id from header WHERE data.start_datetime >= header.start_datetime AND data.counttime_end <= header.enddate)"""
+            pysqldf = lambda q: sqldf(q, globals())
+            df = sqldf(q, locals())
+            df = pd.DataFrame(df)
+        return df
+
+#### CREATE DATA FOR TRAFFIC COUNTS ####
+
     def dtype21(df: pd.DataFrame) -> pd.DataFrame:
         data = df.loc[(df[0] == "21") & (df[1].isin(["0", "1", "2", "3", "4"]))].dropna(
             axis=1, how="all"
@@ -741,9 +784,7 @@ class Data(object):
         else:
             ddf = data.iloc[:, 4:]
             ddf = pd.DataFrame(ddf).dropna(axis=1, how="all")
-            if (
-                data[1].all() == "15"
-                or data[1].all() == "17"
+            if (data[1].isin(['15','17']).all()
                 and len(ddf.columns) == 11
             ):
                 ddf.columns = [
@@ -776,9 +817,7 @@ class Data(object):
                         ),
                     ]
                 )
-            elif (
-                data[1].all() == "15"
-                or data[1].all() == "17"
+            elif (data[1].isin(['15','17']).all()
                 and len(ddf.columns) == 13
             ):
                 ddf.columns = [
@@ -811,9 +850,7 @@ class Data(object):
                         ),
                     ]
                 )
-            elif (
-                data[1].all() == "15"
-                or data[1].all() == "17"
+            elif (data[1].isin(['15','17']).all()
                 and len(ddf.columns) == 15
             ):
                 ddf.columns = [
@@ -846,7 +883,7 @@ class Data(object):
                         ),
                     ]
                 )
-            elif data[1].all() == "19":
+            elif data[1].isin(['19']).all():
                 ddf = data.iloc[:, 4:22]
                 ddf = pd.DataFrame(ddf).dropna(axis=1, how="all")
                 ddf.columns = [
@@ -882,12 +919,16 @@ class Data(object):
             ddf = ddf.fillna(0)
             ddf["lane_number"] = ddf["lane_number"].astype(int)
             max_lanes = ddf["lane_number"].max()
-            ddf["direction"] = ddf.apply(
+            try:
+                ddf["direction"] = ddf.apply(
                 lambda x: "P" if x["lane_number"] <= (int(max_lanes) / 2) else "N",
                 axis=1,
             )
-            direction = dfh2.loc[dfh2[0] == "L1", 1:3].astype(int)
-            direction = direction.drop_duplicates()
+                direction = dfh2.loc[dfh2[0] == "L1", 1:3]
+                direction = direction.drop_duplicates()
+            except:
+                pass
+
             try:
                 ddf["forward_direction_code"] = ddf.apply(
                     lambda x: Data.get_direction(x["lane_number"], direction), axis=1
@@ -897,24 +938,24 @@ class Data(object):
                 ddf["forward_direction_code"] = None
                 # ddf['lane_position_code']=None
 
-            if ddf["start_datetime"].map(len).all() == 8:
+            if ddf["start_datetime"].map(len).isin([8]).all():
                 ddf["start_datetime"] = pd.to_datetime(
                     ddf["start_datetime"] + ddf["departure_time"],
                     format="%Y%m%d%H%M%S%f",
                 )
-            elif ddf["start_datetime"].map(len).all() == 6:
+            elif ddf["start_datetime"].map(len).isin([6]).all():
                 ddf["start_datetime"] = pd.to_datetime(
                     ddf["start_datetime"] + ddf["departure_time"],
                     format="%y%m%d%H%M%S%f",
                 )
-            # ddf['year'] = ddf['start_datetime'].dt.year
+            ddf['year'] = ddf['start_datetime'].dt.year
             t1 = dfh2.loc[dfh2[0] == "S0", 1].unique()
             ddf["site_id"] = str(t1[0])
             ddf["site_id"] = ddf["site_id"].astype(str)
 
-            ddf.iloc[:, 2:17] = ddf.iloc[:, 2:17].apply(to_numeric)
-            ddf[21] = ddf[21].astype(str)
-            ddf.iloc[:, 2:17] = ddf.iloc[:, 2:17].apply(to_numeric)
+            # ddf.iloc[:, 2:17] = ddf.iloc[:, 2:17].apply(to_numeric)
+            # ddf[21] = ddf[21].astype(str)
+            # ddf.iloc[:, 2:17] = ddf.iloc[:, 2:17].apply(to_numeric)
             ddf = ddf.drop(["departure_time"], axis=1)
 
             ddf = ddf.drop_duplicates()
@@ -1040,4 +1081,192 @@ class Data(object):
             ddf = ddf.drop_duplicates()
             ddf["start_datetime"] = ddf["start_datetime"].astype("datetime64[ns]")
 
+            return ddf
+
+    def dtype10_separate_table(df: pd.DataFrame) -> pd.DataFrame:
+        data = df.loc[(df[0] == "10") & (df[1].isin(["15", "17", "19"]))].dropna(
+            axis=1, how="all"
+        )
+        dfh2 = pd.DataFrame(df.loc[(df[0].isin(["S0", "L1"]))]).dropna(
+            axis=1, how="all"
+        )
+        if data.empty:
+            print("data empty")
+            print(data)
+        else:
+            ddf = data.iloc[:, 4:]
+            ddf = pd.DataFrame(ddf).dropna(axis=1, how="all")
+            if (data[1].isin(['15','17']).all()
+                and len(ddf.columns) == 11
+            ):
+                ddf.columns = [
+                    "departure_date",
+                    "departure_time",
+                    "assigned_lane_number",
+                    "physical_lane_number",
+                    "forward_reverse_code",
+                    "vehicle_category",
+                    "vehicle_class_code_primary_scheme",
+                    "vehicle_class_code_secondary_scheme",
+                    "vehicle_speed",
+                    "vehicle_length",
+                    "site_occupancy_time_in_milliseconds",
+                    "chassis_height_code",
+                    "vehicle_following_code",
+                ]
+                ddf = pd.concat(
+                    [
+                        ddf,
+                        pd.DataFrame(
+                            columns=[
+                                "vehicle_tag_code",
+                                "trailer_count",
+                                "axle_count",
+                                "bumper_to_1st_axle_spacing",
+                                "sub_data_type_code_sx",
+                                "number_of_axles_spacings_counted",
+                            ]
+                        ),
+                    ]
+                )
+            elif (data[1].isin(['15','17']).all()
+                and len(ddf.columns) == 13
+            ):
+                ddf.columns = [
+                    "departure_date",
+                    "departure_time",
+                    "assigned_lane_number",
+                    "physical_lane_number",
+                    "forward_reverse_code",
+                    "vehicle_category",
+                    "vehicle_class_code_primary_scheme",
+                    "vehicle_class_code_secondary_scheme",
+                    "vehicle_speed",
+                    "vehicle_length",
+                    "site_occupancy_time_in_milliseconds",
+                    "chassis_height_code",
+                    "vehicle_following_code",
+                ]
+                ddf = pd.concat(
+                    [
+                        ddf,
+                        pd.DataFrame(
+                            columns=[
+                                "vehicle_tag_code",
+                                "trailer_count",
+                                "axle_count",
+                                "bumper_to_1st_axle_spacing",
+                                "sub_data_type_code_sx",
+                                "number_of_axles_spacings_counted",
+                            ]
+                        ),
+                    ]
+                )
+            elif (data[1].isin(['15','17']).all()
+                and len(ddf.columns) == 15
+            ):
+                ddf.columns = [
+                    "departure_date",
+                    "departure_time",
+                    "assigned_lane_number",
+                    "physical_lane_number",
+                    "forward_reverse_code",
+                    "vehicle_category",
+                    "vehicle_class_code_primary_scheme",
+                    "vehicle_class_code_secondary_scheme",
+                    "vehicle_speed",
+                    "vehicle_length",
+                    "site_occupancy_time_in_milliseconds",
+                    "chassis_height_code",
+                    "vehicle_following_code",
+                    "vehicle_tag_code",
+                    "trailer_count",
+                ]
+                ddf = pd.concat(
+                    [
+                        ddf,
+                        pd.DataFrame(
+                            columns=[
+                                "axle_count",
+                                "bumper_to_1st_axle_spacing",
+                                "sub_data_type_code_sx",
+                                "number_of_axles_spacings_counted",
+                            ]
+                        ),
+                    ]
+                )
+            elif data[1].isin(['19']).all():
+                ddf = data.iloc[:, 4:22]
+                ddf = pd.DataFrame(ddf).dropna(axis=1, how="all")
+                ddf.columns = [
+                    "departure_date",
+                    "departure_time",
+                    "assigned_lane_number",
+                    "physical_lane_number",
+                    "forward_reverse_code",
+                    "vehicle_category",
+                    "vehicle_class_code_primary_scheme",
+                    "vehicle_class_code_secondary_scheme",
+                    "vehicle_speed",
+                    "vehicle_length",
+                    "site_occupancy_time_in_milliseconds",
+                    "chassis_height_code",
+                    "vehicle_following_code",
+                    "vehicle_tag_code",
+                    "trailer_count", 
+                    "axle_count",
+                    "bumper_to_1st_axle_spacing",
+                    "sub_data_type_code_sx",
+                    "number_of_axles_spacings_counted",
+                ]
+                ddf["number_of_axles_spacings_counted"] = ddf[
+                    "number_of_axles_spacings_counted"
+                ].astype(int)
+                for i in range(ddf["number_of_axles_spacings_counted"].max()()):
+                    i = i + 1
+                    newcolumn = (
+                        "axle_spacing_" + str(i) + "_between_individual_axles_cm"
+                    )
+                    ddf[newcolumn] = data[22 + i]
+
+            ddf = ddf.fillna(0)
+            ddf["assigned_lane_number"] = ddf["assigned_lane_number"].astype(int)
+            max_lanes = ddf["assigned_lane_number"].max()
+            try:
+                ddf["direction"] = ddf.apply(
+                lambda x: "P" if x["assigned_lane_number"] <= (int(max_lanes) / 2) else "N",
+                axis=1,
+            )
+                direction = dfh2.loc[dfh2[0] == "L1", 1:3]
+                direction = direction.drop_duplicates()
+            except:
+                pass
+            try:
+                ddf["forward_direction_code"] = ddf.apply(
+                    lambda x: get_direction(x["assigned_lane_number"], direction), axis=1
+                )
+                # FIXME: ddf['lane_position_code']=ddf.apply(lambda x: Data.get_lane_position(x['lane_number'],direction),axis=1)
+            except Exception:
+                ddf["forward_direction_code"] = None
+                # ddf['lane_position_code']=None
+
+            if ddf["departure_date"].map(len).isin([8]).all():
+                ddf["start_datetime"] = pd.to_datetime(
+                    ddf["departure_date"] + ddf["departure_time"],
+                    format="%Y%m%d%H%M%S%f",
+                )
+            elif ddf["departure_date"].map(len).isin([6]).all():
+                ddf["start_datetime"] = pd.to_datetime(
+                    ddf["departure_date"] + ddf["departure_time"],
+                    format="%y%m%d%H%M%S%f",
+                )
+            ddf['year'] = ddf['start_datetime'].dt.year
+            t1 = dfh2.loc[dfh2[0] == "S0", 1].unique()
+            ddf["site_id"] = str(t1[0])
+            ddf["site_id"] = ddf["site_id"].astype(str)
+            ddf['departure_time'] = pd.to_datetime(ddf['departure_time'], format='%H%M%S%f')
+
+            ddf = ddf.drop_duplicates()
+            ddf["start_datetime"] = ddf["start_datetime"].astype("datetime64[ns]")
+        
             return ddf

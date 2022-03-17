@@ -179,6 +179,175 @@ def psql_insert_copy(table, conn, keys, data_iter):
         sql = "COPY {} ({}) FROM STDIN WITH CSV".format(table_name, columns)
         cur.copy_expert(sql=sql, file=s_buf)
 
+def header_calcs(header, data, dtype):
+    data['start_datetime'] = pd.to_datetime(data['start_datetime'])
+    if dtype == 21:
+        header['adt_total'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['header_id']]).sum().mean()
+        header['adt_positive_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().mean()
+        header['adt_positive_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().mean()
+
+        header['adtt_total'] = data['total_heavy_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['header_id']]).sum().mean()
+        header['adtt_positive_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().mean()
+        header['adtt_positive_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().mean()
+
+        header['total_vehicles'] = data['total_vehicles_type21'].groupby(data['header_id']).sum()[0]
+        header['total_vehicles_positive_direction'] = data['total_vehicles_type21'].groupby(data['direction'].loc[data['direction'] == 'P']).sum()[0]
+        header['total_vehicles_positive_direction'] = data['total_vehicles_type21'].groupby(data['direction'].loc[data['direction'] == 'N']).sum()[0]
+
+        header['total_heavy_vehicles'] = data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
+        header['total_heavy_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
+        header['total_heavy_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
+        header['truck_split_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0] / data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
+        header['truck_split_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0] / data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
+
+        header['total_light_vehicles'] = data['total_light_vehicles_type21'].groupby(data['header_id']).sum()[0]
+        header['total_light_positive_direction'] = data['total_light_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
+        header['total_light_positive_direction'] = data['total_light_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
+
+        header['short_heavy_vehicles'] = data['short_heavy_vehicles'].groupby(data['header_id']).sum()[0]
+        header['short_heavy_positive_direction'] = data['short_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
+        header['short_heavy_positive_direction'] = data['short_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
+
+        header['Medium_heavy_vehicles'] = data['medium_heavy_vehicles'].groupby(data['header_id']).sum()[0]
+        header['Medium_heavy_positive_direction'] = data['medium_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
+        header['Medium_heavy_positive_direction'] = data['medium_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
+
+        header['long_heavy_vehicles'] = data['long_heavy_vehicles'].groupby(data['header_id']).sum()[0]
+        header['long_heavy_positive_direction'] = data['long_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
+        header['long_heavy_positive_direction'] = data['long_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
+
+        header['vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire'] = data['rear_to_rear_headway_shorter_than_2_seconds'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
+        header['vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire'] = data['rear_to_rear_headway_shorter_than_2_seconds'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
+        header['vehicles_with_rear_to_rear_headway_less_than_2sec_total'] = data['rear_to_rear_headway_shorter_than_2_seconds'].groupby(data['header_id']).sum()[0]
+    
+        header['type_21_count_interval_minutes'] = data['duration_min'].mean()
+
+        header['highest_volume_per_hour_positive_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().max()
+        header['highest_volume_per_hour_negative_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().max()
+        header['highest_volume_per_hour_total'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['header_id']]).sum().max()
+
+        header['15th_highest_volume_per_hour_positive_direction'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().quantile(q=0.15,  interpolation='linear'))
+        header['15th_highest_volume_per_hour_negative_direction'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().quantile(q=0.15,  interpolation='linear'))
+        header['15th_highest_volume_per_hour_total'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['header_id']]).sum().quantile(q=0.15, interpolation='linear'))
+        
+        header['30th_highest_volume_per_hour_positive_direction'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().quantile(q=0.3,  interpolation='linear'))
+        header['30th_highest_volume_per_hour_negative_direction'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().quantile(q=0.3, interpolation='linear'))
+        header['30th_highest_volume_per_hour_total'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['header_id']]).sum().quantile(q=0.3, interpolation='linear'))
+
+        # header['average_speed_positive_direction'] = 
+        # header['average_speed_negative_direction'] = 
+        header['average_speed'] = ((
+            (header['speedbin1'] * data['speedbin1'].groupby(data['header_id']).sum()[0]) +
+            (header['speedbin2'] * data['speedbin2'].groupby(data['header_id']).sum()[0]) +
+            (header['speedbin3'] * data['speedbin3'].groupby(data['header_id']).sum()[0]) +
+            (header['speedbin4'] * data['speedbin4'].groupby(data['header_id']).sum()[0]) +
+            (header['speedbin5'] * data['speedbin5'].groupby(data['header_id']).sum()[0]) +
+            (header['speedbin6'] * data['speedbin6'].groupby(data['header_id']).sum()[0]) +
+            (header['speedbin7'] * data['speedbin7'].groupby(data['header_id']).sum()[0]) +
+            (header['speedbin8'] * data['speedbin8'].groupby(data['header_id']).sum()[0]) +
+            (header['speedbin9'] * data['speedbin9'].groupby(data['header_id']).sum()[0]) 
+            )
+            / data['sum_of_heavy_vehicle_speeds'].groupby(data['header_id']).sum()[0]
+            )
+        # header['average_speed_light_vehicles_positive_direction'] = 
+        # header['average_speed_light_vehicles_negative_direction'] = 
+        header['average_speed_light_vehicles'] = ((
+            (header['speedbin1'] * data['speedbin1'].groupby(data['header_id']).sum()[0]) +
+            (header['speedbin2'] * data['speedbin2'].groupby(data['header_id']).sum()[0]) +
+            (header['speedbin3'] * data['speedbin3'].groupby(data['header_id']).sum()[0]) +
+            (header['speedbin4'] * data['speedbin4'].groupby(data['header_id']).sum()[0]) +
+            (header['speedbin5'] * data['speedbin5'].groupby(data['header_id']).sum()[0]) +
+            (header['speedbin6'] * data['speedbin6'].groupby(data['header_id']).sum()[0]) +
+            (header['speedbin7'] * data['speedbin7'].groupby(data['header_id']).sum()[0]) +
+            (header['speedbin8'] * data['speedbin8'].groupby(data['header_id']).sum()[0]) +
+            (header['speedbin9'] * data['speedbin9'].groupby(data['header_id']).sum()[0]) -
+            data['sum_of_heavy_vehicle_speeds'].groupby(data['header_id']).sum()[0]
+            )
+            / data['sum_of_heavy_vehicle_speeds'].groupby(data['header_id']).sum()[0]
+            )
+        
+        # header['average_speed_heavy_vehicles_positive_direction'] = 
+        # header['average_speed_heavy_vehicles_negative_direction'] = 
+        # header['average_speed_heavy_vehicles'] = 
+
+        header['truck_split_positive_direction'] = (str(round(data['short_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0] / 
+        data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0])) + ' : ' +
+        str(round(data['medium_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0] / 
+        data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0])) + ' : ' +
+        str(round(data['long_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0] / 
+        data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0]))
+        )
+        header['truck_split_negative_direction'] = (str(round(data['short_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0] / 
+        data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0])) + ' : ' +
+        str(round(data['medium_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0] / 
+        data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0])) + ' : ' +
+        str(round(data['long_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0] / 
+        data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0]))
+        )
+        header['truck_split_total'] = (str(round(data['short_heavy_vehicles'].groupby(data['header_id']).sum()[0] / 
+        data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0])) + ' : ' +
+        str(round(data['medium_heavy_vehicles'].groupby(data['header_id']).sum()[0] / 
+        data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0])) + ' : ' +
+        str(round(data['long_heavy_vehicles'].groupby(data['header_id']).sum()[0] / 
+        data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]))
+        )
+
+        return header
+    elif dtype == 30:
+        if header['adt_total'].isnull():
+            header['adt_total'] = data['total_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['header_id']]).sum().mean()
+            header['adt_positive_direction'] = data['total_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().mean()
+            header['adt_positive_direction'] = data['total_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().mean()
+        else:
+            pass
+
+        if header['adtt_total'].isnull():
+            header['adtt_total'] = data['total_heavy_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['header_id']]).sum().mean()
+            header['adtt_positive_direction'] = data['total_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().mean()
+            header['adtt_positive_direction'] = data['total_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().mean()
+        else:
+            pass
+
+        if header['total_vehicles'].isnull():
+            header['total_vehicles'] = data['total_vehicles_type30'].groupby(data['header_id']).sum()[0]
+            header['total_vehicles_positive_direction'] = data['total_vehicles_type30'].groupby(data['direction'].loc[data['direction'] == 'P']).sum()[0]
+            header['total_vehicles_positive_direction'] = data['total_vehicles_type30'].groupby(data['direction'].loc[data['direction'] == 'N']).sum()[0]
+        else:
+            pass
+        
+        if header['total_heavy_vehicles'].isnull():
+            header['total_heavy_vehicles'] = data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
+            header['total_heavy_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
+            header['total_heavy_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
+            header['truck_split_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0] / data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
+            header['truck_split_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0] / data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
+        else:
+            pass
+
+        if header['total_light_vehicles'].isnull():
+            header['total_light_vehicles'] = data['total_light_vehicles_type30'].groupby(data['header_id']).sum()[0]
+            header['total_light_positive_direction'] = data['total_light_vehicles_type30'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
+            header['total_light_positive_direction'] = data['total_light_vehicles_type30'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
+        else:
+            pass
+
+        return header
+
+    elif dtype == 70:
+    
+        return header
+
+    elif dtype == 10:
+    
+        return header
+
+    elif dtype == 60:
+        
+        return header
+
+    else:
+        return header
+
 
 ##################################################################################################################################
 ##################################################################################################################################
@@ -187,10 +356,9 @@ def main(files: str):
     global finalheaders, finaldata
     try:
         df = to_df(files)
-        H = rh.Headers(df)
         DATA = rd.Data(df)
 
-        header = H.header
+        header = DATA.header
         header["document_url"] = str(files)
 
         data = DATA.dtype21
@@ -241,6 +409,11 @@ def main(files: str):
         data = data.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
         header = header.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
 
+        header = header_calcs(header, data, 21)
+        header = header_calcs(header, data, 30)
+        header = header_calcs(header, data, 70)
+        header = header_calcs(header, data, 60)
+
         data = data[data.columns.intersection(config.DATA_COLUMN_NAMES)]
         header = header[header.columns.intersection(config.HEADER_COLUMN_NAMES)]
 
@@ -281,6 +454,62 @@ def main(files: str):
 
     gc.collect()
 
+def main_type10(files: str):
+    try:
+        df = to_df(files)
+        H = rh.Headers(df)
+        H = rh.Headers(df)
+        DATA = rd.Data.dtype10(df)
+
+        header = H.header
+        header["document_url"] = str(files)
+
+        # data = DATA.dtype10
+        data = data_join(data, header)
+        data.drop("station_name", axis=1, inplace=True)
+
+        data = data.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
+        # header = header.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
+
+        data = data[data.columns.intersection(config.TYPE10_DATA_COLUMN_NAMES)]
+        # header = header[header.columns.intersection(config.TYPE10_HEADER_COLUMN_NAMES)]
+
+        push_to_db(
+            data,
+            "electronic_count_data_type_10",
+            ["site_id", "start_datetime", "lane_number"],
+        )
+
+        # push_to_db(
+        #     header,
+        #     "electronic_count_header_type_10",
+        #     ["site_id", "start_datetime", "end_datetime"],
+        # )
+
+        # data.to_csv(r"C:\Users\MB2705851\Desktop\Temp\rsa_traffic_counts\data.csv", index=False, mode='a')
+        # header.to_csv(r"C:\Users\MB2705851\Desktop\Temp\rsa_traffic_counts\header.csv", index=False, mode='a')
+
+        with open(
+            os.path.expanduser(config.FILES_COMPLETE),
+            "a",
+            newline="",
+        ) as f:
+            write = csv.writer(f)
+            write.writerows([[files]])
+
+    except Exception as e:
+        print(e)
+        traceback.print_exc()
+        with open(
+            os.path.expanduser(config.PROBLEM_FILES),
+            "a",
+            newline="",
+        ) as f:
+            write = csv.writer(f)
+            write.writerows([[files]])
+        pass
+
+    gc.collect()
 
 ##################################################################################################################################
 ##################################################################################################################################
@@ -328,8 +557,15 @@ if __name__ == "__main__":
     # 			pbar.update()
 
     ########### ATTEMPT AT GETTING A SINGLE PROGRESS BAR ###########
+    # pool = mp.Pool(int(mp.cpu_count()))
+    # for _ in tqdm.tqdm(pool.imap_unordered(main, files), total=len(files)):
+    #     pass
+    # pool.close()
+    # pool.join()
+
+########### FOR TYPE 10's ONLY ###########
     pool = mp.Pool(int(mp.cpu_count()))
-    for _ in tqdm.tqdm(pool.imap_unordered(main, files), total=len(files)):
+    for _ in tqdm.tqdm(pool.imap_unordered(main_type10, files), total=len(files)):
         pass
     pool.close()
     pool.join()
