@@ -915,7 +915,102 @@ class Data(object):
                         "axle_spacing_" + str(i) + "_between_individual_axles_cm"
                     )
                     ddf[newcolumn] = data[22 + i]
+                
+            elif data[1].isin(["18"]).all():
+                ddf = data.iloc[:, 4:20]
+                ddf = pd.DataFrame(ddf).dropna(axis=1, how="all")
+                ddf.columns = [
+                    "departure_date",
+                    "departure_time",
+                    "assigned_lane_number",
+                    "physical_lane_number",
+                    "forward_reverse_code",
+                    "vehicle_category",
+                    "vehicle_class_code_primary_scheme",
+                    "vehicle_class_code_secondary_scheme",
+                    "vehicle_speed",
+                    "vehicle_length",
+                    "site_occupancy_time_in_milliseconds",
+                    "chassis_height_code",
+                    "vehicle_following_code",
+                    "vehicle_tag_code",
+                    "trailer_count", 
+                    "axle_count",
+                ]
+                ddf = pd.concat(
+                    [
+                        ddf,
+                        pd.DataFrame(
+                            columns=[
+                                'sub_data_type_code_sx', 
+                                'number_of_axles_spacings_counted', 
+                                'axle_spacing_1_between_individual_axles_cm', 
+                                'axle_spacing_2_between_individual_axles_cm', 
+                                'axle_spacing_3_between_individual_axles_cm', 
+                                'axle_spacing_4_between_individual_axles_cm', 
+                                'axle_spacing_5_between_individual_axles_cm', 
+                                'axle_spacing_6_between_individual_axles_cm', 
+                                'axle_spacing_7_between_individual_axles_cm', 
+                                'axle_spacing_8_between_individual_axles_cm',
+                                'sub_data_type_code_wx', 
+                                'number_of_wheel_masses', 
+                                'offset_sensor_detesction_code', 
+                                'mass_measurement_resolution', 
+                                'wheel_mass_for_wheel_1', 
+                                'wheel_mass_for_wheel_2', 
+                                'wheel_mass_for_wheel_3', 
+                                'wheel_mass_for_wheel_4', 
+                                'wheel_mass_for_wheel_5', 
+                                'wheel_mass_for_wheel_6', 
+                                'wheel_mass_for_wheel_7', 
+                                'wheel_mass_for_wheel_8', 
+                                'wheel_mass_for_wheel_9', 
+                                'wheel_mass_for_wheel_10'
+                            ]
+                        ),
+                    ]
+                )
 
+                for idx, row in data.iterrows():
+                    id = int(row[21]) + 22
+                    ddf2 = pd.DataFrame([row[20:id].tolist()], index=[idx])
+                    cols = []
+                    for i in range(ddf2.shape[1]):
+                        if i == 0:
+                            cols.append('sub_data_type_code_sx')
+                        elif i == 1:
+                            cols.append("number_of_axles_spacings_counted")
+                        else:
+                            cols.append('axle_spacing_'+ str(i-1) + "_between_individual_axles_cm")
+                    ddf2 = pd.DataFrame(ddf2.values, columns=cols)
+                    ddf2['idx'] = idx
+                    ddf2 = ddf2.set_index('idx')
+                    ddf = pd.concat([ddf,ddf2], axis= 0)
+                    ddf = ddf.groupby(ddf.index).first()
+
+                for idx, row in data.iterrows():
+                    id = int(row[21]) + 22
+                    ddf2 = pd.DataFrame([row[id:].tolist()], index=[idx])
+                    ddf2 = ddf2.dropna(axis=1)
+                    cols = []
+                    for i in range(ddf2.shape[1]):
+                        if i == 0:
+                            cols.append('sub_data_type_code_wx')
+                        elif i == 1:
+                            cols.append("number_of_wheel_masses")
+                        elif i == 2:
+                            cols.append("offset_sensor_detesction_code")
+                        elif i == 3:
+                            cols.append("mass_measurement_resolution")
+                        else:
+                            cols.append('wheel_mass_for_wheel_'+ str(i - 3))
+                    ddf2 = pd.DataFrame(ddf2.values, columns=cols)
+                    ddf2['idx'] = idx
+                    ddf2 = ddf2.set_index('idx')
+                    ddf = pd.concat([ddf,ddf2], axis= 0)
+                    ddf = ddf.groupby(ddf.index).first()
+
+            
             ddf = ddf.fillna(0)
             ddf["lane_number"] = ddf["lane_number"].astype(int)
             max_lanes = ddf["lane_number"].max()
