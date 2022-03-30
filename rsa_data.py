@@ -1055,6 +1055,15 @@ class Data(object):
 
             ddf = ddf.drop_duplicates()
             ddf["start_datetime"] = ddf["start_datetime"].astype("datetime64[ns]")
+
+            ddf.fillna(0, inplace=True)
+
+            for col in ddf.columns:
+                try:
+                    col = col.astype(int)
+                except:
+                    pass
+
             return ddf
 
     def dtype60(df: pd.DataFrame) -> pd.DataFrame:
@@ -1363,5 +1372,9 @@ class Data(object):
 
             ddf = ddf.drop_duplicates()
             ddf["start_datetime"] = ddf["start_datetime"].astype("datetime64[ns]")
+
+            ddf = ddf.replace(r'^\s*$', np.NaN, regex=True)
+
+            ddf = ddf.apply(pd.to_numeric, errors='ignore', downcast='float')
         
             return ddf
