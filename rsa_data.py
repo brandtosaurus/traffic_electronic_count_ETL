@@ -1375,6 +1375,8 @@ class Data(object):
 
             ddf = ddf.replace(r'^\s*$', np.NaN, regex=True)
 
-            ddf = ddf.apply(pd.to_numeric, errors='ignore', downcast='float')
+            scols = ddf.select_dtypes('object').columns
+        
+            ddf[scols] = ddf[scols].apply(pd.to_numeric, axis=1, errors='ignore')
         
             return ddf
