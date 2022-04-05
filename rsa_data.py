@@ -1,6 +1,7 @@
 import pandas as pd
 from pandasql import sqldf
 import numpy as np
+import config
 
 from datetime import timedelta
 import uuid
@@ -773,243 +774,70 @@ class Data(object):
             return ddf
 
     def dtype10(df: pd.DataFrame) -> pd.DataFrame:
-        data = df.loc[(df[0] == "10") & (df[1].isin(["15", "17", "19"]))].dropna(
+        data = df.loc[(df[0] == "10") & (df[3].isin(["1", "0"]))].dropna(
             axis=1, how="all"
         )
         dfh2 = pd.DataFrame(df.loc[(df[0].isin(["S0", "L1"]))]).dropna(
             axis=1, how="all"
         )
+
         if data.empty:
-            pass
+            print("data empty")
+            print(data)
         else:
-            ddf = data.iloc[:, 4:]
-            ddf = pd.DataFrame(ddf).dropna(axis=1, how="all")
-            if (data[1].isin(['15','17']).all()
-                and len(ddf.columns) == 11
-            ):
-                ddf.columns = [
-                    "start_datetime",
-                    "departure_time",
-                    "lane_number",
-                    "physical_lane_number",
-                    "forward_1_or_reverse_code_2",
-                    "vehicle_category",
-                    "vehicle_class_code_primary_scheme",
-                    "vehicle_class_code_secondary_scheme",
-                    "vehicle_speed",
-                    "vehicle_length",
-                    "site_occupancy_time_in_milliseconds",
-                    "chassis_height_code",
-                    "vehicle_following_code",
-                ]
-                ddf = pd.concat(
-                    [
-                        ddf,
-                        pd.DataFrame(
-                            columns=[
-                                "vehicle_Tag_Code",
-                                "Trailer_count",
-                                "axle_count",
-                                "bumper_to_1st_axle_spacing",
-                                "sub_data_type_code_axle_spacing",
-                                "number_of_axles_spacings_counted",
-                            ]
-                        ),
-                    ]
-                )
-            elif (data[1].isin(['15','17']).all()
-                and len(ddf.columns) == 13
-            ):
-                ddf.columns = [
-                    "start_datetime",
-                    "departure_time",
-                    "lane_number",
-                    "physical_lane_number",
-                    "forward_1_or_reverse_code_2",
-                    "vehicle_category",
-                    "vehicle_class_code_primary_scheme",
-                    "vehicle_class_code_secondary_scheme",
-                    "vehicle_speed",
-                    "vehicle_length",
-                    "site_occupancy_time_in_milliseconds",
-                    "chassis_height_code",
-                    "vehicle_following_code",
-                ]
-                ddf = pd.concat(
-                    [
-                        ddf,
-                        pd.DataFrame(
-                            columns=[
-                                "vehicle_Tag_Code",
-                                "Trailer_count",
-                                "axle_count",
-                                "bumper_to_1st_axle_spacing",
-                                "sub_data_type_code_axle_spacing",
-                                "number_of_axles_spacings_counted",
-                            ]
-                        ),
-                    ]
-                )
-            elif (data[1].isin(['15','17']).all()
-                and len(ddf.columns) == 15
-            ):
-                ddf.columns = [
-                    "start_datetime",
-                    "departure_time",
-                    "lane_number",
-                    "physical_lane_number",
-                    "forward_1_or_reverse_code_2",
-                    "vehicle_category",
-                    "vehicle_class_code_primary_scheme",
-                    "vehicle_class_code_secondary_scheme",
-                    "vehicle_speed",
-                    "vehicle_length",
-                    "site_occupancy_time_in_milliseconds",
-                    "chassis_height_code",
-                    "vehicle_following_code",
-                    "vehicle_Tag_Code",
-                    "Trailer_count",
-                ]
-                ddf = pd.concat(
-                    [
-                        ddf,
-                        pd.DataFrame(
-                            columns=[
-                                "axle_count",
-                                "bumper_to_1st_axle_spacing",
-                                "sub_data_type_code_axle_spacing",
-                                "number_of_axles_spacings_counted",
-                            ]
-                        ),
-                    ]
-                )
-            elif data[1].isin(['19']).all():
-                ddf = data.iloc[:, 4:22]
-                ddf = pd.DataFrame(ddf).dropna(axis=1, how="all")
-                ddf.columns = [
-                    "start_datetime",
-                    "departure_time",
-                    "lane_number",
-                    "physical_lane_number",
-                    "forward_1_or_reverse_code_2",
-                    "vehicle_category",
-                    "vehicle_class_code_primary_scheme",
-                    "vehicle_class_code_secondary_scheme",
-                    "vehicle_speed",
-                    "vehicle_length",
-                    "site_occupancy_time_in_milliseconds",
-                    "chassis_height_code",
-                    "vehicle_following_code",
-                    "vehicle_Tag_Code",
-                    "Trailer_count" "axle_count",
-                    "bumper_to_1st_axle_spacing",
-                    "sub_data_type_code_axle_spacing",
-                    "number_of_axles_spacings_counted",
-                ]
-                ddf["number_of_axles_spacings_counted"] = ddf[
-                    "number_of_axles_spacings_counted"
-                ].astype(int)
-                for i in range(ddf["number_of_axles_spacings_counted"].max()()):
-                    i = i + 1
-                    newcolumn = (
-                        "axle_spacing_" + str(i) + "_between_individual_axles_cm"
-                    )
-                    ddf[newcolumn] = data[22 + i]
-                
-            elif data[1].isin(["18"]).all():
-                ddf = data.iloc[:, 4:20]
-                ddf = pd.DataFrame(ddf).dropna(axis=1, how="all")
-                ddf.columns = [
-                    "departure_date",
-                    "departure_time",
-                    "assigned_lane_number",
-                    "physical_lane_number",
-                    "forward_reverse_code",
-                    "vehicle_category",
-                    "vehicle_class_code_primary_scheme",
-                    "vehicle_class_code_secondary_scheme",
-                    "vehicle_speed",
-                    "vehicle_length",
-                    "site_occupancy_time_in_milliseconds",
-                    "chassis_height_code",
-                    "vehicle_following_code",
-                    "vehicle_tag_code",
-                    "trailer_count", 
-                    "axle_count",
-                ]
-                ddf = pd.concat(
-                    [
-                        ddf,
-                        pd.DataFrame(
-                            columns=[
-                                'sub_data_type_code_sx', 
-                                'number_of_axles_spacings_counted', 
-                                'axle_spacing_1_between_individual_axles_cm', 
-                                'axle_spacing_2_between_individual_axles_cm', 
-                                'axle_spacing_3_between_individual_axles_cm', 
-                                'axle_spacing_4_between_individual_axles_cm', 
-                                'axle_spacing_5_between_individual_axles_cm', 
-                                'axle_spacing_6_between_individual_axles_cm', 
-                                'axle_spacing_7_between_individual_axles_cm', 
-                                'axle_spacing_8_between_individual_axles_cm',
-                                'sub_data_type_code_wx', 
-                                'number_of_wheel_masses', 
-                                'offset_sensor_detesction_code', 
-                                'mass_measurement_resolution', 
-                                'wheel_mass_for_wheel_1', 
-                                'wheel_mass_for_wheel_2', 
-                                'wheel_mass_for_wheel_3', 
-                                'wheel_mass_for_wheel_4', 
-                                'wheel_mass_for_wheel_5', 
-                                'wheel_mass_for_wheel_6', 
-                                'wheel_mass_for_wheel_7', 
-                                'wheel_mass_for_wheel_8', 
-                                'wheel_mass_for_wheel_9', 
-                                'wheel_mass_for_wheel_10'
-                            ]
-                        ),
-                    ]
-                )
+            num_of_fields = int(data.iloc[:,1].unique()[0])
+            ddf = data.iloc[:,: 2 + num_of_fields]
+            ddf.reset_index(inplace=True)
 
-                for idx, row in data.iterrows():
-                    id = int(row[21]) + 22
-                    ddf2 = pd.DataFrame([row[20:id].tolist()], index=[idx])
-                    cols = []
-                    for i in range(ddf2.shape[1]):
-                        if i == 0:
-                            cols.append('sub_data_type_code_sx')
-                        elif i == 1:
-                            cols.append("number_of_axles_spacings_counted")
+            cols = ['index']
+            for i in range(ddf.shape[1]-1):
+                cols.append(config.TYPE10_DATA_COLUMN_NAMES[i])
+            ddf = pd.DataFrame(ddf.values, columns=cols)
+            ddf["data_id"] = ddf.apply(lambda x: uuid.uuid4(), axis=1)
+
+            if data.shape[1] > ddf.shape[1]:
+                sub_data_df = pd.DataFrame(columns=['index','sub_data_type_code','offset_sensor_detection_code','mass_measurement_resolution_kg', 'number','value'])
+                for index, row in data.iterrows():
+                    col = int(row[1]) + 2
+                    while col < len(row) and row[col] != None:
+                        sub_data_type = row[col]
+                        col += 1
+                        NoOfType = int(row[col])        
+                        col +=1
+                        if sub_data_type[0].lower() in ['w','a','g']:
+                            odc = row[col]
+                            col += 1
+                            mmr = row[col]
+                            col +=1
+                            for i in range(0,NoOfType):
+                                tempdf = pd.DataFrame([[index,
+                                sub_data_type,
+                                odc,
+                                mmr,
+                                i + 1,
+                                row[col]]
+                                ], columns = ['index',
+                                'sub_data_type_code',
+                                'offset_sensor_detection_code',
+                                'mass_measurement_resolution_kg',
+                                'number',
+                                'value'
+                                ])
+                                sub_data_df = pd.concat([sub_data_df, tempdf])
+                                col += 1
                         else:
-                            cols.append('axle_spacing_'+ str(i-1) + "_between_individual_axles_cm")
-                    ddf2 = pd.DataFrame(ddf2.values, columns=cols)
-                    ddf2['idx'] = idx
-                    ddf2 = ddf2.set_index('idx')
-                    ddf = pd.concat([ddf,ddf2], axis= 0)
-                    ddf = ddf.groupby(ddf.index).first()
+                            for i in range(0,NoOfType):
+                                tempdf = pd.DataFrame([[index, 
+                                sub_data_type,
+                                i + 1,
+                                row[col]]], columns = ['index' ,
+                                'sub_data_type_code',
+                                'number',
+                                'value'])
+                                sub_data_df = pd.concat([sub_data_df, tempdf])
+                                col += 1
 
-                for idx, row in data.iterrows():
-                    id = int(row[21]) + 22
-                    ddf2 = pd.DataFrame([row[id:].tolist()], index=[idx])
-                    ddf2 = ddf2.dropna(axis=1)
-                    cols = []
-                    for i in range(ddf2.shape[1]):
-                        if i == 0:
-                            cols.append('sub_data_type_code_wx')
-                        elif i == 1:
-                            cols.append("number_of_wheel_masses")
-                        elif i == 2:
-                            cols.append("offset_sensor_detesction_code")
-                        elif i == 3:
-                            cols.append("mass_measurement_resolution")
-                        else:
-                            cols.append('wheel_mass_for_wheel_'+ str(i - 3))
-                    ddf2 = pd.DataFrame(ddf2.values, columns=cols)
-                    ddf2['idx'] = idx
-                    ddf2 = ddf2.set_index('idx')
-                    ddf = pd.concat([ddf,ddf2], axis= 0)
-                    ddf = ddf.groupby(ddf.index).first()
-
+            sub_data_df = sub_data_df.merge(ddf[['index', 'data_id']], how='left', on='index')
             
             ddf = ddf.fillna(0)
             ddf["lane_number"] = ddf["lane_number"].astype(int)
@@ -1023,15 +851,6 @@ class Data(object):
                 direction = direction.drop_duplicates()
             except:
                 pass
-
-            try:
-                ddf["forward_direction_code"] = ddf.apply(
-                    lambda x: Data.get_direction(x["lane_number"], direction), axis=1
-                )
-                # FIXME: ddf['lane_position_code']=ddf.apply(lambda x: Data.get_lane_position(x['lane_number'],direction),axis=1)
-            except Exception:
-                ddf["forward_direction_code"] = None
-                # ddf['lane_position_code']=None
 
             if ddf["start_datetime"].map(len).isin([8]).all():
                 ddf["start_datetime"] = pd.to_datetime(
@@ -1048,23 +867,22 @@ class Data(object):
             ddf["site_id"] = str(t1[0])
             ddf["site_id"] = ddf["site_id"].astype(str)
 
-            # ddf.iloc[:, 2:17] = ddf.iloc[:, 2:17].apply(to_numeric)
-            # ddf[21] = ddf[21].astype(str)
-            # ddf.iloc[:, 2:17] = ddf.iloc[:, 2:17].apply(to_numeric)
             ddf = ddf.drop(["departure_time"], axis=1)
 
             ddf = ddf.drop_duplicates()
             ddf["start_datetime"] = ddf["start_datetime"].astype("datetime64[ns]")
 
-            ddf.fillna(0, inplace=True)
+            ddf = ddf.replace(r'^\s*$', np.NaN, regex=True)
+            sub_data_df = sub_data_df.replace(r'^\s*$', np.NaN, regex=True)
+            sub_data_df = sub_data_df.drop("index", axis=1)
 
-            for col in ddf.columns:
-                try:
-                    col = col.astype(int)
-                except:
-                    pass
+            scols = ddf.select_dtypes('object').columns
+            
+            ddf[scols] = ddf[scols].apply(pd.to_numeric, axis=1, errors='ignore')
 
-            return ddf
+            ddf = ddf[ddf.columns.intersection(config.TYPE10_DATA_TABLE_COL_LIST)]
+
+            return ddf, sub_data_df
 
     def dtype60(df: pd.DataFrame) -> pd.DataFrame:
         data = df.loc[(df[0] == "60") & (df[1].isin(["15", "17", "19"]))].dropna(

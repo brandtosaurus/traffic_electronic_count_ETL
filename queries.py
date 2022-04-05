@@ -249,8 +249,8 @@ CREATE TABLE IF NOT EXISTS trafc.electronic_count_header_type_10 (
 """
 
 CREATE_TYPE10_DATA_TABLE_QRY = """
-CREATE TABLE IF NOT EXISTS trafc.electronic_count_data_type_10 (
-	id uuid NOT NULL default uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS trafc.electronic_count_data_type10 (
+	data_id uuid NOT NULL default uuid_generate_v4(),
 	site_id text NOT NULL,
 	header_id uuid NULL,
 	"year" int4 NULL,
@@ -279,7 +279,7 @@ CREATE TABLE IF NOT EXISTS trafc.electronic_count_data_type_10 (
 	tyre_type int4 NULL
 	CONSTRAINT electronic_count_data_type_10_pk PRIMARY KEY (id)
 )
-CREATE UNIQUE INDEX electronic_count_data_type_10_id_idx ON trafc.electronic_count_data_type_10 USING btree (id);"""
+CREATE UNIQUE INDEX electronic_count_data_type10_id_idx ON trafc.electronic_count_data_type10 USING btree (data_id);"""
 
 CREATE_AXLE_SPACING_TABLE = """
 CREATE TABLE IF NOT EXISTS trafc.electronic_count_data_type_10_axle_spacing (
@@ -297,7 +297,6 @@ CREATE TABLE IF NOT EXISTS trafc.traffic_e_type10_axle_group_configuration (
 	id int8 NOT NULL GENERATED ALWAYS AS IDENTITY,
 	type10_id uuid NOT NULL,
 	sub_data_type_code varchar NULL,
-	number_of_axle_groups int2 NULL,
 	axle_group_number int2 NULL,
 	group_axle_count int2 NULL,
 	CONSTRAINT traffic_e_type10_axle_group_configuration_pk PRIMARY KEY (id)
@@ -309,7 +308,6 @@ CREATE TABLE IF NOT EXISTS trafc.traffic_e_type10_axle_group_mass (
 	id int8 NOT NULL GENERATED ALWAYS AS IDENTITY,
 	type10_id uuid NOT NULL,
 	sub_data_type_code varchar NULL,
-	number_of_axle_group_masses int2 NULL,
 	offset_sensor_detection_code varchar NULL,
 	mass_measurement_resolution_kg float4 NULL,
 	axle_group_mass_number int2 NULL,
@@ -323,7 +321,6 @@ CREATE TABLE IF NOT EXISTS trafc.traffic_e_type10_axle_mass (
 	id int8 NOT NULL GENERATED ALWAYS AS IDENTITY,
 	type10_id uuid NOT NULL,
 	sub_data_type_code varchar NULL,
-	number_of_axle_masses int2 NULL,
 	offset_sensor_detection_code varchar NULL,
 	mass_measurement_resolution_kg float4 NULL,
 	axle_mass_number int2 NULL,
@@ -337,7 +334,6 @@ CREATE TABLE IF NOT EXISTS trafc.traffic_e_type10_axle_spacing (
 	id int8 NOT NULL GENERATED ALWAYS AS IDENTITY,
 	type10_id uuid NOT NULL,
 	sub_data_type_code varchar NULL,
-	number_of_axle_spacings int2 NULL,
 	axle_spacing_number int2 NULL,
 	axle_spacing_cm float4 NULL,
 	CONSTRAINT traffic_e_type10_axle_spacing_pk PRIMARY KEY (id)
@@ -350,7 +346,6 @@ CREATE TABLE IF NOT EXISTS trafc.traffic_e_type10_identification_data_images (
 	type10_id uuid NOT NULL,
 	sub_data_type_code varchar NULL,
 	vehicle_registration_number text NULL,
-	number_of_images int2 NULL,
 	image_number int2 NULL,
 	image_name text NULL,
 	CONSTRAINT traffic_e_type10_identification_data_images_pk PRIMARY KEY (id)
@@ -362,7 +357,6 @@ REATE TABLE IF NOT EXISTS trafc.traffic_e_type10_tyre (
 	id int8 NOT NULL GENERATED ALWAYS AS IDENTITY,
 	type10_id uuid NOT NULL,
 	sub_data_type_code varchar NULL,
-	number_of_tyres int2 NULL,
 	tyre_number int2 NULL,
 	tyre_code float4 NULL,
 	CONSTRAINT traffic_e_type10_tyre_pk PRIMARY KEY (id)
@@ -374,7 +368,6 @@ CREATE TABLE IF NOT EXISTS trafc.traffic_e_type10_wheel_mass (
 	id int8 NOT NULL GENERATED ALWAYS AS IDENTITY,
 	type10_id uuid NOT NULL,
 	sub_data_type_code varchar NULL,
-	number_of_wheel_masses int2 NULL,
 	offset_sensor_detection_code varchar NULL,
 	mass_measurement_resolution_kg float4 NULL,
 	wheel_mass_number int2 NULL,
