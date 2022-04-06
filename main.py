@@ -2,6 +2,7 @@ import csv
 import os
 import zipfile
 import traceback
+from numpy import empty
 import tqdm
 import pandas as pd
 from pandasql import sqldf
@@ -12,6 +13,7 @@ from io import StringIO
 import rsa_data as rd
 import rsa_headers as rh
 import config
+import queries as q
 
 from tkinter import filedialog
 from tkinter import *
@@ -348,6 +350,20 @@ def header_calcs(header, data, dtype):
     else:
         return header
 
+def create_database_tables():
+    conn=config.CONN
+    cur = conn.cursor()
+    cur.execute(q.CREATE_AXLE_GROU_MASS_GX)
+    cur.execute(q.CREATE_AXLE_GROUP_CONFIG_TABLE_CX)
+    cur.execute(q.CREATE_AXLE_MASS_TABLE_AX)
+    cur.execute(q.CREATE_AXLE_GROUP_MASS_TABLE_GX)
+    cur.execute(q.CREATE_AXLE_SPACING_TABLE_SX)
+    cur.execute(q.CREATE_IMAGES_TABLE_VX)
+    cur.execute(q.CREATE_TYRE_TABLE_TX)
+    cur.execute(q.CREATE_WHEEL_MASS_TABLE_WX)
+    cur.commit()
+    cur.close()
+
 
 ##################################################################################################################################
 ##################################################################################################################################
@@ -386,14 +402,118 @@ def main(files: str):
                 d2, how="outer", on=["site_id", "start_datetime", "lane_number"]
             )
 
-        d2 = DATA.dtype10
+        d2, sub_data_df = DATA.dtype10
         if d2 is None:
             pass
         else:
-            data = data_join(d2, header)
-            data.drop("station_name", axis=1, inplace=True)
-            data = data.merge(
-                d2, how="outer", on=["site_id", "start_datetime", "lane_number"]
+            push_to_db(d2,
+            "electronic_count_data_type_10",
+            ["site_id", "start_datetime", "assigned_lane_number"],
+            )
+
+        sub_data_df = sub_data_df.replace(r'^\s*$', np.NaN, regex=True)
+        sub_data_df = sub_data_df.drop("index", axis=1) 
+        wx_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 'w']
+        sx_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 's']
+        gx_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 'g']
+        vx_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 'v']
+        tx_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 't']
+        ax_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 'a']
+        cx_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 'c']
+
+        if wx_data.empty:
+            pass
+        else:
+            wx_data.rename(columns = {"value":"wheel_mass", "number":"wheel_mass_number", "id":"type10_id"}, inplace=True)
+            wx_data.to_sql(
+                "traffic_e_type10_wheel_mass",
+                con=config.ENGINE,
+                schema="trafc",
+                if_exists="append",
+                index=False,
+                method=psql_insert_copy,
+            )
+
+        if ax_data.empty:
+            pass
+        else:
+            ax_data.rename(columns = {"value":"axle_mass", "number":"axle_mass_number", "id":"type10_id"}, inplace=True)
+            ax_data.to_sql(
+                "traffic_e_type10_axle_mass",
+                con=config.ENGINE,
+                schema="trafc",
+                if_exists="append",
+                index=False,
+                method=psql_insert_copy,
+            )
+
+        if gx_data.empty:
+            pass
+        else:
+            gx_data.rename(columns = {"value":"axle_group_mass", "number":"axle_group_mass_number", "id":"type10_id"}, inplace=True)
+            gx_data.to_sql(
+                "traffic_e_type10_axle_group_mass",
+                con=config.ENGINE,
+                schema="trafc",
+                if_exists="append",
+                index=False,
+                method=psql_insert_copy,
+            )
+
+        if sx_data.empty:
+            pass
+        else:
+            sx_data.rename(columns = {"value":"axle_spacing_cm", "number":"axle_spacing_number", "id":"type10_id"}, inplace=True)
+            sx_data = sx_data.drop(["offset_sensor_detection_code","mass_measurement_resolution_kg"], axis=1)
+            sx_data.to_sql(
+                "traffic_e_type10_axle_spacing",
+                con=config.ENGINE,
+                schema="trafc",
+                if_exists="append",
+                index=False,
+                method=psql_insert_copy,
+            )
+
+        if tx_data.empty:
+            pass
+        else:
+            tx_data.rename(columns = {"value":"tyre_code", "number":"tyre_number", "id":"type10_id"}, inplace=True)
+            tx_data = tx_data.drop(["offset_sensor_detection_code","mass_measurement_resolution_kg"], axis=1)
+            tx_data.to_sql(
+                "traffic_e_type10_tyre",
+                con=config.ENGINE,
+                schema="trafc",
+                if_exists="append",
+                index=False,
+                method=psql_insert_copy,
+            )
+
+        if cx_data.empty:
+            pass
+        else:
+            cx_data.rename(columns = {"value":"group_axle_count", "number":"group_axle_number", "id":"type10_id"}, inplace=True)
+            cx_data = cx_data.drop(["offset_sensor_detection_code","mass_measurement_resolution_kg"], axis=1)
+            cx_data.to_sql(
+                "traffic_e_type10_axle_group_configuration",
+                con=config.ENGINE,
+                schema="trafc",
+                if_exists="append",
+                index=False,
+                method=psql_insert_copy,
+            )
+
+        if vx_data.empty:
+            pass
+        else:
+            vx_data.rename(columns = {"value":"group_axle_count", "offset_sensor_detection_code":"vehicle_registration_number" ,"number":"group_axle_number", "id":"type10_id"}, inplace=True)
+            vx_data = vx_data.drop(["mass_measurement_resolution_kg"], axis=1)
+            vx_data.to_sql(
+                "traffic_e_type10_identification_data_images",
+                con=config.ENGINE,
+                schema="trafc",
+                if_exists="append",
+                index=False,
+                method=psql_insert_copy,
             )
 
         d2 = DATA.dtype60

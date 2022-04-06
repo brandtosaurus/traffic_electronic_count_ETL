@@ -2,6 +2,7 @@ import pandas as pd
 from pandasql import sqldf
 import numpy as np
 import config
+import rsa_headers as rh
 
 from datetime import timedelta
 import uuid
@@ -11,11 +12,12 @@ import uuid
 #################################################################################################################################################################################################################################
 class Data(object):
     def __init__(self, df):
-        self.dtype21 = Data.join_header_id(Data.dtype21(df), self.header)
-        self.dtype30 = Data.join_header_id(Data.dtype30(df), self.header)
-        self.dtype70 = Data.join_header_id(Data.dtype70(df), self.header)
-        self.dtype10 = Data.join_header_id(Data.dtype10(df), self.header)
-        self.dtype60 = Data.join_header_id(Data.dtype60(df), self.header)
+        self.dtype21 = Data.join_header_id(Data.dtype21(df))
+        self.dtype30 = Data.join_header_id(Data.dtype30(df))
+        self.dtype70 = Data.join_header_id(Data.dtype70(df))
+        self.dtype10, self.dtype10_sub_data = Data.dtype10(df)
+        self.dtype10 = Data.join_header_id(self.dtype10)
+        self.dtype60 = Data.join_header_id(Data.dtype60(df))
         self.type10_separate_table = Data.type10_separate_table(df)
         pass
 
@@ -825,7 +827,7 @@ class Data(object):
                                 ])
                                 sub_data_df = pd.concat([sub_data_df, tempdf])
                                 col += 1
-                        else:
+                        elif sub_data_type[0].lower() in ['s','t','c']:
                             for i in range(0,NoOfType):
                                 tempdf = pd.DataFrame([[index, 
                                 sub_data_type,
@@ -836,6 +838,25 @@ class Data(object):
                                 'value'])
                                 sub_data_df = pd.concat([sub_data_df, tempdf])
                                 col += 1
+                        elif sub_data_type[0].lower() in ['v']:
+                            odc = row[col]
+                            col += 1
+                            for i in range(0,NoOfType):
+                                tempdf = pd.DataFrame([[index,
+                                sub_data_type,
+                                odc,
+                                i + 1,
+                                row[col]]
+                                ], columns = ['index',
+                                'sub_data_type_code',
+                                'offset_sensor_detection_code',
+                                'number',
+                                'value'
+                                ])
+                                sub_data_df = pd.concat([sub_data_df, tempdf])
+                                col += 1
+
+
 
             sub_data_df = sub_data_df.merge(ddf[['index', 'data_id']], how='left', on='index')
             

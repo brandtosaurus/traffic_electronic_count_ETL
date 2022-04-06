@@ -1,28 +1,31 @@
 import sqlalchemy as sa
+import psycopg2
 
 #### DB CONNECTION
+DB_NAME = "gauteng"
+DB_USER = "postgres"
+DB_PASS = "Lin3@r1in3!431"
+DB_HOST = "linearline.dedicated.co.za"
+DB_PORT = "5432"
 
 ENGINE_URL = sa.engine.url.URL(
     "postgresql",
-    username="postgres",
-    password="Lin3@r1in3!431",
-    host="linearline.dedicated.co.za",
-    port=5432,
-    database="gauteng",
+    username=DB_USER,
+    password=DB_PASS,
+    host=DB_HOST,
+    port=DB_PORT,
+    database=DB_NAME,
 )
-
-# ENGINE_URL = sa.engine.url.URL(
-#     "postgresql",
-#     username="postgres",
-#     password="Lin3@r1in3!431",
-#     host="localhost",
-#     port=5432,
-#     database="gauteng",
-# )
 
 ENGINE = sa.create_engine(
     ENGINE_URL
 )
+
+CONN = psycopg2.connect(database=DB_NAME,
+                        user=DB_USER,
+                        password=DB_PASS,
+                        host=DB_HOST,
+                        port=DB_PORT)
 
 OUTPUT_FILE = r"~\Desktop\Temp\rsa_traffic_counts\TEMP_E_COUNT_"
 
