@@ -8,7 +8,7 @@ DB_PASS = "Lin3@r1in3!431"
 DB_HOST = "linearline.dedicated.co.za"
 DB_PORT = "5432"
 
-ENGINE_URL = sa.engine.url.URL(
+ENGINE_URL = sa.engine.URL.create(
     "postgresql",
     username=DB_USER,
     password=DB_PASS,
