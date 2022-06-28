@@ -8,6 +8,8 @@ import pandas as pd
 from pandasql import sqldf
 import multiprocessing as mp
 
+from sqlalchemy.dialects.postgresql import insert
+
 from io import StringIO
 
 import rsa_data as rd
@@ -51,7 +53,7 @@ def getfiles(path: str) -> List[str]:
 
 
 def to_df(file: str) -> pd.DataFrame:
-    df = pd.read_csv(file, header=None, sep="\n")
+    df = pd.read_csv(file, header=None)
     df = df[0].str.split("\s+|,\s+|,", expand=True)
     df = pd.DataFrame(df)
     return df
@@ -130,7 +132,30 @@ def dropDuplicatesDoSomePostProcesingAndSaveCsv(csv_label: str):
     )
 
 
-def push_to_db(df: pd.DataFrame, table: str, subset: List[str]) -> None:
+def push_to_partitioned_table(df, table, subset) -> None:
+    yr = data['year'].unique()[0]
+    print(yr)
+    try:
+        df.to_sql(
+            table+'_'+str(yr),
+            con=config.ENGINE,
+            schema="trafc",
+            if_exists="append",
+            index=False,
+            method=psql_insert_copy,
+        )
+    except Exception:
+        df = df.drop_duplicates(subset=subset)
+        df.to_sql(
+            table+'_'+yr,
+            con=config.ENGINE,
+            schema="trafc",
+            if_exists="append",
+            index=False,
+            method=psql_insert_copy,
+        )
+
+def push_to_db(df, table, subset) -> None:
     try:
         df.to_sql(
             table,
@@ -150,6 +175,16 @@ def push_to_db(df: pd.DataFrame, table: str, subset: List[str]) -> None:
             index=False,
             method=psql_insert_copy,
         )
+
+def postgres_upsert(table, conn, keys, data_iter):
+    data = [dict(zip(keys, row)) for row in data_iter]
+
+    insert_statement = insert(table.table).values(data)
+    upsert_statement = insert_statement.on_conflict_do_update(
+        constraint=f"{table.table.name}_un",
+        set_={c.key: c for c in insert_statement.excluded},
+    )
+    conn.execute(upsert_statement)
 
 
 def psql_insert_copy(table, conn, keys, data_iter):
@@ -431,7 +466,7 @@ def main(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=psql_insert_copy,
+                method=postgres_upsert,
             )
 
         if ax_data.empty:
@@ -444,7 +479,7 @@ def main(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=psql_insert_copy,
+                method=postgres_upsert,
             )
 
         if gx_data.empty:
@@ -457,7 +492,7 @@ def main(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=psql_insert_copy,
+                method=postgres_upsert,
             )
 
         if sx_data.empty:
@@ -471,7 +506,7 @@ def main(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=psql_insert_copy,
+                method=postgres_upsert,
             )
 
         if tx_data.empty:
@@ -485,7 +520,7 @@ def main(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=psql_insert_copy,
+                method=postgres_upsert,
             )
 
         if cx_data.empty:
@@ -499,7 +534,7 @@ def main(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=psql_insert_copy,
+                method=postgres_upsert,
             )
 
         if vx_data.empty:
@@ -513,7 +548,7 @@ def main(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=psql_insert_copy,
+                method=postgres_upsert,
             )
 
         d2 = DATA.dtype60
@@ -537,7 +572,7 @@ def main(files: str):
         data = data[data.columns.intersection(config.DATA_COLUMN_NAMES)]
         header = header[header.columns.intersection(config.HEADER_COLUMN_NAMES)]
 
-        push_to_db(
+        push_to_partitioned_table(
             data,
             "electronic_count_data_partitioned",
             ["site_id", "start_datetime", "lane_number"],
@@ -594,7 +629,7 @@ def main_type10(files: str):
         data = data[data.columns.intersection(config.TYPE10_DATA_COLUMN_NAMES)]
         # header = header[header.columns.intersection(config.TYPE10_HEADER_COLUMN_NAMES)]
 
-        push_to_db(
+        push_to_partitioned_table(
             data,
             "electronic_count_data_type_10",
             ["site_id", "start_datetime", "lane_number"],

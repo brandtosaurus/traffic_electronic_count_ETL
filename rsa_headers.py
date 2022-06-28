@@ -11,7 +11,7 @@ class Headers(object):
     def get_head(df) -> pd.DataFrame:
         dfh = pd.DataFrame(
             df.loc[
-                (df[0].isin(["H0", "S0", "I0", "S1", "D0", "D1", "D3", "L0", "L1"]))
+                (df[0].isin(["H0", "S0", "I0", "S1", "D0", "D1", "D3", "L0", "L1", "L2", "L3","L4" ,"L5","L6","L7","L8","L9","L10","L11","L12"]))
                 | (
                     (df[0].isin(["21", "70", "30", "13", "60"]))
                     & (~df[1].isin(["0", "1", "2", "3", "4"]))
@@ -56,6 +56,10 @@ class Headers(object):
                 pass
 
             headers["number_of_lanes"] = dfh.loc[dfh[0] == "L0", 2].astype(int)
+
+            headers["primary_direction"] = dfh.loc[dfh[0] == 'L1', 2].astype(int)
+            headers["secondary_direction"] = dfh.loc[dfh[0] == 'L'+ headers["number_of_lanes"].iloc[0].astype(str), 2].astype(int)            
+                
 
             try:
                 headers["speedbin1"] = dfh.loc[dfh[0] == "21", 4].astype(int)
@@ -378,3 +382,12 @@ class Headers(object):
         else:
             pass
         return headers
+
+    def lanes(dfh: pd.DataFrame) -> pd.DataFrame:
+        if not dfh.empty:
+            lanes_df = dfh.loc[
+                (dfh[0].isin(["L0", "L1", "L2", "L3","L4" ,"L5","L6","L7","L8","L9","L10","L11","L12"]))
+            ]
+        else:
+            pass
+        return lanes_df

@@ -231,6 +231,8 @@ HEADER_COLUMN_NAMES = [
     "85th_percentile_speed_negative_direction",
     "85th_percentile_speed_total",
     "year",
+    "primary_direction",
+    "secondary_direction",
 ]
 
 TYPE10_DATA_COLUMN_NAMES = [
@@ -292,5 +294,7 @@ TYPE10_HEADER_COLUMN_NAMES = [
     'vehicle_classification_scheme_primary', 
     'vehicle_classification_scheme_secondary', 
     'maximum_gap_milliseconds', 
-    'maximum_differential_speed'
+    'maximum_differential_speed',
+    "primary_direction",
+    "secondary_direction",
 ]

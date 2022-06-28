@@ -3,16 +3,46 @@ from pandasql import sqldf
 import numpy as np
 import config
 from sqlalchemy.dialects.postgresql import insert
-
-
-from datetime import timedelta
+from sqlalchemy.exc import SQLAlchemyError, SQLError
+import zipfile
+from typing import List
+from datetime import timedelta, datetime
 import uuid
-
-#################################################################################################################################################################################################################################
-##########################################################################				  DATA RECORDS BELOW									 #############################################################################
-#################################################################################################################################################################################################################################
+import csv
+import os
 
 #### DATA TOOLS ####
+def gui():
+    root = Tk().withdraw()
+    f = filedialog.askdirectory()
+    # root.destroy()
+    return str(f)
+
+def is_zip(path: str) -> bool:
+    for filename in path:
+        return zipfile.is_zipfile(filename)
+
+def getfiles(path: str) -> List[str]:
+    print("COLLECTING FILES......")
+    src = []
+    for root, dirs, files in os.walk(path):
+        for name in files:
+            if (
+                name.endswith(".RSA")
+                or name.endswith(".rsa")
+                or name.endswith(".rsv")
+                or name.endswith(".RSV")
+            ):
+                p = os.path.join(root, name)
+                src.append(p)
+    src = list(set(src))
+    return src
+
+def to_df(file: str) -> pd.DataFrame:
+    df = pd.read_csv(file, header=None, sep='\s+')
+    df = df[0].str.split("\s+|,\s+|,", expand=True)
+    df = pd.DataFrame(df)
+    return df
 
 def get_direction(lane_number, df: pd.DataFrame) -> pd.DataFrame:
     filt = df[1] == lane_number
@@ -75,6 +105,70 @@ def postgres_upsert(table, conn, keys, data_iter):
         set_={c.key: c for c in insert_statement.excluded},
     )
     conn.execute(upsert_statement)
+
+def push_to_db(df, table, subset) -> None:
+    try:
+        df.to_sql(
+            table,
+            con=config.ENGINE,
+            schema="trafc",
+            if_exists="append",
+            index=False,
+            method=psql_insert_copy,
+        )
+    except Exception:
+        df = df.drop_duplicates(subset=subset)
+        df.to_sql(
+            table,
+            con=config.ENGINE,
+            schema="trafc",
+            if_exists="append",
+            index=False,
+            method=psql_insert_copy,
+        )
+
+def create_database_tables():
+    conn=config.CONN
+    cur = conn.cursor()
+    cur.execute(q.CREATE_AXLE_GROU_MASS_GX)
+    cur.execute(q.CREATE_AXLE_GROUP_CONFIG_TABLE_CX)
+    cur.execute(q.CREATE_AXLE_MASS_TABLE_AX)
+    cur.execute(q.CREATE_AXLE_GROUP_MASS_TABLE_GX)
+    cur.execute(q.CREATE_AXLE_SPACING_TABLE_SX)
+    cur.execute(q.CREATE_IMAGES_TABLE_VX)
+    cur.execute(q.CREATE_TYRE_TABLE_TX)
+    cur.execute(q.CREATE_WHEEL_MASS_TABLE_WX)
+    cur.commit()
+    cur.close()
+
+def psql_insert_copy(table, conn, keys, data_iter):
+    """
+    Execute SQL statement inserting data
+
+    Parameters
+    ----------
+    table : pandas.io.sql.SQLTable
+    conn : sqlalchemy.engine.Engine or sqlalchemy.engine.Connection
+    keys : list of str
+        Column names
+    data_iter : Iterable that iterates the values to be inserted
+    """
+    # gets a DBAPI connection that can provide a cursor
+    dbapi_conn = conn.connection
+    with dbapi_conn.cursor() as cur:
+        s_buf = StringIO()
+        writer = csv.writer(s_buf)
+        writer.writerows(data_iter)
+        s_buf.seek(0)
+
+        columns = ", ".join('"{}"'.format(k) for k in keys)
+        if table.schema:
+            table_name = "{}.{}".format(table.schema, table.name)
+        else:
+            table_name = table.name
+
+        sql = "COPY {} ({}) FROM STDIN WITH CSV".format(table_name, columns)
+        cur.copy_expert(sql=sql, file=s_buf)
 
 #### CREATE DATA FOR TRAFFIC COUNTS ####
 
@@ -468,7 +562,6 @@ def headers(dfh: pd.DataFrame) -> pd.DataFrame:
     else:
         pass
     return headers
-
 
 def lanes(dfh: pd.DataFrame) -> pd.DataFrame:
     if not dfh.empty:
@@ -1431,7 +1524,7 @@ def dtype60(df: pd.DataFrame) -> pd.DataFrame:
 
         return ddf
 
-def header_calcs(header, data, dtype):
+def header_calcs(header: pd.DataFrame, data: pd.DataFrame, dtype: int):
     speed_limit_qry = f"select max_speed from trafc.countstation where tcname = '{data['site_id'][0]}' ;"
     speed_limit = pd.read_sql_query(speed_limit_qry,config.ENGINE)
     speed_limit = speed_limit['max_speed'][0]
@@ -1669,6 +1762,301 @@ def header_calcs(header, data, dtype):
     else:
         return header
 
+def data_update_type21(row):
+    qry = f"""
+        UPDATE trafc.electronic_count_data_partitioned SET 
+        header_id = '{row['header_id']}',
+        end_datetime = '{row['end_datetime']}',
+        duration_min = {row['duration_min']},
+        lane_number = {row['lane_number']},
+        speedbin1 = {row['speedbin1']},
+        speedbin2 = {row['speedbin2']},
+        speedbin3 = {row['speedbin3']},
+        speedbin4 = {row['speedbin4']},
+        speedbin5 = {row['speedbin5']},
+        speedbin6 = {row['speedbin6']},
+        speedbin7 = {row['speedbin7']},
+        speedbin8 = {row['speedbin8']},
+        speedbin9 = {row['speedbin9']},
+        speedbin10 = {row['speedbin10']},
+        sum_of_heavy_vehicle_speeds = {row['sum_of_heavy_vehicle_speeds']},
+        short_heavy_vehicles = {row['short_heavy_vehicles']},
+        medium_heavy_vehicles = {row['medium_heavy_vehicles']},
+        long_heavy_vehicles = {row['long_heavy_vehicles']},
+        rear_to_rear_headway_shorter_than_2_seconds = {row['rear_to_rear_headway_shorter_than_2_seconds']},
+        rear_to_rear_headways_shorter_than_programmed_time = {row['rear_to_rear_headways_shorter_than_programmed_time']},
+        speedbin0 = {row['speedbin0']},
+        total_heavy_vehicles_type21 = {row['total_heavy_vehicles_type21']},
+        total_light_vehicles_type21 = {row['total_light_vehicles_type21']},
+        total_vehicles_type21 = {row['total_vehicles_type21']},
+        direction = '{row['direction']}',
+        start_datetime = '{row['start_datetime']}',
+        year = 	{row['year']},
+        site_id = '{row['site_id']}'
+        where site_id = '{row['site_id']}' and start_datetime = '{row['start_datetime']}' and lane_number = {row['lane_number']}
+    """
+    return qry
+
+def data_insert_type21(row):
+	qry = f"""insert into
+	trafc.electronic_count_data_partitioned
+	(
+	header_id,
+	end_datetime,
+	duration_min,
+	lane_number,
+	speedbin1,
+	speedbin2,
+	speedbin3,
+	speedbin4,
+	speedbin5,
+	speedbin6,
+	speedbin7,
+	speedbin8,
+	speedbin9,
+	speedbin10,
+	sum_of_heavy_vehicle_speeds,
+	short_heavy_vehicles,
+	medium_heavy_vehicles,
+	long_heavy_vehicles,
+	rear_to_rear_headway_shorter_than_2_seconds,
+	rear_to_rear_headways_shorter_than_programmed_time,
+	speedbin0,
+	total_heavy_vehicles_type21,
+	total_light_vehicles_type21,
+	total_vehicles_type21,
+	direction,
+	start_datetime,
+	year,
+	site_id)
+	values(
+	'{row['header_id']}',
+	'{row['end_datetime']}',
+	{row['duration_min']},
+	{row['lane_number']},
+	{row['speedbin1']},
+	{row['speedbin2']},
+	{row['speedbin3']},
+	{row['speedbin4']},
+	{row['speedbin5']},
+	{row['speedbin6']},
+	{row['speedbin7']},
+	{row['speedbin8']},
+	{row['speedbin9']},
+	{row['speedbin10']},
+	{row['sum_of_heavy_vehicle_speeds']},
+	{row['short_heavy_vehicles']},
+	{row['medium_heavy_vehicles']},
+	{row['long_heavy_vehicles']},
+	{row['rear_to_rear_headway_shorter_than_2_seconds']},
+	{row['rear_to_rear_headways_shorter_than_programmed_time']},
+	{row['speedbin0']},
+	{row['total_heavy_vehicles_type21']},
+	{row['total_light_vehicles_type21']},
+	{row['total_vehicles_type21']},
+	'{row['direction']}',
+	'{row['start_datetime']}',
+	{row['year']},
+	'{row['site_id']}'
+	);
+	"""
+	return qry
+
+def data_insert_type30(row):
+    qry = f"""
+    insert into	trafc.electronic_count_data_partitioned (
+        end_datetime,
+        end_time,
+        duration_min,
+        lane_number,
+        unknown_vehicle_error_class,
+        motorcycle,
+        light_motor_vehicles,
+        light_motor_vehicles_towing,
+        two_axle_busses,
+        two_axle_6_tyre_single_units,
+        busses_with_3_or_4_axles,
+        two_axle_6_tyre_single_unit_with_light_trailer_4_axles_max,
+        three_axle_single_unit_including_single_axle_light_trailer,
+        four_or_less_axle_including_a_single_trailer,
+        buses_with_5_or_more_axles,
+        three_axle_single_unit_and_light_trailer_more_than_4_axles,
+        five_axle_single_trailer,
+        six_axle_single_trailer,
+        five_or_less_axle_multi_trailer,
+        six_axle_multi_trailer,
+        seven_axle_multi_trailer,
+        eight_or_more_axle_multi_trailer,
+        heavy_vehicle,
+        direction,
+        start_datetime,
+        year,
+        site_id       
+    )
+    VALUES (
+        '{row['end_datetime']}',
+        '{row['end_time']}',
+        {row['duration_min']},
+        {row['lane_number']},
+        {row['unknown_vehicle_error_class']},
+        {row['motorcycle']},
+        {row['light_motor_vehicles']},
+        {row['light_motor_vehicles_towing']},
+        {row['two_axle_busses']},
+        {row['two_axle_6_tyre_single_units']},
+        {row['busses_with_3_or_4_axles']},
+        {row['two_axle_6_tyre_single_unit_with_light_trailer_4_axles_max']},
+        {row['three_axle_single_unit_including_single_axle_light_trailer']},
+        {row['four_or_less_axle_including_a_single_trailer']},
+        {row['buses_with_5_or_more_axles']},
+        {row['three_axle_single_unit_and_light_trailer_more_than_4_axles']},
+        {row['five_axle_single_trailer']},
+        {row['six_axle_single_trailer']},
+        {row['five_or_less_axle_multi_trailer']},
+        {row['six_axle_multi_trailer']},
+        {row['seven_axle_multi_trailer']},
+        {row['eight_or_more_axle_multi_trailer']},
+        {row['heavy_vehicle']},
+        '{row['direction']}',
+        '{row['start_datetime']}',
+        {row['year']},
+        '{row['site_id']}'
+    )
+    """
+    return qry
+
+def data_update_type30(row):
+    qry = f"""
+    UPDATE trafc.electronic_count_data_partitioned SET 
+        end_datetime = '{row['end_datetime']}',
+        end_time = '{row['end_time']}',
+        duration_min = {row['duration_min']},
+        lane_number = {row['lane_number']},
+        unknown_vehicle_error_class = {row['unknown_vehicle_error_class']},
+        motorcycle = {row['motorcycle']},
+        light_motor_vehicles = {row['light_motor_vehicles']},
+        light_motor_vehicles_towing = {row['light_motor_vehicles_towing']},
+        two_axle_busses = {row['two_axle_busses']},
+        two_axle_6_tyre_single_units = {row['two_axle_6_tyre_single_units']},
+        busses_with_3_or_4_axles = {row['busses_with_3_or_4_axles']},
+        two_axle_6_tyre_single_unit_with_light_trailer_4_axles_max = {row['two_axle_6_tyre_single_unit_with_light_trailer_4_axles_max']},
+        three_axle_single_unit_including_single_axle_light_trailer = {row['three_axle_single_unit_including_single_axle_light_trailer']},
+        four_or_less_axle_including_a_single_trailer = {row['four_or_less_axle_including_a_single_trailer']},
+        buses_with_5_or_more_axles = {row['buses_with_5_or_more_axles']},
+        three_axle_single_unit_and_light_trailer_more_than_4_axles = {row['three_axle_single_unit_and_light_trailer_more_than_4_axles']},
+        five_axle_single_trailer = {row['five_axle_single_trailer']},
+        six_axle_single_trailer = {row['six_axle_single_trailer']},
+        five_or_less_axle_multi_trailer = {row['five_or_less_axle_multi_trailer']},
+        six_axle_multi_trailer = {row['six_axle_multi_trailer']},
+        seven_axle_multi_trailer = {row['seven_axle_multi_trailer']},
+        eight_or_more_axle_multi_trailer = {row['eight_or_more_axle_multi_trailer']},
+        heavy_vehicle = {row['heavy_vehicle']},
+        direction = '{row['direction']}',
+        start_datetime = '{row['start_datetime']}',
+        year = {row['year']},
+        site_id = '{row['site_id']}'
+        where site_id = '{row['site_id']}' and start_datetime = '{row['start_datetime']}' and lane_number = {row['lane_number']}
+    """
+    return qry
+
+def data_insert_type10(row):
+    qry = f"""
+    INSERT INTO trafc.electronic_count_data_type_10 (
+        site_id,
+        header_id,
+        "year",
+        number_of_fields_associated_with_the_basic_vehicle_data,
+        data_source_code,
+        edit_code,
+        departure_date,
+        departure_time,
+        assigned_lane_number,
+        physical_lane_number,
+        forward_reverse_code,
+        vehicle_category,
+        vehicle_class_code_primary_scheme,
+        vehicle_class_code_secondary_scheme,
+        vehicle_speed,
+        vehicle_length,
+        site_occupancy_time_in_milliseconds,
+        chassis_height_code,
+        vehicle_following_code,
+        vehicle_tag_code,
+        trailer_count,
+        axle_count,
+        bumper_to_1st_axle_spacing,
+        tyre_type,
+        start_datetime,
+        direction,
+        data_id
+    )
+    VALUES (
+        '{row['site_id']}',
+        '{row['header_id']}',
+        {row['year']},
+        {row['number_of_fields_associated_with_the_basic_vehicle_data']},
+        {row['data_source_code']},
+        {row['edit_code']},
+        '{row['departure_date']}',
+        '{row['departure_time']}',
+        {row['assigned_lane_number']},
+        {row['physical_lane_number']},
+        {row['forward_reverse_code']},
+        {row['vehicle_category']},
+        {row['vehicle_class_code_primary_scheme']},
+        {row['vehicle_class_code_secondary_scheme']},
+        {row['vehicle_speed']},
+        {row['vehicle_length']},
+        {row['site_occupancy_time_in_milliseconds']},
+        {row['chassis_height_code']},
+        {row['vehicle_following_code']},
+        {row['vehicle_tag_code']},
+        {row['trailer_count']},
+        {row['axle_count']},
+        {row['bumper_to_1st_axle_spacing']},
+        {row['tyre_type']},
+        '{row['start_datetime']}',
+        '{row['direction']}',
+        '{row['data_id']}'
+    )
+    """
+    return qry
+
+def data_update_type10(row):
+    qry = f"""
+    UPDATE trafc.electronic_count_data_type_10 SET
+        site_id = '{row['site_id']}',
+        header_id = '{row['header_id']}',
+        "year" = {row['year']},
+        number_of_fields_associated_with_the_basic_vehicle_data = {row['number_of_fields_associated_with_the_basic_vehicle_data']},
+        data_source_code = {row['data_source_code']},
+        edit_code = {row['edit_code']},
+        departure_date = '{row['departure_date']}',
+        departure_time = '{row['departure_time']}',
+        assigned_lane_number = {row['assigned_lane_number']},
+        physical_lane_number = {row['physical_lane_number']},
+        forward_reverse_code = {row['forward_reverse_code']},
+        vehicle_category = {row['vehicle_category']},
+        vehicle_class_code_primary_scheme = {row['vehicle_class_code_primary_scheme']},
+        vehicle_class_code_secondary_scheme = {row['vehicle_class_code_secondary_scheme']},
+        vehicle_speed = {row['vehicle_speed']},
+        vehicle_length = {row['vehicle_length']},
+        site_occupancy_time_in_milliseconds = {row['site_occupancy_time_in_milliseconds']},
+        chassis_height_code = {row['chassis_height_code']},
+        vehicle_following_code = {row['vehicle_following_code']},
+        vehicle_tag_code = {row['vehicle_tag_code']},
+        trailer_count = {row['trailer_count']},
+        axle_count = {row['axle_count']},
+        bumper_to_1st_axle_spacing = {row['bumper_to_1st_axle_spacing']},
+        tyre_type = {row['tyre_type']},
+        start_datetime'{row['start_datetime']}',
+        direction'{row['direction']}',
+        data_id'{row['data_id']}'
+        where site_id = '{row['site_id']}' and physical_lane_number = {row['physical_lane_number']} and start_datetime'{row['start_datetime']}' 
+    )
+    """
+    return qry
+
 def header_update_type10(data):
     speed_limit_qry = f"select max_speed from trafc.countstation where tcname = '{data['site_id'][0]}' ;"
     speed_limit = pd.read_sql_query(speed_limit_qry,config.ENGINE)
@@ -1749,6 +2137,631 @@ def header_update_type10(data):
         and end_datetime = '{data['end_datetime'][0]}';
         """
     return UPDATE_STRING
+
+def header_insert(row):
+    qry = f"""
+    INSERT INTO trafc.electronic_count_header (
+        header_id,
+        site_id,
+        station_name,
+        x,
+        y,
+        start_datetime,
+        end_datetime,
+        number_of_lanes,
+        type_21_count_interval_minutes,
+        type_21_programmable_rear_to_rear_headway_bin,
+        type_21_program_id,
+        speedbin1,
+        speedbin2,
+        speedbin3,
+        speedbin4,
+        speedbin5,
+        speedbin6,
+        speedbin7,
+        speedbin8,
+        speedbin9,
+        speedbin10,
+        type_10_vehicle_classification_scheme_primary,
+        type_10_vehicle_classification_scheme_secondary,
+        type_10_maximum_gap_milliseconds,
+        type_10_maximum_differential_speed,
+        type_30_summary_interval_minutes,
+        type_30_vehicle_classification_scheme,
+        type_70_summary_interval_minutes,
+        type_70_vehicle_classification_scheme,
+        type_70_maximum_gap_milliseconds,
+        type_70_maximum_differential_speed,
+        type_70_error_bin_code,
+        instrumentation_description,
+        document_url,
+        date_processed,
+        growth_rate_use,
+        total_light_positive_direction,
+        total_light_negative_direction,
+        total_light_vehicles,
+        total_heavy_positive_direction,
+        total_heavy_negative_direction,
+        total_heavy_vehicles,
+        total_short_heavy_positive_direction,
+        total_short_heavy_negative_direction,
+        total_short_heavy_vehicles,
+        total_medium_heavy_positive_direction,
+        total_medium_heavy_negative_direction,
+        total_medium_heavy_vehicles,
+        total_long_heavy_positive_direction,
+        total_long_heavy_negative_direction,
+        total_long_heavy_vehicles,
+        total_vehicles_positive_direction,
+        total_vehicles_negative_direction,
+        total_vehicles,
+        average_speed_positive_direction,
+        average_speed_negative_direction,
+        average_speed,
+        average_speed_light_vehicles_positive_direction,
+        average_speed_light_vehicles_negative_direction,
+        average_speed_light_vehicles,
+        average_speed_heavy_vehicles_positive_direction,
+        average_speed_heavy_vehicles_negative_direction,
+        average_speed_heavy_vehicles,
+        truck_split_positive_direction,
+        truck_split_negative_direction,
+        truck_split_total,
+        estimated_axles_per_truck_positive_direction,
+        estimated_axles_per_truck_negative_direction,
+        estimated_axles_per_truck_total,
+        percentage_speeding_positive_direction,
+        percentage_speeding_negative_direction,
+        percentage_speeding_total,
+        vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire,
+        vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire,
+        vehicles_with_rear_to_rear_headway_less_than_2sec_total,
+        estimated_e80_positive_direction,
+        estimated_e80_negative_direction,
+        estimated_e80_on_road,
+        adt_positive_direction,
+        adt_negative_direction,
+        adt_total,
+        adtt_positive_direction,
+        adtt_negative_direction,
+        adtt_total,
+        highest_volume_per_hour_positive_direction,
+        highest_volume_per_hour_negative_direction,
+        highest_volume_per_hour_total,
+        "15th_highest_volume_per_hour_positive_direction",
+        "15th_highest_volume_per_hour_negative_direction",
+        "15th_highest_volume_per_hour_total",
+        "30th_highest_volume_per_hour_positive_direction",
+        "30th_highest_volume_per_hour_negative_direction",
+        "30th_highest_volume_per_hour_total",
+        "15th_percentile_speed_positive_direction",
+        "15th_percentile_speed_negative_direction",
+        "15th_percentile_speed_total",
+        "85th_percentile_speed_positive_direction",
+        "85th_percentile_speed_negative_direction",
+        "85th_percentile_speed_total",
+        "year",
+        positive_direction,
+        negative_direction,
+        avg_weekday_traffic,
+        number_of_days_counted,
+        duration_hours
+    )
+    VALUES (
+        '{row['header_id']}',
+        '{row['site_id']}',
+        '{row['station_name']}',
+        '{row['x']}',
+        '{row['y']}',
+        '{row['start_datetime']}',
+        '{row['end_datetime']}',
+        {row['number_of_lanes']},
+        {row['type_21_count_interval_minutes']},
+        {row['type_21_programmable_rear_to_rear_headway_bin']},
+        {row['type_21_program_id']},
+        {row['speedbin1']},
+        {row['speedbin2']},
+        {row['speedbin3']},
+        {row['speedbin4']},
+        {row['speedbin5']},
+        {row['speedbin6']},
+        {row['speedbin7']},
+        {row['speedbin8']},
+        {row['speedbin9']},
+        {row['speedbin10']},
+        {row['type_10_vehicle_classification_scheme_primary']},
+        {row['type_10_vehicle_classification_scheme_secondary']},
+        {row['type_10_maximum_gap_milliseconds']},
+        {row['type_10_maximum_differential_speed']},
+        {row['type_30_summary_interval_minutes']},
+        {row['type_30_vehicle_classification_scheme']},
+        {row['type_70_summary_interval_minutes']},
+        {row['type_70_vehicle_classification_scheme']},
+        {row['type_70_maximum_gap_milliseconds']},
+        {row['type_70_maximum_differential_speed']},
+        {row['type_70_error_bin_code']},
+        '{row['instrumentation_description']}',
+        '{row['document_url']}',
+        '{row['date_processed']}',
+        '{row['growth_rate_use']}',
+        {row['total_light_positive_direction']},
+        {row['total_light_negative_direction']},
+        {row['total_light_vehicles']},
+        {row['total_heavy_positive_direction']},
+        {row['total_heavy_negative_direction']},
+        {row['total_heavy_vehicles']},
+        {row['total_short_heavy_positive_direction']},
+        {row['total_short_heavy_negative_direction']},
+        {row['total_short_heavy_vehicles']},
+        {row['total_medium_heavy_positive_direction']},
+        {row['total_medium_heavy_negative_direction']},
+        {row['total_medium_heavy_vehicles']},
+        {row['total_long_heavy_positive_direction']},
+        {row['total_long_heavy_negative_direction']},
+        {row['total_long_heavy_vehicles']},
+        {row['total_vehicles_positive_direction']},
+        {row['total_vehicles_negative_direction']},
+        {row['total_vehicles']},
+        {row['average_speed_positive_direction']},
+        {row['average_speed_negative_direction']},
+        {row['average_speed']},
+        {row['average_speed_light_vehicles_positive_direction']},
+        {row['average_speed_light_vehicles_negative_direction']},
+        {row['average_speed_light_vehicles']},
+        {row['average_speed_heavy_vehicles_positive_direction']},
+        {row['average_speed_heavy_vehicles_negative_direction']},
+        {row['average_speed_heavy_vehicles']},
+        '{row['truck_split_positive_direction']}',
+        '{row['truck_split_negative_direction']}',
+        '{row['truck_split_total']}',
+        {row['estimated_axles_per_truck_positive_direction']},
+        {row['estimated_axles_per_truck_negative_direction']},
+        {row['estimated_axles_per_truck_total']},
+        {row['percentage_speeding_positive_direction']},
+        {row['percentage_speeding_negative_direction']},
+        {row['percentage_speeding_total']},
+        {row['vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire']},
+        {row['vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire']},
+        {row['vehicles_with_rear_to_rear_headway_less_than_2sec_total']},
+        {row['estimated_e80_positive_direction']},
+        {row['estimated_e80_negative_direction']},
+        {row['estimated_e80_on_road']},
+        {row['adt_positive_direction']},
+        {row['adt_negative_direction']},
+        {row['adt_total']},
+        {row['adtt_positive_direction']},
+        {row['adtt_negative_direction']},
+        {row['adtt_total']},
+        {row['highest_volume_per_hour_positive_direction']},
+        {row['highest_volume_per_hour_negative_direction']},
+        {row['highest_volume_per_hour_total']},
+        {row['15th_highest_volume_per_hour_positive_direction']},
+        {row['15th_highest_volume_per_hour_negative_direction']},
+        {row['15th_highest_volume_per_hour_total']},
+        {row['30th_highest_volume_per_hour_positive_direction']},
+        {row['30th_highest_volume_per_hour_negative_direction']},
+        {row['30th_highest_volume_per_hour_total']},
+        {row['15th_percentile_speed_positive_direction']},
+        {row['15th_percentile_speed_negative_direction']},
+        {row['15th_percentile_speed_total']},
+        {row['85th_percentile_speed_positive_direction']},
+        {row['85th_percentile_speed_negative_direction']},
+        {row['85th_percentile_speed_total']},
+        {row['year']},
+        '{row['positive_direction']}',
+        '{row['negative_direction']}',
+        {row['avg_weekday_traffic']},
+        {row['number_of_days_counted']},
+        {row['duration_hours']}
+            )
+        """
+    return qry
+
+def header_update(row):
+    qry = f""" UPDATE trafc.electronic_count_header SET
+        x = '{row['x']}',
+        y = '{row['y']}',
+        number_of_lanes = {row['number_of_lanes']},
+        type_21_count_interval_minutes = {row['type_21_count_interval_minutes']},
+        type_21_programmable_rear_to_rear_headway_bin = {row['type_21_programmable_rear_to_rear_headway_bin']},
+        type_21_program_id = {row['type_21_program_id']},
+        speedbin1 = {row['speedbin1']},
+        speedbin2 = {row['speedbin2']},
+        speedbin3 = {row['speedbin3']},
+        speedbin4 = {row['speedbin4']},
+        speedbin5 = {row['speedbin5']},
+        speedbin6 = {row['speedbin6']},
+        speedbin7 = {row['speedbin7']},
+        speedbin8 = {row['speedbin8']},
+        speedbin9 = {row['speedbin9']},
+        speedbin10 = {row['speedbin10']},
+        type_10_vehicle_classification_scheme_primary = {row['type_10_vehicle_classification_scheme_primary']},
+        type_10_vehicle_classification_scheme_secondary = {row['type_10_vehicle_classification_scheme_secondary']},
+        type_10_maximum_gap_milliseconds = {row['type_10_maximum_gap_milliseconds']},
+        type_10_maximum_differential_speed = {row['type_10_maximum_differential_speed']},
+        type_30_summary_interval_minutes = {row['type_30_summary_interval_minutes']},
+        type_30_vehicle_classification_scheme = {row['type_30_vehicle_classification_scheme']},
+        type_70_summary_interval_minutes = {row['type_70_summary_interval_minutes']},
+        type_70_vehicle_classification_scheme = {row['type_70_vehicle_classification_scheme']},
+        type_70_maximum_gap_milliseconds = {row['type_70_maximum_gap_milliseconds']},
+        type_70_maximum_differential_speed = {row['type_70_maximum_differential_speed']},
+        type_70_error_bin_code = {row['type_70_error_bin_code']},
+        instrumentation_description = '{row['instrumentation_description']}',
+        document_url = '{row['document_url']}',
+        date_processed = '{row['date_processed']}',
+        growth_rate_use = '{row['growth_rate_use']}',
+        total_light_positive_direction = {row['total_light_positive_direction']},
+        total_light_negative_direction = {row['total_light_negative_direction']},
+        total_light_vehicles = {row['total_light_vehicles']},
+        total_heavy_positive_direction = {row['total_heavy_positive_direction']},
+        total_heavy_negative_direction = {row['total_heavy_negative_direction']},
+        total_heavy_vehicles = {row['total_heavy_vehicles']},
+        total_short_heavy_positive_direction = {row['total_short_heavy_positive_direction']},
+        total_short_heavy_negative_direction = {row['total_short_heavy_negative_direction']},
+        total_short_heavy_vehicles = {row['total_short_heavy_vehicles']},
+        total_medium_heavy_positive_direction = {row['total_medium_heavy_positive_direction']},
+        total_medium_heavy_negative_direction = {row['total_medium_heavy_negative_direction']},
+        total_medium_heavy_vehicles = {row['total_medium_heavy_vehicles']},
+        total_long_heavy_positive_direction = {row['total_long_heavy_positive_direction']},
+        total_long_heavy_negative_direction = {row['total_long_heavy_negative_direction']},
+        total_long_heavy_vehicles = {row['total_long_heavy_vehicles']},
+        total_vehicles_positive_direction = {row['total_vehicles_positive_direction']},
+        total_vehicles_negative_direction = {row['total_vehicles_negative_direction']},
+        total_vehicles = {row['total_vehicles']},
+        average_speed_positive_direction = {row['average_speed_positive_direction']},
+        average_speed_negative_direction = {row['average_speed_negative_direction']},
+        average_speed = {row['average_speed']},
+        average_speed_light_vehicles_positive_direction = {row['average_speed_light_vehicles_positive_direction']},
+        average_speed_light_vehicles_negative_direction = {row['average_speed_light_vehicles_negative_direction']},
+        average_speed_light_vehicles = {row['average_speed_light_vehicles']},
+        average_speed_heavy_vehicles_positive_direction = {row['average_speed_heavy_vehicles_positive_direction']},
+        average_speed_heavy_vehicles_negative_direction = {row['average_speed_heavy_vehicles_negative_direction']},
+        average_speed_heavy_vehicles = {row['average_speed_heavy_vehicles']},
+        truck_split_positive_direction = '{row['truck_split_positive_direction']}',
+        truck_split_negative_direction = '{row['truck_split_negative_direction']}',
+        truck_split_total = '{row['truck_split_total']}',
+        estimated_axles_per_truck_positive_direction = {row['estimated_axles_per_truck_positive_direction']},
+        estimated_axles_per_truck_negative_direction = {row['estimated_axles_per_truck_negative_direction']},
+        estimated_axles_per_truck_total = {row['estimated_axles_per_truck_total']},
+        percentage_speeding_positive_direction = {row['percentage_speeding_positive_direction']},
+        percentage_speeding_negative_direction = {row['percentage_speeding_negative_direction']},
+        percentage_speeding_total = {row['percentage_speeding_total']},
+        vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire = {row['vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire']},
+        vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire = {row['vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire']},
+        vehicles_with_rear_to_rear_headway_less_than_2sec_total = {row['vehicles_with_rear_to_rear_headway_less_than_2sec_total']},
+        estimated_e80_positive_direction = {row['estimated_e80_positive_direction']},
+        estimated_e80_negative_direction = {row['estimated_e80_negative_direction']},
+        estimated_e80_on_road = {row['estimated_e80_on_road']},
+        adt_positive_direction = {row['adt_positive_direction']},
+        adt_negative_direction = {row['adt_negative_direction']},
+        adt_total = {row['adt_total']},
+        adtt_positive_direction = {row['adtt_positive_direction']},
+        adtt_negative_direction = {row['adtt_negative_direction']},
+        adtt_total = {row['adtt_total']},
+        highest_volume_per_hour_positive_direction = {row['highest_volume_per_hour_positive_direction']},
+        highest_volume_per_hour_negative_direction = {row['highest_volume_per_hour_negative_direction']},
+        highest_volume_per_hour_total = {row['highest_volume_per_hour_total']},
+        "15th_highest_volume_per_hour_positive_direction" = {row['15th_highest_volume_per_hour_positive_direction']},
+        "15th_highest_volume_per_hour_negative_direction" = {row['15th_highest_volume_per_hour_negative_direction']},
+        "15th_highest_volume_per_hour_total" = {row['15th_highest_volume_per_hour_total']},
+        "30th_highest_volume_per_hour_positive_direction" = {row['30th_highest_volume_per_hour_positive_direction']},
+        "30th_highest_volume_per_hour_negative_direction" = {row['30th_highest_volume_per_hour_negative_direction']},
+        "30th_highest_volume_per_hour_total" = {row['30th_highest_volume_per_hour_total']},
+        "15th_percentile_speed_positive_direction" = {row['15th_percentile_speed_positive_direction']},
+        "15th_percentile_speed_negative_direction" = {row['15th_percentile_speed_negative_direction']},
+        "15th_percentile_speed_total" = {row['15th_percentile_speed_total']},
+        "85th_percentile_speed_positive_direction" = {row['85th_percentile_speed_positive_direction']},
+        "85th_percentile_speed_negative_direction" = {row['85th_percentile_speed_negative_direction']},
+        "85th_percentile_speed_total" = {row['85th_percentile_speed_total']},
+        "year" = {row['year']},
+        positive_direction = '{row['positive_direction']}',
+        negative_direction = '{row['negative_direction']}',
+        avg_weekday_traffic = {row['avg_weekday_traffic']},
+        number_of_days_counted = {row['number_of_days_counted']},
+        duration_hours = {row['duration_hours']}
+        WHERE site_id='{row['site_id']}' AND start_datetime='{row['start_datetime']}' AND end_datetime='{row['end_datetime']}'
+        on conflict on constraint electronic_count_header_un do update set
+    id = coalesce(excluded.id,id),
+    header_id = coalesce(excluded.header_id,header_id),
+    station_name = coalesce(excluded.station_name,station_name),
+    x = coalesce(excluded.x,x),
+    y = coalesce(excluded.y,y),
+    number_of_lanes = coalesce(excluded.number_of_lanes,number_of_lanes),
+    type_21_count_interval_minutes = coalesce(excluded.type_21_count_interval_minutes,type_21_count_interval_minutes),
+    type_21_programmable_rear_to_rear_headway_bin = coalesce(excluded.type_21_programmable_rear_to_rear_headway_bin,type_21_programmable_rear_to_rear_headway_bin),
+    type_21_program_id = coalesce(excluded.type_21_program_id,type_21_program_id),
+    speedbin1 = coalesce(excluded.speedbin1,speedbin1),
+    speedbin2 = coalesce(excluded.speedbin2,speedbin2),
+    speedbin3 = coalesce(excluded.speedbin3,speedbin3),
+    speedbin4 = coalesce(excluded.speedbin4,speedbin4),
+    speedbin5 = coalesce(excluded.speedbin5,speedbin5),
+    speedbin6 = coalesce(excluded.speedbin6,speedbin6),
+    speedbin7 = coalesce(excluded.speedbin7,speedbin7),
+    speedbin8 = coalesce(excluded.speedbin8,speedbin8),
+    speedbin9 = coalesce(excluded.speedbin9,speedbin9),
+    speedbin10 = coalesce(excluded.speedbin10,speedbin10),
+    type_10_vehicle_classification_scheme_primary = coalesce(excluded.type_10_vehicle_classification_scheme_primary,type_10_vehicle_classification_scheme_primary),
+    type_10_vehicle_classification_scheme_secondary = coalesce(excluded.type_10_vehicle_classification_scheme_secondary,type_10_vehicle_classification_scheme_secondary),
+    type_10_maximum_gap_milliseconds = coalesce(excluded.type_10_maximum_gap_milliseconds,type_10_maximum_gap_milliseconds),
+    type_10_maximum_differential_speed = coalesce(excluded.type_10_maximum_differential_speed,type_10_maximum_differential_speed),
+    type_30_summary_interval_minutes = coalesce(excluded.type_30_summary_interval_minutes,type_30_summary_interval_minutes),
+    type_30_vehicle_classification_scheme = coalesce(excluded.type_30_vehicle_classification_scheme,type_30_vehicle_classification_scheme),
+    type_70_summary_interval_minutes = coalesce(excluded.type_70_summary_interval_minutes,type_70_summary_interval_minutes),
+    type_70_vehicle_classification_scheme = coalesce(excluded.type_70_vehicle_classification_scheme,type_70_vehicle_classification_scheme),
+    type_70_maximum_gap_milliseconds = coalesce(excluded.type_70_maximum_gap_milliseconds,type_70_maximum_gap_milliseconds),
+    type_70_maximum_differential_speed = coalesce(excluded.type_70_maximum_differential_speed,type_70_maximum_differential_speed),
+    type_70_error_bin_code = coalesce(excluded.type_70_error_bin_code,type_70_error_bin_code),
+    instrumentation_description = coalesce(excluded.instrumentation_description,instrumentation_description),
+    document_url = coalesce(excluded.document_url,document_url),
+    date_processed = coalesce(excluded.date_processed,date_processed),
+    growth_rate_use = coalesce(excluded.growth_rate_use,growth_rate_use),
+    total_light_positive_direction = coalesce(excluded.total_light_positive_direction,total_light_positive_direction),
+    total_light_negative_direction = coalesce(excluded.total_light_negative_direction,total_light_negative_direction),
+    total_light_vehicles = coalesce(excluded.total_light_vehicles,total_light_vehicles),
+    total_heavy_positive_direction = coalesce(excluded.total_heavy_positive_direction,total_heavy_positive_direction),
+    total_heavy_negative_direction = coalesce(excluded.total_heavy_negative_direction,total_heavy_negative_direction),
+    total_heavy_vehicles = coalesce(excluded.total_heavy_vehicles,total_heavy_vehicles),
+    total_short_heavy_positive_direction = coalesce(excluded.total_short_heavy_positive_direction,total_short_heavy_positive_direction),
+    total_short_heavy_negative_direction = coalesce(excluded.total_short_heavy_negative_direction,total_short_heavy_negative_direction),
+    total_short_heavy_vehicles = coalesce(excluded.total_short_heavy_vehicles,total_short_heavy_vehicles),
+    total_medium_heavy_positive_direction = coalesce(excluded.total_medium_heavy_positive_direction,total_medium_heavy_positive_direction),
+    total_medium_heavy_negative_direction = coalesce(excluded.total_medium_heavy_negative_direction,total_medium_heavy_negative_direction),
+    total_medium_heavy_vehicles = coalesce(excluded.total_medium_heavy_vehicles,total_medium_heavy_vehicles),
+    total_long_heavy_positive_direction = coalesce(excluded.total_long_heavy_positive_direction,total_long_heavy_positive_direction),
+    total_long_heavy_negative_direction = coalesce(excluded.total_long_heavy_negative_direction,total_long_heavy_negative_direction),
+    total_long_heavy_vehicles = coalesce(excluded.total_long_heavy_vehicles,total_long_heavy_vehicles),
+    total_vehicles_positive_direction = coalesce(excluded.total_vehicles_positive_direction,total_vehicles_positive_direction),
+    total_vehicles_negative_direction = coalesce(excluded.total_vehicles_negative_direction,total_vehicles_negative_direction),
+    total_vehicles = coalesce(excluded.total_vehicles,total_vehicles),
+    average_speed_positive_direction = coalesce(excluded.average_speed_positive_direction,average_speed_positive_direction),
+    average_speed_negative_direction = coalesce(excluded.average_speed_negative_direction,average_speed_negative_direction),
+    average_speed = coalesce(excluded.average_speed,average_speed),
+    average_speed_light_vehicles_positive_direction = coalesce(excluded.average_speed_light_vehicles_positive_direction,average_speed_light_vehicles_positive_direction),
+    average_speed_light_vehicles_negative_direction = coalesce(excluded.average_speed_light_vehicles_negative_direction,average_speed_light_vehicles_negative_direction),
+    average_speed_light_vehicles = coalesce(excluded.average_speed_light_vehicles,average_speed_light_vehicles),
+    average_speed_heavy_vehicles_positive_direction = coalesce(excluded.average_speed_heavy_vehicles_positive_direction,average_speed_heavy_vehicles_positive_direction),
+    average_speed_heavy_vehicles_negative_direction = coalesce(excluded.average_speed_heavy_vehicles_negative_direction,average_speed_heavy_vehicles_negative_direction),
+    average_speed_heavy_vehicles = coalesce(excluded.average_speed_heavy_vehicles,average_speed_heavy_vehicles),
+    truck_split_positive_direction = coalesce(excluded.truck_split_positive_direction,truck_split_positive_direction),
+    truck_split_negative_direction = coalesce(excluded.truck_split_negative_direction,truck_split_negative_direction),
+    truck_split_total = coalesce(excluded.truck_split_total,truck_split_total),
+    estimated_axles_per_truck_positive_direction = coalesce(excluded.estimated_axles_per_truck_positive_direction,estimated_axles_per_truck_positive_direction),
+    estimated_axles_per_truck_negative_direction = coalesce(excluded.estimated_axles_per_truck_negative_direction,estimated_axles_per_truck_negative_direction),
+    estimated_axles_per_truck_total = coalesce(excluded.estimated_axles_per_truck_total,estimated_axles_per_truck_total),
+    percentage_speeding_positive_direction = coalesce(excluded.percentage_speeding_positive_direction,percentage_speeding_positive_direction),
+    percentage_speeding_negative_direction = coalesce(excluded.percentage_speeding_negative_direction,percentage_speeding_negative_direction),
+    percentage_speeding_total = coalesce(excluded.percentage_speeding_total,percentage_speeding_total),
+    vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire = coalesce(excluded.vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire,vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire),
+    vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire = coalesce(excluded.vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire,vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire),
+    vehicles_with_rear_to_rear_headway_less_than_2sec_total = coalesce(excluded.vehicles_with_rear_to_rear_headway_less_than_2sec_total,vehicles_with_rear_to_rear_headway_less_than_2sec_total),
+    estimated_e80_positive_direction = coalesce(excluded.estimated_e80_positive_direction,estimated_e80_positive_direction),
+    estimated_e80_negative_direction = coalesce(excluded.estimated_e80_negative_direction,estimated_e80_negative_direction),
+    estimated_e80_on_road = coalesce(excluded.estimated_e80_on_road,estimated_e80_on_road),
+    adt_positive_direction = coalesce(excluded.adt_positive_direction,adt_positive_direction),
+    adt_negative_direction = coalesce(excluded.adt_negative_direction,adt_negative_direction),
+    adt_total = coalesce(excluded.adt_total,adt_total),
+    adtt_positive_direction = coalesce(excluded.adtt_positive_direction,adtt_positive_direction),
+    adtt_negative_direction = coalesce(excluded.adtt_negative_direction,adtt_negative_direction),
+    adtt_total = coalesce(excluded.adtt_total,adtt_total),
+    highest_volume_per_hour_positive_direction = coalesce(excluded.highest_volume_per_hour_positive_direction,highest_volume_per_hour_positive_direction),
+    highest_volume_per_hour_negative_direction = coalesce(excluded.highest_volume_per_hour_negative_direction,highest_volume_per_hour_negative_direction),
+    highest_volume_per_hour_total = coalesce(excluded.highest_volume_per_hour_total,highest_volume_per_hour_total),
+    "15th_highest_volume_per_hour_positive_direction" = coalesce(excluded."15th_highest_volume_per_hour_positive_direction","15th_highest_volume_per_hour_positive_direction"),
+    "15th_highest_volume_per_hour_negative_direction" = coalesce(excluded."15th_highest_volume_per_hour_negative_direction","15th_highest_volume_per_hour_negative_direction"),
+    "15th_highest_volume_per_hour_total" = coalesce(excluded."15th_highest_volume_per_hour_total","15th_highest_volume_per_hour_total"),
+    "30th_highest_volume_per_hour_positive_direction" = coalesce(excluded."30th_highest_volume_per_hour_positive_direction","30th_highest_volume_per_hour_positive_direction"),
+    "30th_highest_volume_per_hour_negative_direction" = coalesce(excluded."30th_highest_volume_per_hour_negative_direction","30th_highest_volume_per_hour_negative_direction"),
+    "30th_highest_volume_per_hour_total" = coalesce(excluded."30th_highest_volume_per_hour_total","30th_highest_volume_per_hour_total"),
+    "15th_percentile_speed_positive_direction" = coalesce(excluded."15th_percentile_speed_positive_direction","15th_percentile_speed_positive_direction"),
+    "15th_percentile_speed_negative_direction" = coalesce(excluded."15th_percentile_speed_negative_direction","15th_percentile_speed_negative_direction"),
+    "15th_percentile_speed_total" = coalesce(excluded."15th_percentile_speed_total","15th_percentile_speed_total"),
+    "85th_percentile_speed_positive_direction" = coalesce(excluded."85th_percentile_speed_positive_direction","85th_percentile_speed_positive_direction"),
+    "85th_percentile_speed_negative_direction" = coalesce(excluded."85th_percentile_speed_negative_direction","85th_percentile_speed_negative_direction"),
+    "85th_percentile_speed_total" = coalesce(excluded."85th_percentile_speed_total","85th_percentile_speed_total"),
+    "year" = coalesce(excluded."year","year"),
+    positive_direction = coalesce(excluded.positive_direction,positive_direction),
+    negative_direction = coalesce(excluded.negative_direction,negative_direction),
+    avg_weekday_traffic = coalesce(excluded.avg_weekday_traffic,avg_weekday_traffic),
+    number_of_days_counted = coalesce(excluded.number_of_days_counted,number_of_days_counted),
+    duration_hours = coalesce(excluded.duration_hours,duration_hours)
+    ;
+        """
+    return qry
+
+def header_update_2(header_out):
+    qry = f"""update
+        trafc.electronic_count_header
+    set
+        type_21_count_interval_minutes = {header_out['type_21_count_interval_minutes'][0]},
+        type_21_programmable_rear_to_rear_headway_bin = {header_out['type_21_programmable_rear_to_rear_headway_bin'][0]},
+        type_21_program_id = {header_out['type_21_program_id'][0]},
+        speedbin1 = {header_out['speedbin1'][0]},
+        speedbin2 = {header_out['speedbin2'][0]},
+        speedbin3 = {header_out['speedbin3'][0]},
+        speedbin4 = {header_out['speedbin4'][0]},
+        speedbin5 = {header_out['speedbin5'][0]},
+        speedbin6 = {header_out['speedbin6'][0]},
+        speedbin7 = {header_out['speedbin7'][0]},
+        speedbin8 = {header_out['speedbin8'][0]},
+        speedbin9 = {header_out['speedbin9'][0]},
+        total_light_positive_direction = {header_out['total_light_positive_direction'][0]},
+        total_light_negative_direction = {header_out['total_light_negative_direction'][0]},
+        total_light_vehicles = {header_out['total_light_vehicles'][0]},
+        total_heavy_positive_direction = {header_out['total_heavy_positive_direction'][0]},
+        total_heavy_negative_direction = {header_out['total_heavy_negative_direction'][0]},
+        total_heavy_vehicles = {header_out['total_heavy_vehicles'][0]},
+        total_short_heavy_positive_direction = {header_out['total_short_heavy_positive_direction'][0]},
+        total_short_heavy_negative_direction = {header_out['total_short_heavy_negative_direction'][0]},
+        total_short_heavy_vehicles = {header_out['total_short_heavy_vehicles'][0]},
+        total_medium_heavy_positive_direction = {header_out['total_medium_heavy_positive_direction'][0]},
+        total_medium_heavy_negative_direction = {header_out['total_medium_heavy_negative_direction'][0]},
+        total_medium_heavy_vehicles = {header_out['total_medium_heavy_vehicles'][0]},
+        total_long_heavy_positive_direction = {header_out['total_long_heavy_positive_direction'][0]},
+        total_long_heavy_negative_direction = {header_out['total_long_heavy_negative_direction'][0]},
+        total_long_heavy_vehicles = {header_out['total_long_heavy_vehicles'][0]},
+        total_vehicles_positive_direction = {header_out['total_vehicles_positive_direction'][0]},
+        total_vehicles_negative_direction = {header_out['total_vehicles_negative_direction'][0]},
+        total_vehicles = {header_out['total_vehicles'][0]},
+        average_speed_positive_direction = {header_out['average_speed_positive_direction'][0]},
+        average_speed_negative_direction = {header_out['average_speed_negative_direction'][0]},
+        average_speed = {header_out['average_speed'][0]},
+        average_speed_light_vehicles_positive_direction = {header_out['average_speed_light_vehicles_positive_direction'][0]},
+        average_speed_light_vehicles_negative_direction = {header_out['average_speed_light_vehicles_negative_direction'][0]},
+        average_speed_light_vehicles = {header_out['average_speed_light_vehicles'][0]},
+        average_speed_heavy_vehicles_positive_direction = {header_out['average_speed_heavy_vehicles_positive_direction'][0]},
+        average_speed_heavy_vehicles_negative_direction = {header_out['average_speed_heavy_vehicles_negative_direction'][0]},
+        average_speed_heavy_vehicles = {header_out['average_speed_heavy_vehicles'][0]},
+        truck_split_positive_direction = '{header_out['truck_split_positive_direction'][0]}',
+        truck_split_negative_direction = '{header_out['truck_split_negative_direction'][0]}',
+        truck_split_total = '{header_out['truck_split_total'][0]}',
+        estimated_axles_per_truck_positive_direction = {header_out['estimated_axles_per_truck_positive_direction'][0]},
+        estimated_axles_per_truck_negative_direction = {header_out['estimated_axles_per_truck_negative_direction'][0]},
+        estimated_axles_per_truck_total = {header_out['estimated_axles_per_truck_total'][0]},
+        percentage_speeding_positive_direction = {header_out['percentage_speeding_positive_direction'][0]},
+        percentage_speeding_negative_direction = {header_out['percentage_speeding_negative_direction'][0]},
+        percentage_speeding_total = {header_out['percentage_speeding_total'][0]},
+        vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire = {header_out['vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire'][0]},
+        vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire = {header_out['vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire'][0]},
+        vehicles_with_rear_to_rear_headway_less_than_2sec_total = {header_out['vehicles_with_rear_to_rear_headway_less_than_2sec_total'][0]},
+        estimated_e80_positive_direction = {header_out['estimated_e80_positive_direction'][0]},
+        estimated_e80_negative_direction = {header_out['estimated_e80_negative_direction'][0]},
+        estimated_e80_on_road = {header_out['estimated_e80_on_road'][0]},
+        adt_positive_direction = {header_out['adt_positive_direction'][0]},
+        adt_negative_direction = {header_out['adt_negative_direction'][0]},
+        adt_total = {header_out['adt_total'][0]},
+        adtt_positive_direction = {header_out['adtt_positive_direction'][0]},
+        adtt_negative_direction = {header_out['adtt_negative_direction'][0]},
+        adtt_total = {header_out['adtt_total'][0]},
+        highest_volume_per_hour_positive_direction = {header_out['highest_volume_per_hour_positive_direction'][0]},
+        highest_volume_per_hour_negative_direction = {header_out['highest_volume_per_hour_negative_direction'][0]},
+        highest_volume_per_hour_total = {header_out['highest_volume_per_hour_total'][0]},
+        "15th_highest_volume_per_hour_positive_direction" = {header_out['15th_highest_volume_per_hour_positive_direction'][0]},
+        "15th_highest_volume_per_hour_negative_direction" = {header_out['15th_highest_volume_per_hour_negative_direction'][0]},
+        "15th_highest_volume_per_hour_total" = {header_out['15th_highest_volume_per_hour_total'][0]},
+        "30th_highest_volume_per_hour_positive_direction" = {header_out['30th_highest_volume_per_hour_positive_direction'][0]},
+        "30th_highest_volume_per_hour_negative_direction" = {header_out['30th_highest_volume_per_hour_negative_direction'][0]},
+        "30th_highest_volume_per_hour_total" = {header_out['30th_highest_volume_per_hour_total'][0]},
+        "15th_percentile_speed_positive_direction" = {header_out['15th_percentile_speed_positive_direction'][0]},
+        "15th_percentile_speed_negative_direction" = {header_out['15th_percentile_speed_negative_direction'][0]},
+        "15th_percentile_speed_total" = {header_out['15th_percentile_speed_total'][0]},
+        "85th_percentile_speed_positive_direction" = {header_out['85th_percentile_speed_positive_direction'][0]},
+        "85th_percentile_speed_negative_direction" = {header_out['85th_percentile_speed_negative_direction'][0]},
+        "85th_percentile_speed_total" = {header_out['85th_percentile_speed_total'][0]},
+        "year" = {header_out['year'][0]},
+        avg_weekday_traffic = {header_out['avg_weekday_traffic'][0]},
+        number_of_days_counted = {header_out['number_of_days_counted'][0]},
+        duration_hours = {header_out['duration_hours'][0]}
+    where
+        site_id = '{header_out['site_id'][0]}'
+        and start_datetime = '{header_out['start_datetime'][0]}'
+        and end_datetime = '{header_out['end_datetime'][0]}'
+    on conflict on constraint electronic_count_header_un do update set
+    id = coalesce(excluded.id,id),
+    header_id = coalesce(excluded.header_id,header_id),
+    station_name = coalesce(excluded.station_name,station_name),
+    x = coalesce(excluded.x,x),
+    y = coalesce(excluded.y,y),
+    number_of_lanes = coalesce(excluded.number_of_lanes,number_of_lanes),
+    type_21_count_interval_minutes = coalesce(excluded.type_21_count_interval_minutes,type_21_count_interval_minutes),
+    type_21_programmable_rear_to_rear_headway_bin = coalesce(excluded.type_21_programmable_rear_to_rear_headway_bin,type_21_programmable_rear_to_rear_headway_bin),
+    type_21_program_id = coalesce(excluded.type_21_program_id,type_21_program_id),
+    speedbin1 = coalesce(excluded.speedbin1,speedbin1),
+    speedbin2 = coalesce(excluded.speedbin2,speedbin2),
+    speedbin3 = coalesce(excluded.speedbin3,speedbin3),
+    speedbin4 = coalesce(excluded.speedbin4,speedbin4),
+    speedbin5 = coalesce(excluded.speedbin5,speedbin5),
+    speedbin6 = coalesce(excluded.speedbin6,speedbin6),
+    speedbin7 = coalesce(excluded.speedbin7,speedbin7),
+    speedbin8 = coalesce(excluded.speedbin8,speedbin8),
+    speedbin9 = coalesce(excluded.speedbin9,speedbin9),
+    speedbin10 = coalesce(excluded.speedbin10,speedbin10),
+    type_10_vehicle_classification_scheme_primary = coalesce(excluded.type_10_vehicle_classification_scheme_primary,type_10_vehicle_classification_scheme_primary),
+    type_10_vehicle_classification_scheme_secondary = coalesce(excluded.type_10_vehicle_classification_scheme_secondary,type_10_vehicle_classification_scheme_secondary),
+    type_10_maximum_gap_milliseconds = coalesce(excluded.type_10_maximum_gap_milliseconds,type_10_maximum_gap_milliseconds),
+    type_10_maximum_differential_speed = coalesce(excluded.type_10_maximum_differential_speed,type_10_maximum_differential_speed),
+    type_30_summary_interval_minutes = coalesce(excluded.type_30_summary_interval_minutes,type_30_summary_interval_minutes),
+    type_30_vehicle_classification_scheme = coalesce(excluded.type_30_vehicle_classification_scheme,type_30_vehicle_classification_scheme),
+    type_70_summary_interval_minutes = coalesce(excluded.type_70_summary_interval_minutes,type_70_summary_interval_minutes),
+    type_70_vehicle_classification_scheme = coalesce(excluded.type_70_vehicle_classification_scheme,type_70_vehicle_classification_scheme),
+    type_70_maximum_gap_milliseconds = coalesce(excluded.type_70_maximum_gap_milliseconds,type_70_maximum_gap_milliseconds),
+    type_70_maximum_differential_speed = coalesce(excluded.type_70_maximum_differential_speed,type_70_maximum_differential_speed),
+    type_70_error_bin_code = coalesce(excluded.type_70_error_bin_code,type_70_error_bin_code),
+    instrumentation_description = coalesce(excluded.instrumentation_description,instrumentation_description),
+    document_url = coalesce(excluded.document_url,document_url),
+    date_processed = coalesce(excluded.date_processed,date_processed),
+    growth_rate_use = coalesce(excluded.growth_rate_use,growth_rate_use),
+    total_light_positive_direction = coalesce(excluded.total_light_positive_direction,total_light_positive_direction),
+    total_light_negative_direction = coalesce(excluded.total_light_negative_direction,total_light_negative_direction),
+    total_light_vehicles = coalesce(excluded.total_light_vehicles,total_light_vehicles),
+    total_heavy_positive_direction = coalesce(excluded.total_heavy_positive_direction,total_heavy_positive_direction),
+    total_heavy_negative_direction = coalesce(excluded.total_heavy_negative_direction,total_heavy_negative_direction),
+    total_heavy_vehicles = coalesce(excluded.total_heavy_vehicles,total_heavy_vehicles),
+    total_short_heavy_positive_direction = coalesce(excluded.total_short_heavy_positive_direction,total_short_heavy_positive_direction),
+    total_short_heavy_negative_direction = coalesce(excluded.total_short_heavy_negative_direction,total_short_heavy_negative_direction),
+    total_short_heavy_vehicles = coalesce(excluded.total_short_heavy_vehicles,total_short_heavy_vehicles),
+    total_medium_heavy_positive_direction = coalesce(excluded.total_medium_heavy_positive_direction,total_medium_heavy_positive_direction),
+    total_medium_heavy_negative_direction = coalesce(excluded.total_medium_heavy_negative_direction,total_medium_heavy_negative_direction),
+    total_medium_heavy_vehicles = coalesce(excluded.total_medium_heavy_vehicles,total_medium_heavy_vehicles),
+    total_long_heavy_positive_direction = coalesce(excluded.total_long_heavy_positive_direction,total_long_heavy_positive_direction),
+    total_long_heavy_negative_direction = coalesce(excluded.total_long_heavy_negative_direction,total_long_heavy_negative_direction),
+    total_long_heavy_vehicles = coalesce(excluded.total_long_heavy_vehicles,total_long_heavy_vehicles),
+    total_vehicles_positive_direction = coalesce(excluded.total_vehicles_positive_direction,total_vehicles_positive_direction),
+    total_vehicles_negative_direction = coalesce(excluded.total_vehicles_negative_direction,total_vehicles_negative_direction),
+    total_vehicles = coalesce(excluded.total_vehicles,total_vehicles),
+    average_speed_positive_direction = coalesce(excluded.average_speed_positive_direction,average_speed_positive_direction),
+    average_speed_negative_direction = coalesce(excluded.average_speed_negative_direction,average_speed_negative_direction),
+    average_speed = coalesce(excluded.average_speed,average_speed),
+    average_speed_light_vehicles_positive_direction = coalesce(excluded.average_speed_light_vehicles_positive_direction,average_speed_light_vehicles_positive_direction),
+    average_speed_light_vehicles_negative_direction = coalesce(excluded.average_speed_light_vehicles_negative_direction,average_speed_light_vehicles_negative_direction),
+    average_speed_light_vehicles = coalesce(excluded.average_speed_light_vehicles,average_speed_light_vehicles),
+    average_speed_heavy_vehicles_positive_direction = coalesce(excluded.average_speed_heavy_vehicles_positive_direction,average_speed_heavy_vehicles_positive_direction),
+    average_speed_heavy_vehicles_negative_direction = coalesce(excluded.average_speed_heavy_vehicles_negative_direction,average_speed_heavy_vehicles_negative_direction),
+    average_speed_heavy_vehicles = coalesce(excluded.average_speed_heavy_vehicles,average_speed_heavy_vehicles),
+    truck_split_positive_direction = coalesce(excluded.truck_split_positive_direction,truck_split_positive_direction),
+    truck_split_negative_direction = coalesce(excluded.truck_split_negative_direction,truck_split_negative_direction),
+    truck_split_total = coalesce(excluded.truck_split_total,truck_split_total),
+    estimated_axles_per_truck_positive_direction = coalesce(excluded.estimated_axles_per_truck_positive_direction,estimated_axles_per_truck_positive_direction),
+    estimated_axles_per_truck_negative_direction = coalesce(excluded.estimated_axles_per_truck_negative_direction,estimated_axles_per_truck_negative_direction),
+    estimated_axles_per_truck_total = coalesce(excluded.estimated_axles_per_truck_total,estimated_axles_per_truck_total),
+    percentage_speeding_positive_direction = coalesce(excluded.percentage_speeding_positive_direction,percentage_speeding_positive_direction),
+    percentage_speeding_negative_direction = coalesce(excluded.percentage_speeding_negative_direction,percentage_speeding_negative_direction),
+    percentage_speeding_total = coalesce(excluded.percentage_speeding_total,percentage_speeding_total),
+    vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire = coalesce(excluded.vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire,vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire),
+    vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire = coalesce(excluded.vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire,vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire),
+    vehicles_with_rear_to_rear_headway_less_than_2sec_total = coalesce(excluded.vehicles_with_rear_to_rear_headway_less_than_2sec_total,vehicles_with_rear_to_rear_headway_less_than_2sec_total),
+    estimated_e80_positive_direction = coalesce(excluded.estimated_e80_positive_direction,estimated_e80_positive_direction),
+    estimated_e80_negative_direction = coalesce(excluded.estimated_e80_negative_direction,estimated_e80_negative_direction),
+    estimated_e80_on_road = coalesce(excluded.estimated_e80_on_road,estimated_e80_on_road),
+    adt_positive_direction = coalesce(excluded.adt_positive_direction,adt_positive_direction),
+    adt_negative_direction = coalesce(excluded.adt_negative_direction,adt_negative_direction),
+    adt_total = coalesce(excluded.adt_total,adt_total),
+    adtt_positive_direction = coalesce(excluded.adtt_positive_direction,adtt_positive_direction),
+    adtt_negative_direction = coalesce(excluded.adtt_negative_direction,adtt_negative_direction),
+    adtt_total = coalesce(excluded.adtt_total,adtt_total),
+    highest_volume_per_hour_positive_direction = coalesce(excluded.highest_volume_per_hour_positive_direction,highest_volume_per_hour_positive_direction),
+    highest_volume_per_hour_negative_direction = coalesce(excluded.highest_volume_per_hour_negative_direction,highest_volume_per_hour_negative_direction),
+    highest_volume_per_hour_total = coalesce(excluded.highest_volume_per_hour_total,highest_volume_per_hour_total),
+    "15th_highest_volume_per_hour_positive_direction" = coalesce(excluded."15th_highest_volume_per_hour_positive_direction","15th_highest_volume_per_hour_positive_direction"),
+    "15th_highest_volume_per_hour_negative_direction" = coalesce(excluded."15th_highest_volume_per_hour_negative_direction","15th_highest_volume_per_hour_negative_direction"),
+    "15th_highest_volume_per_hour_total" = coalesce(excluded."15th_highest_volume_per_hour_total","15th_highest_volume_per_hour_total"),
+    "30th_highest_volume_per_hour_positive_direction" = coalesce(excluded."30th_highest_volume_per_hour_positive_direction","30th_highest_volume_per_hour_positive_direction"),
+    "30th_highest_volume_per_hour_negative_direction" = coalesce(excluded."30th_highest_volume_per_hour_negative_direction","30th_highest_volume_per_hour_negative_direction"),
+    "30th_highest_volume_per_hour_total" = coalesce(excluded."30th_highest_volume_per_hour_total","30th_highest_volume_per_hour_total"),
+    "15th_percentile_speed_positive_direction" = coalesce(excluded."15th_percentile_speed_positive_direction","15th_percentile_speed_positive_direction"),
+    "15th_percentile_speed_negative_direction" = coalesce(excluded."15th_percentile_speed_negative_direction","15th_percentile_speed_negative_direction"),
+    "15th_percentile_speed_total" = coalesce(excluded."15th_percentile_speed_total","15th_percentile_speed_total"),
+    "85th_percentile_speed_positive_direction" = coalesce(excluded."85th_percentile_speed_positive_direction","85th_percentile_speed_positive_direction"),
+    "85th_percentile_speed_negative_direction" = coalesce(excluded."85th_percentile_speed_negative_direction","85th_percentile_speed_negative_direction"),
+    "85th_percentile_speed_total" = coalesce(excluded."85th_percentile_speed_total","85th_percentile_speed_total"),
+    "year" = coalesce(excluded."year","year"),
+    positive_direction = coalesce(excluded.positive_direction,positive_direction),
+    negative_direction = coalesce(excluded.negative_direction,negative_direction),
+    avg_weekday_traffic = coalesce(excluded.avg_weekday_traffic,avg_weekday_traffic),
+    number_of_days_counted = coalesce(excluded.number_of_days_counted,number_of_days_counted),
+    duration_hours = coalesce(excluded.duration_hours,duration_hours)
+    ;
+    """
+    return qry
 
 def wim_stations_header_update(header_id):
     SELECT_TYPE10_QRY = f"""SELECT 
@@ -1858,7 +2871,7 @@ def wim_stations_header_update(header_id):
     #     worst_triple_axle_cnt = {},
     #     worst_triple_axle_olhv_perc = {},
     #     worst_triple_axle_tonperhv = {},
-    #     bridge_formula_cnt = {},
+    #     bridge_formula_cnt = {(18000 + 2.1 * (df2.loc[df2['axle_spacing_number']>1].groupby('id')['axle_spacing_cm'].sum().mean().round(2))).round(2)},
     #     bridge_formula_olhv_perc = {},
     #     bridge_formula_tonperhv = {},
     #     gross_formula_cnt = {},
@@ -1923,7 +2936,14 @@ def wim_stations_header_update(header_id):
     insert into trafc.electronic_count_header_hswim (
         header_id,
         egrl_percent,
-        egrw_percent,
+        egrl_percent_positive_direction,
+        egrl_percent_negative_direction,
+        egrw_percent ,
+        egrw_percent_positive_direction ,
+        egrw_percent_negative_direction ,
+        num_weighed,
+        num_weighed_positive_direction,
+        num_weighed_negative_direction,
         mean_equivalent_axle_mass,
         mean_equivalent_axle_mass_positive_direction,
         mean_equivalent_axle_mass_negative_direction,
@@ -2041,6 +3061,15 @@ def wim_stations_header_update(header_id):
         )
     values(
         '{header_id}',
+        , --  egrl_percent,
+        , --  egrl_percent_positive_direction,
+        , --  egrl_percent_negative_direction,
+        , --  egrw_percent ,
+        , --  egrw_percent_positive_direction ,
+        , --  egrw_percent_negative_direction ,
+        {df3.groupby(pd.Grouper(key='id')).count().count()[0]}, --  num_weighed,
+        {df3.loc[df3['direction']=='P'].groupby(pd.Grouper(key='id')).count().count()[0]}, --  num_weighed_positive_direction,
+        {df3.loc[df3['direction']=='N'].groupby(pd.Grouper(key='id')).count().count()[0]}, --  num_weighed_negative_direction,
         {(df.groupby(pd.Grouper(key='id')).mean()*2).mean().round(2)}, --mean_equivalent_axle_mass
         {(df.loc[df['direction']=='P'].groupby(pd.Grouper(key='id')).mean()*2).mean().round(2)}, --mean_equivalent_axle_mass_positive_direction
         {(df.loc[df['direction']=='N'].groupby(pd.Grouper(key='id')).mean()*2).mean().round(2)}, --mean_equivalent_axle_mass_negative_direction
@@ -2098,7 +3127,7 @@ def wim_stations_header_update(header_id):
         ,    -- worst_triple_axle_cnt
         ,    -- worst_triple_axle_olhv_perc
         ,    -- worst_triple_axle_tonperhv
-        ,    -- bridge_formula_cnt
+        {(18000 + 2.1 * (df.loc[df['axle_spacing_number']>1].groupby('id')['axle_spacing_cm'].sum().mean().round(2))).round(2)},    -- bridge_formula_cnt
         ,    -- bridge_formula_olhv_perc
         ,    -- bridge_formula_tonperhv
         ,    -- gross_formula_cnt
@@ -2155,6 +3184,130 @@ def wim_stations_header_update(header_id):
         ,    -- total_avg_cnt_negative_direciton
         ,    -- total_avg_olhv_perc_negative_direciton
             -- total_avg_tonperhv_negative_direciton
+            ON CONFLICT ON CONSTRAINT electronic_count_header_hswim_pkey DO UPDATE SET
+            egrl_percent = coalesce(excluded.egrl_percent,egrl_percent),
+            egrl_percent_positive_direction = coalesce(excluded.egrl_percent_positive_direction,egrl_percent_positive_direction),
+            egrl_percent_negative_direction = coalesce(excluded.egrl_percent_negative_direction,egrl_percent_negative_direction),
+            egrw_percent = coalesce(excluded.egrw_percent,egrw_percent),
+            egrw_percent_positive_direction = coalesce(excluded.egrw_percent_positive_direction,egrw_percent_positive_direction),
+            egrw_percent_negative_direction = coalesce(excluded.egrw_percent_negative_direction,egrw_percent_negative_direction),
+            num_weighed = coalesce(excluded.num_weighed,num_weighed),
+            num_weighed_positive_direction = coalesce(excluded.num_weighed_positive_direction,num_weighed_positive_direction),
+            num_weighed_negative_direction = coalesce(excluded.num_weighed_negative_direction,num_weighed_negative_direction),
+            mean_equivalent_axle_mass = coalesce(excluded.mean_equivalent_axle_mass,mean_equivalent_axle_mass),
+            mean_equivalent_axle_mass_positive_direction = coalesce(excluded.mean_equivalent_axle_mass_positive_direction,mean_equivalent_axle_mass_positive_direction),
+            mean_equivalent_axle_mass_negative_direction = coalesce(excluded.mean_equivalent_axle_mass_negative_direction,mean_equivalent_axle_mass_negative_direction),
+            mean_axle_spacing = coalesce(excluded.mean_axle_spacing,mean_axle_spacing),
+            mean_axle_spacing_positive_direction = coalesce(excluded.mean_axle_spacing_positive_direction,mean_axle_spacing_positive_direction),
+            mean_axle_spacing_negative_direction = coalesce(excluded.mean_axle_spacing_negative_direction,mean_axle_spacing_negative_direction),
+            e80_per_axle = coalesce(excluded.e80_per_axle,e80_per_axle),
+            e80_per_axle_positive_direction = coalesce(excluded.e80_per_axle_positive_direction,e80_per_axle_positive_direction),
+            e80_per_axle_negative_direction = coalesce(excluded.e80_per_axle_negative_direction,e80_per_axle_negative_direction),
+            olhv = coalesce(excluded.olhv,olhv),
+            olhv_positive_direction = coalesce(excluded.olhv_positive_direction,olhv_positive_direction),
+            olhv_negative_direction = coalesce(excluded.olhv_negative_direction,olhv_negative_direction),
+            olhv_percent = coalesce(excluded.olhv_percent,olhv_percent),
+            olhv_percent_positive_direction = coalesce(excluded.olhv_percent_positive_direction,olhv_percent_positive_direction),
+            olhv_percent_negative_direction = coalesce(excluded.olhv_percent_negative_direction,olhv_percent_negative_direction),
+            tonnage_generated = coalesce(excluded.tonnage_generated,tonnage_generated),
+            tonnage_generated_positive_direction = coalesce(excluded.tonnage_generated_positive_direction,tonnage_generated_positive_direction),
+            tonnage_generated_negative_direction = coalesce(excluded.tonnage_generated_negative_direction,tonnage_generated_negative_direction),
+            olton = coalesce(excluded.olton,olton),
+            olton_positive_direction = coalesce(excluded.olton_positive_direction,olton_positive_direction),
+            olton_negative_direction = coalesce(excluded.olton_negative_direction,olton_negative_direction),
+            olton_percent = coalesce(excluded.olton_percent,olton_percent),
+            olton_percent_positive_direction = coalesce(excluded.olton_percent_positive_direction,olton_percent_positive_direction),
+            olton_percent_negative_direction = coalesce(excluded.olton_percent_negative_direction,olton_percent_negative_direction),
+            ole80 = coalesce(excluded.ole80,ole80),
+            ole80_positive_direction = coalesce(excluded.ole80_positive_direction,ole80_positive_direction),
+            ole80_negative_direction = coalesce(excluded.ole80_negative_direction,ole80_negative_direction),
+            ole80_percent = coalesce(excluded.ole80_percent,ole80_percent),
+            ole80_percent_positive_direction = coalesce(excluded.ole80_percent_positive_direction,ole80_percent_positive_direction),
+            ole80_percent_negative_direction = coalesce(excluded.ole80_percent_negative_direction,ole80_percent_negative_direction),
+            xe80 = coalesce(excluded.xe80,xe80),
+            xe80_positive_direction = coalesce(excluded.xe80_positive_direction,xe80_positive_direction),
+            xe80_negative_direction = coalesce(excluded.xe80_negative_direction,xe80_negative_direction),
+            xe80_percent = coalesce(excluded.xe80_percent,xe80_percent),
+            xe80_percent_positive_direction = coalesce(excluded.xe80_percent_positive_direction,xe80_percent_positive_direction),
+            xe80_percent_negative_direction = coalesce(excluded.xe80_percent_negative_direction,xe80_percent_negative_direction),
+            e80_per_day = coalesce(excluded.e80_per_day,e80_per_day),
+            e80_per_day_positive_direction = coalesce(excluded.e80_per_day_positive_direction,e80_per_day_positive_direction),
+            e80_per_day_negative_direction = coalesce(excluded.e80_per_day_negative_direction,e80_per_day_negative_direction),
+            e80_per_heavy_vehicle = coalesce(excluded.e80_per_heavy_vehicle,e80_per_heavy_vehicle),
+            e80_per_heavy_vehicle_positive_direction = coalesce(excluded.e80_per_heavy_vehicle_positive_direction,e80_per_heavy_vehicle_positive_direction),
+            e80_per_heavy_vehicle_negative_direction = coalesce(excluded.e80_per_heavy_vehicle_negative_direction,e80_per_heavy_vehicle_negative_direction),
+            worst_steering_single_axle_cnt = coalesce(excluded.worst_steering_single_axle_cnt,worst_steering_single_axle_cnt),
+            worst_steering_single_axle_olhv_perc = coalesce(excluded.worst_steering_single_axle_olhv_perc,worst_steering_single_axle_olhv_perc),
+            worst_steering_single_axle_tonperhv = coalesce(excluded.worst_steering_single_axle_tonperhv,worst_steering_single_axle_tonperhv),
+            worst_steering_double_axle_cnt = coalesce(excluded.worst_steering_double_axle_cnt,worst_steering_double_axle_cnt),
+            worst_steering_double_axle_olhv_perc = coalesce(excluded.worst_steering_double_axle_olhv_perc,worst_steering_double_axle_olhv_perc),
+            worst_steering_double_axle_tonperhv = coalesce(excluded.worst_steering_double_axle_tonperhv,worst_steering_double_axle_tonperhv),
+            worst_non_steering_single_axle_cnt = coalesce(excluded.worst_non_steering_single_axle_cnt,worst_non_steering_single_axle_cnt),
+            worst_non_steering_single_axle_olhv_perc = coalesce(excluded.worst_non_steering_single_axle_olhv_perc,worst_non_steering_single_axle_olhv_perc),
+            worst_non_steering_single_axle_tonperhv = coalesce(excluded.worst_non_steering_single_axle_tonperhv,worst_non_steering_single_axle_tonperhv),
+            worst_non_steering_double_axle_cnt = coalesce(excluded.worst_non_steering_double_axle_cnt,worst_non_steering_double_axle_cnt),
+            worst_non_steering_double_axle_olhv_perc = coalesce(excluded.worst_non_steering_double_axle_olhv_perc,worst_non_steering_double_axle_olhv_perc),
+            worst_non_steering_double_axle_tonperhv = coalesce(excluded.worst_non_steering_double_axle_tonperhv,worst_non_steering_double_axle_tonperhv),
+            worst_triple_axle_cnt = coalesce(excluded.worst_triple_axle_cnt,worst_triple_axle_cnt),
+            worst_triple_axle_olhv_perc = coalesce(excluded.worst_triple_axle_olhv_perc,worst_triple_axle_olhv_perc),
+            worst_triple_axle_tonperhv = coalesce(excluded.worst_triple_axle_tonperhv,worst_triple_axle_tonperhv),
+            bridge_formula_cnt = coalesce(excluded.bridge_formula_cnt,bridge_formula_cnt),
+            bridge_formula_olhv_perc = coalesce(excluded.bridge_formula_olhv_perc,bridge_formula_olhv_perc),
+            bridge_formula_tonperhv = coalesce(excluded.bridge_formula_tonperhv,bridge_formula_tonperhv),
+            gross_formula_cnt = coalesce(excluded.gross_formula_cnt,gross_formula_cnt),
+            gross_formula_olhv_perc = coalesce(excluded.gross_formula_olhv_perc,gross_formula_olhv_perc),
+            gross_formula_tonperhv = coalesce(excluded.gross_formula_tonperhv,gross_formula_tonperhv),
+            total_avg_cnt = coalesce(excluded.total_avg_cnt,total_avg_cnt),
+            total_avg_olhv_perc = coalesce(excluded.total_avg_olhv_perc,total_avg_olhv_perc),
+            total_avg_tonperhv = coalesce(excluded.total_avg_tonperhv,total_avg_tonperhv),
+            worst_steering_single_axle_cnt_positive_direciton = coalesce(excluded.worst_steering_single_axle_cnt_positive_direciton,worst_steering_single_axle_cnt_positive_direciton),
+            worst_steering_single_axle_olhv_perc_positive_direciton = coalesce(excluded.worst_steering_single_axle_olhv_perc_positive_direciton,worst_steering_single_axle_olhv_perc_positive_direciton),
+            worst_steering_single_axle_tonperhv_positive_direciton = coalesce(excluded.worst_steering_single_axle_tonperhv_positive_direciton,worst_steering_single_axle_tonperhv_positive_direciton),
+            worst_steering_double_axle_cnt_positive_direciton = coalesce(excluded.worst_steering_double_axle_cnt_positive_direciton,worst_steering_double_axle_cnt_positive_direciton),
+            worst_steering_double_axle_olhv_perc_positive_direciton = coalesce(excluded.worst_steering_double_axle_olhv_perc_positive_direciton,worst_steering_double_axle_olhv_perc_positive_direciton),
+            worst_steering_double_axle_tonperhv_positive_direciton = coalesce(excluded.worst_steering_double_axle_tonperhv_positive_direciton,worst_steering_double_axle_tonperhv_positive_direciton),
+            worst_non_steering_single_axle_cnt_positive_direciton = coalesce(excluded.worst_non_steering_single_axle_cnt_positive_direciton,worst_non_steering_single_axle_cnt_positive_direciton),
+            worst_non_steering_single_axle_olhv_perc_positive_direciton = coalesce(excluded.worst_non_steering_single_axle_olhv_perc_positive_direciton,worst_non_steering_single_axle_olhv_perc_positive_direciton),
+            worst_non_steering_single_axle_tonperhv_positive_direciton = coalesce(excluded.worst_non_steering_single_axle_tonperhv_positive_direciton,worst_non_steering_single_axle_tonperhv_positive_direciton),
+            worst_non_steering_double_axle_cnt_positive_direciton = coalesce(excluded.worst_non_steering_double_axle_cnt_positive_direciton,worst_non_steering_double_axle_cnt_positive_direciton),
+            worst_non_steering_double_axle_olhv_perc_positive_direciton = coalesce(excluded.worst_non_steering_double_axle_olhv_perc_positive_direciton,worst_non_steering_double_axle_olhv_perc_positive_direciton),
+            worst_non_steering_double_axle_tonperhv_positive_direciton = coalesce(excluded.worst_non_steering_double_axle_tonperhv_positive_direciton,worst_non_steering_double_axle_tonperhv_positive_direciton),
+            worst_triple_axle_cnt_positive_direciton = coalesce(excluded.worst_triple_axle_cnt_positive_direciton,worst_triple_axle_cnt_positive_direciton),
+            worst_triple_axle_olhv_perc_positive_direciton = coalesce(excluded.worst_triple_axle_olhv_perc_positive_direciton,worst_triple_axle_olhv_perc_positive_direciton),
+            worst_triple_axle_tonperhv_positive_direciton = coalesce(excluded.worst_triple_axle_tonperhv_positive_direciton,worst_triple_axle_tonperhv_positive_direciton),
+            bridge_formula_cnt_positive_direciton = coalesce(excluded.bridge_formula_cnt_positive_direciton,bridge_formula_cnt_positive_direciton),
+            bridge_formula_olhv_perc_positive_direciton = coalesce(excluded.bridge_formula_olhv_perc_positive_direciton,bridge_formula_olhv_perc_positive_direciton),
+            bridge_formula_tonperhv_positive_direciton = coalesce(excluded.bridge_formula_tonperhv_positive_direciton,bridge_formula_tonperhv_positive_direciton),
+            gross_formula_cnt_positive_direciton = coalesce(excluded.gross_formula_cnt_positive_direciton,gross_formula_cnt_positive_direciton),
+            gross_formula_olhv_perc_positive_direciton = coalesce(excluded.gross_formula_olhv_perc_positive_direciton,gross_formula_olhv_perc_positive_direciton),
+            gross_formula_tonperhv_positive_direciton = coalesce(excluded.gross_formula_tonperhv_positive_direciton,gross_formula_tonperhv_positive_direciton),
+            total_avg_cnt_positive_direciton = coalesce(excluded.total_avg_cnt_positive_direciton,total_avg_cnt_positive_direciton),
+            total_avg_olhv_perc_positive_direciton = coalesce(excluded.total_avg_olhv_perc_positive_direciton,total_avg_olhv_perc_positive_direciton),
+            total_avg_tonperhv_positive_direciton = coalesce(excluded.total_avg_tonperhv_positive_direciton,total_avg_tonperhv_positive_direciton),
+            worst_steering_single_axle_cnt_negative_direciton = coalesce(excluded.worst_steering_single_axle_cnt_negative_direciton,worst_steering_single_axle_cnt_negative_direciton),
+            worst_steering_single_axle_olhv_perc_negative_direciton = coalesce(excluded.worst_steering_single_axle_olhv_perc_negative_direciton,worst_steering_single_axle_olhv_perc_negative_direciton),
+            worst_steering_single_axle_tonperhv_negative_direciton = coalesce(excluded.worst_steering_single_axle_tonperhv_negative_direciton,worst_steering_single_axle_tonperhv_negative_direciton),
+            worst_steering_double_axle_cnt_negative_direciton = coalesce(excluded.worst_steering_double_axle_cnt_negative_direciton,worst_steering_double_axle_cnt_negative_direciton),
+            worst_steering_double_axle_olhv_perc_negative_direciton = coalesce(excluded.worst_steering_double_axle_olhv_perc_negative_direciton,worst_steering_double_axle_olhv_perc_negative_direciton),
+            worst_steering_double_axle_tonperhv_negative_direciton = coalesce(excluded.worst_steering_double_axle_tonperhv_negative_direciton,worst_steering_double_axle_tonperhv_negative_direciton),
+            worst_non_steering_single_axle_cnt_negative_direciton = coalesce(excluded.worst_non_steering_single_axle_cnt_negative_direciton,worst_non_steering_single_axle_cnt_negative_direciton),
+            worst_non_steering_single_axle_olhv_perc_negative_direciton = coalesce(excluded.worst_non_steering_single_axle_olhv_perc_negative_direciton,worst_non_steering_single_axle_olhv_perc_negative_direciton),
+            worst_non_steering_single_axle_tonperhv_negative_direciton = coalesce(excluded.worst_non_steering_single_axle_tonperhv_negative_direciton,worst_non_steering_single_axle_tonperhv_negative_direciton),
+            worst_non_steering_double_axle_cnt_negative_direciton = coalesce(excluded.worst_non_steering_double_axle_cnt_negative_direciton,worst_non_steering_double_axle_cnt_negative_direciton),
+            worst_non_steering_double_axle_olhv_perc_negative_direciton = coalesce(excluded.worst_non_steering_double_axle_olhv_perc_negative_direciton,worst_non_steering_double_axle_olhv_perc_negative_direciton),
+            worst_non_steering_double_axle_tonperhv_negative_direciton = coalesce(excluded.worst_non_steering_double_axle_tonperhv_negative_direciton,worst_non_steering_double_axle_tonperhv_negative_direciton),
+            worst_triple_axle_cnt_negative_direciton = coalesce(excluded.worst_triple_axle_cnt_negative_direciton,worst_triple_axle_cnt_negative_direciton),
+            worst_triple_axle_olhv_perc_negative_direciton = coalesce(excluded.worst_triple_axle_olhv_perc_negative_direciton,worst_triple_axle_olhv_perc_negative_direciton),
+            worst_triple_axle_tonperhv_negative_direciton = coalesce(excluded.worst_triple_axle_tonperhv_negative_direciton,worst_triple_axle_tonperhv_negative_direciton),
+            bridge_formula_cnt_negative_direciton = coalesce(excluded.bridge_formula_cnt_negative_direciton,bridge_formula_cnt_negative_direciton),
+            bridge_formula_olhv_perc_negative_direciton = coalesce(excluded.bridge_formula_olhv_perc_negative_direciton,bridge_formula_olhv_perc_negative_direciton),
+            bridge_formula_tonperhv_negative_direciton = coalesce(excluded.bridge_formula_tonperhv_negative_direciton,bridge_formula_tonperhv_negative_direciton),
+            gross_formula_cnt_negative_direciton = coalesce(excluded.gross_formula_cnt_negative_direciton,gross_formula_cnt_negative_direciton),
+            gross_formula_olhv_perc_negative_direciton = coalesce(excluded.gross_formula_olhv_perc_negative_direciton,gross_formula_olhv_perc_negative_direciton),
+            gross_formula_tonperhv_negative_direciton = coalesce(excluded.gross_formula_tonperhv_negative_direciton,gross_formula_tonperhv_negative_direciton),
+            total_avg_cnt_negative_direciton = coalesce(excluded.total_avg_cnt_negative_direciton,total_avg_cnt_negative_direciton),
+            total_avg_olhv_perc_negative_direciton = coalesce(excluded.total_avg_olhv_perc_negative_direciton,total_avg_olhv_perc_negative_direciton),
+            total_avg_tonperhv_negative_direciton = coalesce(excluded.total_avg_tonperhv_negative_direciton,total_avg_tonperhv_negative_direciton)
         )
     """
 

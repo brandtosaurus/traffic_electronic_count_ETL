@@ -493,7 +493,8 @@ alter table trafc.electronic_count_header add column total_avg_olhv_perc_negativ
 alter table trafc.electronic_count_header add column total_avg_tonperhv_negative_direciton numeric;
 """
 
-CREATE_HSWIM_HEADER_TABLE = """CREATE TABLE IF NOT EXISTS trafc.electronic_count_header_hswim (
+CREATE_HSWIM_HEADER_TABLE = """
+CREATE TABLE IF NOT EXISTS trafc.electronic_count_header_hswim (
 header_id uuid not null primary key,
 egrl_percent numeric,
 egrw_percent numeric,
