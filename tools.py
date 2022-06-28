@@ -2763,7 +2763,7 @@ def header_update_2(header_out):
     """
     return qry
 
-def wim_stations_header_update(header_id):
+def wim_stations_header_insert(header_id):
     SELECT_TYPE10_QRY = f"""SELECT 
         *
         FROM trafc.electronic_count_data_type_10 t10
@@ -2805,132 +2805,6 @@ def wim_stations_header_update(header_id):
         """
     df = pd.read_sql_query(AXLE_SPACING_SELECT_QRY,config.ENGINE)
     df3 = pd.read_sql_query(WHEEL_MASS_SELECT_QRY,config.ENGINE)
-
-    # axle_load_limits = pd.read_sql_query("SELECT * FROM traf_lu.axle_load_limits",config.ENGINE)
-    # gross_vehicle_mass_limits = pd.read_sql_query("SELECT * FROM traf_lu.gross_vehicle_mass_limits",config.ENGINE)
-
-    # UPDATE_STRING = f"""
-    # update
-    #     trafc.electronic_count_header set
-    #     egrl_percent {},
-    #     egrw_percent {},
-    #     mean_equivalent_axle_mass = {(df3.groupby(pd.Grouper(key='id')).mean()*2).mean().round(2)},
-    #     mean_equivalent_axle_mass_positive_direction = {(df3.loc[df3['direction']=='P'].groupby(pd.Grouper(key='id')).mean()*2).mean().round(2)},
-    #     mean_equivalent_axle_mass_negative_direction = {(df3.loc[df3['direction']=='N'].groupby(pd.Grouper(key='id')).mean()*2).mean().round(2)},
-    #     mean_axle_spacing = {(df3.groupby(pd.Grouper(key='id')).mean()).mean()['axle_spacing_number'].round()},
-    #     mean_axle_spacing_positive_direction = {(df3.loc[df3['direction']=='P'].groupby(pd.Grouper(key='id')).mean()).mean()['axle_spacing_number'].round()},
-    #     mean_axle_spacing_negative_direction = {(df3.loc[df3['direction']=='N'].groupby(pd.Grouper(key='id')).mean()).mean()['axle_spacing_number'].round()},
-    #     e80_per_axle = {((df3['wheel_mass']*2/8200)**4.2).sum().round()},
-    #     e80_per_axle_positive_direction = {((df3.loc[df3['direction']=='P']['wheel_mass']*2/8200)**4.2).sum().round()},
-    #     e80_per_axle_negative_direction = {((df3.loc[df3['direction']=='N']['wheel_mass']*2/8200)**4.2).sum().round()},
-    #     olhv = {len(df3.loc[df3['gross_mass']>df3['vehicle_mass_limit_kg']]['id'].unique())},
-    #     olhv_positive_direction = {len(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['id'].unique())},
-    #     olhv_negative_direction = {len(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['id'].unique())},
-    #     olhv_percent = {round(((len(df3.loc[df3['gross_mass']>df3['vehicle_mass_limit_kg']]['id'].unique())/len(df3['id'].unique()))*100),2)},
-    #     olhv_percent_positive_direction = {round(((len(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['id'].unique())/len(df3.loc[df3['direction']=='P']['id'].unique()))*100),2)},
-    #     olhv_percent_negative_direction = {round(((len(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['id'].unique())/len(df3.loc[df3['direction']=='N']['id'].unique()))*100),2)},
-    #     tonnage_generated = {((df3['wheel_mass']*2).sum()/1000).round().astype(int)},
-    #     tonnage_generated_positive_direction = {((df3.loc[df3['direction']=='P']['wheel_mass']*2).sum()/1000).round().astype(int)},
-    #     tonnage_generated_negative_direction = {((df3.loc[df3['direction']=='N']['wheel_mass']*2).sum()/1000).round().astype(int)},
-    #     olton = {(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])]['wheel_mass']*2).sum().astype(int)},
-    #     olton_positive_direction = {(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['wheel_mass']*2).sum().astype(int)},
-    #     olton_negative_direction = {(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['wheel_mass']*2).sum().astype(int)},
-    #     olton_percent = {round(((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])]['wheel_mass']*2).sum()/(df3['wheel_mass']*2).sum())*100,2)},
-    #     olton_percent_positive_direction = {round(((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['wheel_mass']*2).sum()/(df3.loc[df3['direction']=='P']['wheel_mass']*2).sum())*100,2)},
-    #     olton_percent_negative_direction = {round(((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['wheel_mass']*2).sum()/(df3.loc[df3['direction']=='N']['wheel_mass']*2).sum())*100,2)},
-    #     ole80 = {((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])]['wheel_mass']*2/8200)**4.2).sum().round()},
-    #     ole80_positive_direction = {((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['wheel_mass']*2/8200)**4.2).sum().round()},
-    #     ole80_negative_direction = {((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['wheel_mass']*2/8200)**4.2).sum().round()},
-    #     ole80_percent = {((((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])]['wheel_mass']*2/8200)**4.2).sum().round()/((df3['wheel_mass']*2/8200)**4.2).sum().round())*100).round(2)},
-    #     ole80_percent_positive_direction = {((((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['wheel_mass']*2/8200)**4.2).sum().round()/((df3.loc[df3['direction']=='P']['wheel_mass']*2/8200)**4.2).sum().round())*100).round(2)},
-    #     ole80_percent_negative_direction = {((((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['wheel_mass']*2/8200)**4.2).sum().round()/((df3.loc[df3['direction']=='N']['wheel_mass']*2/8200)**4.2).sum().round())*100).round(2)},
-    #     xe80 = {},
-    #     xe80_positive_direction = {},
-    #     xe80_negative_direction = {},
-    #     xe80_percent = {},
-    #     xe80_percent_positive_direction = {},
-    #     xe80_percent_negative_direction = {},
-    #     e80_per_day = {((((df3['wheel_mass']*2/8200)**4.2).sum().round()/df3.groupby(pd.Grouper(key='start_datetime',freq='D')).count().count()[0])*100).round(2)},
-    #     e80_per_day_positive_direction = {((((df3.loc[df3['direction']=='P']['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[df3['direction']=='P'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().count()[0])*100).round(2)},
-    #     e80_per_day_negative_direction = {((((df3.loc[df3['direction']=='N']['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[df3['direction']=='N'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().count()[0])*100).round(2)},
-    #     e80_per_heavy_vehicle = {((((df3.loc[df3['vehicle_class_code_primary_scheme']>3]['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[df3['vehicle_class_code_primary_scheme']>3].count()[0])*100).round(2)},
-    #     e80_per_heavy_vehicle_positive_direction = {((((df3.loc[(df3['vehicle_class_code_primary_scheme']>3)&(df3['direction']=='P')]['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[(df3['vehicle_class_code_primary_scheme']>3)&(df3['direction']=='P')].count()[0])*100).round(2)},
-    #     e80_per_heavy_vehicle_negative_direction = {((((df3.loc[(df3['vehicle_class_code_primary_scheme']>3)&(df3['direction']=='N')]['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[(df3['vehicle_class_code_primary_scheme']>3)&(df3['direction']=='N')].count()[0])*100).round(2)},
-    #     worst_steering_single_axle_cnt = {},
-    #     worst_steering_single_axle_olhv_perc = {},
-    #     worst_steering_single_axle_tonperhv = {},
-    #     worst_steering_double_axle_cnt = {},
-    #     worst_steering_double_axle_olhv_perc = {},
-    #     worst_steering_double_axle_tonperhv = {},
-    #     worst_non_steering_single_axle_cnt = {},
-    #     worst_non_steering_single_axle_olhv_perc = {},
-    #     worst_non_steering_single_axle_tonperhv = {},
-    #     worst_non_steering_double_axle_cnt = {},
-    #     worst_non_steering_double_axle_olhv_perc = {},
-    #     worst_non_steering_double_axle_tonperhv = {},
-    #     worst_triple_axle_cnt = {},
-    #     worst_triple_axle_olhv_perc = {},
-    #     worst_triple_axle_tonperhv = {},
-    #     bridge_formula_cnt = {(18000 + 2.1 * (df2.loc[df2['axle_spacing_number']>1].groupby('id')['axle_spacing_cm'].sum().mean().round(2))).round(2)},
-    #     bridge_formula_olhv_perc = {},
-    #     bridge_formula_tonperhv = {},
-    #     gross_formula_cnt = {},
-    #     gross_formula_olhv_perc = {},
-    #     gross_formula_tonperhv = {},
-    #     total_avg_cnt = {},
-    #     total_avg_olhv_perc = {},
-    #     total_avg_tonperhv = {},
-    #     worst_steering_single_axle_cnt_positive_direciton = {},
-    #     worst_steering_single_axle_olhv_perc_positive_direciton = {},
-    #     worst_steering_single_axle_tonperhv_positive_direciton = {},
-    #     worst_steering_double_axle_cnt_positive_direciton = {},
-    #     worst_steering_double_axle_olhv_perc_positive_direciton = {},
-    #     worst_steering_double_axle_tonperhv_positive_direciton = {},
-    #     worst_non_steering_single_axle_cnt_positive_direciton = {},
-    #     worst_non_steering_single_axle_olhv_perc_positive_direciton = {},
-    #     worst_non_steering_single_axle_tonperhv_positive_direciton = {},
-    #     worst_non_steering_double_axle_cnt_positive_direciton = {},
-    #     worst_non_steering_double_axle_olhv_perc_positive_direciton = {},
-    #     worst_non_steering_double_axle_tonperhv_positive_direciton = {},
-    #     worst_triple_axle_cnt_positive_direciton = {},
-    #     worst_triple_axle_olhv_perc_positive_direciton = {},
-    #     worst_triple_axle_tonperhv_positive_direciton = {},
-    #     bridge_formula_cnt_positive_direciton = {},
-    #     bridge_formula_olhv_perc_positive_direciton = {},
-    #     bridge_formula_tonperhv_positive_direciton = {},
-    #     gross_formula_cnt_positive_direciton = {},
-    #     gross_formula_olhv_perc_positive_direciton = {},
-    #     gross_formula_tonperhv_positive_direciton = {},
-    #     total_avg_cnt_positive_direciton = {},
-    #     total_avg_olhv_perc_positive_direciton = {},
-    #     total_avg_tonperhv_positive_direciton = {},
-    #     worst_steering_single_axle_cnt_negative_direciton = {},
-    #     worst_steering_single_axle_olhv_perc_negative_direciton = {},
-    #     worst_steering_single_axle_tonperhv_negative_direciton = {},
-    #     worst_steering_double_axle_cnt_negative_direciton = {},
-    #     worst_steering_double_axle_olhv_perc_negative_direciton = {},
-    #     worst_steering_double_axle_tonperhv_negative_direciton = {},
-    #     worst_non_steering_single_axle_cnt_negative_direciton = {},
-    #     worst_non_steering_single_axle_olhv_perc_negative_direciton = {},
-    #     worst_non_steering_single_axle_tonperhv_negative_direciton = {},
-    #     worst_non_steering_double_axle_cnt_negative_direciton = {},
-    #     worst_non_steering_double_axle_olhv_perc_negative_direciton = {},
-    #     worst_non_steering_double_axle_tonperhv_negative_direciton = {},
-    #     worst_triple_axle_cnt_negative_direciton = {},
-    #     worst_triple_axle_olhv_perc_negative_direciton = {},
-    #     worst_triple_axle_tonperhv_negative_direciton = {},
-    #     bridge_formula_cnt_negative_direciton = {},
-    #     bridge_formula_olhv_perc_negative_direciton = {},
-    #     bridge_formula_tonperhv_negative_direciton = {},
-    #     gross_formula_cnt_negative_direciton = {},
-    #     gross_formula_olhv_perc_negative_direciton = {},
-    #     gross_formula_tonperhv_negative_direciton = {},
-    #     total_avg_cnt_negative_direciton = {},
-    #     total_avg_olhv_perc_negative_direciton = {},
-    #     total_avg_tonperhv_negative_direciton = {}
-    # where
-    #     header_id = '{header_id}';
-    # """
 
     INSERT_STRING = f"""
     insert into trafc.electronic_count_header_hswim (
@@ -3312,3 +3186,171 @@ def wim_stations_header_update(header_id):
     """
 
     return INSERT_STRING
+
+def wim_stations_header_update(header_id):
+    SELECT_TYPE10_QRY = f"""SELECT 
+        *
+        FROM trafc.electronic_count_data_type_10 t10
+        left join traf_lu.vehicle_classes_scheme_08 c on c.id = t10.vehicle_class_code_primary_scheme
+        where t10.header_id = '{header_id}'
+        """
+    AXLE_SPACING_SELECT_QRY = f"""SELECT 
+        t10.id,
+        t10.header_id, 
+        t10.start_datetime,
+        t10.edit_code,
+        t10.vehicle_class_code_primary_scheme, 
+        t10.vehicle_class_code_secondary_scheme,
+        t10.direction,
+        t10.axle_count,
+        axs.axle_spacing_number,
+        axs.axle_spacing_cm,
+        FROM trafc.electronic_count_data_type_10 t10
+        left join trafc.traffic_e_type10_axle_spacing axs ON axs.type10_id = t10.data_id
+        where t10.header_id = '{header_id}'
+        """
+    WHEEL_MASS_SELECT_QRY = f"""SELECT 
+        t10.id,
+        t10.header_id, 
+        t10.start_datetime,
+        t10.edit_code,
+        t10.vehicle_class_code_primary_scheme, 
+        t10.vehicle_class_code_secondary_scheme,
+        t10.direction,
+        t10.axle_count,
+        wm.wheel_mass_number,
+        wm.wheel_mass,
+        vm.kg as vehicle_mass_limit_kg,
+        sum(wm.wheel_mass)*2 over(partition by t10.id) as gross_mass
+        FROM trafc.electronic_count_data_type_10 t10
+        left join trafc.traffic_e_type10_wheel_mass wm ON wm.type10_id = t10.data_id
+        left join traf_lu.gross_vehicle_mass_limits vm on vm.number_of_axles = t10.axle_count
+        where t10.header_id = '{header_id}'
+        """
+    df = pd.read_sql_query(AXLE_SPACING_SELECT_QRY,config.ENGINE)
+    df3 = pd.read_sql_query(WHEEL_MASS_SELECT_QRY,config.ENGINE)
+
+    UPDATE_STRING = f"""
+    update
+        trafc.electronic_count_header set
+        egrl_percent {},
+        egrw_percent {},
+        mean_equivalent_axle_mass = {(df3.groupby(pd.Grouper(key='id')).mean()*2).mean().round(2)},
+        mean_equivalent_axle_mass_positive_direction = {(df3.loc[df3['direction']=='P'].groupby(pd.Grouper(key='id')).mean()*2).mean().round(2)},
+        mean_equivalent_axle_mass_negative_direction = {(df3.loc[df3['direction']=='N'].groupby(pd.Grouper(key='id')).mean()*2).mean().round(2)},
+        mean_axle_spacing = {(df3.groupby(pd.Grouper(key='id')).mean()).mean()['axle_spacing_number'].round()},
+        mean_axle_spacing_positive_direction = {(df3.loc[df3['direction']=='P'].groupby(pd.Grouper(key='id')).mean()).mean()['axle_spacing_number'].round()},
+        mean_axle_spacing_negative_direction = {(df3.loc[df3['direction']=='N'].groupby(pd.Grouper(key='id')).mean()).mean()['axle_spacing_number'].round()},
+        e80_per_axle = {((df3['wheel_mass']*2/8200)**4.2).sum().round()},
+        e80_per_axle_positive_direction = {((df3.loc[df3['direction']=='P']['wheel_mass']*2/8200)**4.2).sum().round()},
+        e80_per_axle_negative_direction = {((df3.loc[df3['direction']=='N']['wheel_mass']*2/8200)**4.2).sum().round()},
+        olhv = {len(df3.loc[df3['gross_mass']>df3['vehicle_mass_limit_kg']]['id'].unique())},
+        olhv_positive_direction = {len(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['id'].unique())},
+        olhv_negative_direction = {len(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['id'].unique())},
+        olhv_percent = {round(((len(df3.loc[df3['gross_mass']>df3['vehicle_mass_limit_kg']]['id'].unique())/len(df3['id'].unique()))*100),2)},
+        olhv_percent_positive_direction = {round(((len(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['id'].unique())/len(df3.loc[df3['direction']=='P']['id'].unique()))*100),2)},
+        olhv_percent_negative_direction = {round(((len(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['id'].unique())/len(df3.loc[df3['direction']=='N']['id'].unique()))*100),2)},
+        tonnage_generated = {((df3['wheel_mass']*2).sum()/1000).round().astype(int)},
+        tonnage_generated_positive_direction = {((df3.loc[df3['direction']=='P']['wheel_mass']*2).sum()/1000).round().astype(int)},
+        tonnage_generated_negative_direction = {((df3.loc[df3['direction']=='N']['wheel_mass']*2).sum()/1000).round().astype(int)},
+        olton = {(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])]['wheel_mass']*2).sum().astype(int)},
+        olton_positive_direction = {(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['wheel_mass']*2).sum().astype(int)},
+        olton_negative_direction = {(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['wheel_mass']*2).sum().astype(int)},
+        olton_percent = {round(((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])]['wheel_mass']*2).sum()/(df3['wheel_mass']*2).sum())*100,2)},
+        olton_percent_positive_direction = {round(((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['wheel_mass']*2).sum()/(df3.loc[df3['direction']=='P']['wheel_mass']*2).sum())*100,2)},
+        olton_percent_negative_direction = {round(((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['wheel_mass']*2).sum()/(df3.loc[df3['direction']=='N']['wheel_mass']*2).sum())*100,2)},
+        ole80 = {((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])]['wheel_mass']*2/8200)**4.2).sum().round()},
+        ole80_positive_direction = {((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['wheel_mass']*2/8200)**4.2).sum().round()},
+        ole80_negative_direction = {((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['wheel_mass']*2/8200)**4.2).sum().round()},
+        ole80_percent = {((((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])]['wheel_mass']*2/8200)**4.2).sum().round()/((df3['wheel_mass']*2/8200)**4.2).sum().round())*100).round(2)},
+        ole80_percent_positive_direction = {((((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['wheel_mass']*2/8200)**4.2).sum().round()/((df3.loc[df3['direction']=='P']['wheel_mass']*2/8200)**4.2).sum().round())*100).round(2)},
+        ole80_percent_negative_direction = {((((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['wheel_mass']*2/8200)**4.2).sum().round()/((df3.loc[df3['direction']=='N']['wheel_mass']*2/8200)**4.2).sum().round())*100).round(2)},
+        xe80 = {},
+        xe80_positive_direction = {},
+        xe80_negative_direction = {},
+        xe80_percent = {},
+        xe80_percent_positive_direction = {},
+        xe80_percent_negative_direction = {},
+        e80_per_day = {((((df3['wheel_mass']*2/8200)**4.2).sum().round()/df3.groupby(pd.Grouper(key='start_datetime',freq='D')).count().count()[0])*100).round(2)},
+        e80_per_day_positive_direction = {((((df3.loc[df3['direction']=='P']['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[df3['direction']=='P'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().count()[0])*100).round(2)},
+        e80_per_day_negative_direction = {((((df3.loc[df3['direction']=='N']['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[df3['direction']=='N'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().count()[0])*100).round(2)},
+        e80_per_heavy_vehicle = {((((df3.loc[df3['vehicle_class_code_primary_scheme']>3]['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[df3['vehicle_class_code_primary_scheme']>3].count()[0])*100).round(2)},
+        e80_per_heavy_vehicle_positive_direction = {((((df3.loc[(df3['vehicle_class_code_primary_scheme']>3)&(df3['direction']=='P')]['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[(df3['vehicle_class_code_primary_scheme']>3)&(df3['direction']=='P')].count()[0])*100).round(2)},
+        e80_per_heavy_vehicle_negative_direction = {((((df3.loc[(df3['vehicle_class_code_primary_scheme']>3)&(df3['direction']=='N')]['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[(df3['vehicle_class_code_primary_scheme']>3)&(df3['direction']=='N')].count()[0])*100).round(2)},
+        worst_steering_single_axle_cnt = {},
+        worst_steering_single_axle_olhv_perc = {},
+        worst_steering_single_axle_tonperhv = {},
+        worst_steering_double_axle_cnt = {},
+        worst_steering_double_axle_olhv_perc = {},
+        worst_steering_double_axle_tonperhv = {},
+        worst_non_steering_single_axle_cnt = {},
+        worst_non_steering_single_axle_olhv_perc = {},
+        worst_non_steering_single_axle_tonperhv = {},
+        worst_non_steering_double_axle_cnt = {},
+        worst_non_steering_double_axle_olhv_perc = {},
+        worst_non_steering_double_axle_tonperhv = {},
+        worst_triple_axle_cnt = {},
+        worst_triple_axle_olhv_perc = {},
+        worst_triple_axle_tonperhv = {},
+        bridge_formula_cnt = {(18000 + 2.1 * (df2.loc[df2['axle_spacing_number']>1].groupby('id')['axle_spacing_cm'].sum().mean().round(2))).round(2)},
+        bridge_formula_olhv_perc = {},
+        bridge_formula_tonperhv = {},
+        gross_formula_cnt = {},
+        gross_formula_olhv_perc = {},
+        gross_formula_tonperhv = {},
+        total_avg_cnt = {},
+        total_avg_olhv_perc = {},
+        total_avg_tonperhv = {},
+        worst_steering_single_axle_cnt_positive_direciton = {},
+        worst_steering_single_axle_olhv_perc_positive_direciton = {},
+        worst_steering_single_axle_tonperhv_positive_direciton = {},
+        worst_steering_double_axle_cnt_positive_direciton = {},
+        worst_steering_double_axle_olhv_perc_positive_direciton = {},
+        worst_steering_double_axle_tonperhv_positive_direciton = {},
+        worst_non_steering_single_axle_cnt_positive_direciton = {},
+        worst_non_steering_single_axle_olhv_perc_positive_direciton = {},
+        worst_non_steering_single_axle_tonperhv_positive_direciton = {},
+        worst_non_steering_double_axle_cnt_positive_direciton = {},
+        worst_non_steering_double_axle_olhv_perc_positive_direciton = {},
+        worst_non_steering_double_axle_tonperhv_positive_direciton = {},
+        worst_triple_axle_cnt_positive_direciton = {},
+        worst_triple_axle_olhv_perc_positive_direciton = {},
+        worst_triple_axle_tonperhv_positive_direciton = {},
+        bridge_formula_cnt_positive_direciton = {},
+        bridge_formula_olhv_perc_positive_direciton = {},
+        bridge_formula_tonperhv_positive_direciton = {},
+        gross_formula_cnt_positive_direciton = {},
+        gross_formula_olhv_perc_positive_direciton = {},
+        gross_formula_tonperhv_positive_direciton = {},
+        total_avg_cnt_positive_direciton = {},
+        total_avg_olhv_perc_positive_direciton = {},
+        total_avg_tonperhv_positive_direciton = {},
+        worst_steering_single_axle_cnt_negative_direciton = {},
+        worst_steering_single_axle_olhv_perc_negative_direciton = {},
+        worst_steering_single_axle_tonperhv_negative_direciton = {},
+        worst_steering_double_axle_cnt_negative_direciton = {},
+        worst_steering_double_axle_olhv_perc_negative_direciton = {},
+        worst_steering_double_axle_tonperhv_negative_direciton = {},
+        worst_non_steering_single_axle_cnt_negative_direciton = {},
+        worst_non_steering_single_axle_olhv_perc_negative_direciton = {},
+        worst_non_steering_single_axle_tonperhv_negative_direciton = {},
+        worst_non_steering_double_axle_cnt_negative_direciton = {},
+        worst_non_steering_double_axle_olhv_perc_negative_direciton = {},
+        worst_non_steering_double_axle_tonperhv_negative_direciton = {},
+        worst_triple_axle_cnt_negative_direciton = {},
+        worst_triple_axle_olhv_perc_negative_direciton = {},
+        worst_triple_axle_tonperhv_negative_direciton = {},
+        bridge_formula_cnt_negative_direciton = {},
+        bridge_formula_olhv_perc_negative_direciton = {},
+        bridge_formula_tonperhv_negative_direciton = {},
+        gross_formula_cnt_negative_direciton = {},
+        gross_formula_olhv_perc_negative_direciton = {},
+        gross_formula_tonperhv_negative_direciton = {},
+        total_avg_cnt_negative_direciton = {},
+        total_avg_olhv_perc_negative_direciton = {},
+        total_avg_tonperhv_negative_direciton = {}
+    where
+        header_id = '{header_id}';
+    """
+
+    return UPDATE_STRING
