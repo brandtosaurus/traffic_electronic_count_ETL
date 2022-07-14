@@ -1,416 +1,29 @@
 import csv
 import os
-import zipfile
 import traceback
-from numpy import empty
 import numpy as np
 import tqdm
 import pandas as pd
-from pandasql import sqldf
 import multiprocessing as mp
+import gc
 
-from sqlalchemy.dialects.postgresql import insert
-
-from io import StringIO
-
-import rsa_data as rd
+import rsa_data_summary as rd
+import rsa_data_wim as wim
 import rsa_headers as rh
 import config
 import queries as q
 import tools
 
-from tkinter import filedialog
-from tkinter import *
-import gc
-from typing import List
-
-
-def gui():
-    root = Tk().withdraw()
-    f = filedialog.askdirectory()
-    # root.destroy()
-    return str(f)
-
-def is_zip(path: str) -> bool:
-    for filename in path:
-        return zipfile.is_zipfile(filename)
-
-def getfiles(path: str) -> List[str]:
-    print("COLLECTING FILES......")
-    src = []
-    for root, dirs, files in os.walk(path):
-        for name in files:
-            if (
-                name.endswith(".RSA")
-                or name.endswith(".rsa")
-                or name.endswith(".rsv")
-                or name.endswith(".RSV")
-            ):
-                p = os.path.join(root, name)
-                src.append(p)
-    src = list(set(src))
-    return src
-
-def to_df(file: str) -> pd.DataFrame:
-    df = pd.read_csv(file, header=None)
-    df = df[0].str.split("\s+|,\s+|,", expand=True)
-    df = pd.DataFrame(df)
-    return df
-
-
-def join(header: pd.DataFrame, data: pd.DataFrame) -> pd.DataFrame:
-    if data.empty:
-        df = pd.DataFrame()
-    else:
-        q = """
-		SELECT header.header_id, header.station_name, data.*
-		FROM header
-		LEFT JOIN data ON data.start_datetime WHERE data.start_datetime >= header.start_datetime AND data.end_datetime <= header.end_datetime;
-		"""
-        q2 = """UPDATE data set header_id = (SELECT header_id from header WHERE data.start_datetime >= header.start_datetime AND data.counttime_end <= header.enddate)"""
-        pysqldf = lambda q: sqldf(q, globals())
-        df = sqldf(q, locals())
-        df = pd.DataFrame(df)
-    return df
-
-
-def data_join(data: pd.DataFrame, header: pd.DataFrame) -> pd.DataFrame:
-    if data is None:
-        pass
-    elif data.empty:
-        pass
-    else:
-        data = pd.DataFrame(data)
-        data = join(header, data)
-    return data
-
-
-def save_to_temp_csv(df: pd.DataFrame, label: str):
-    if not os.path.exists(os.path.expanduser(config.OUTPUT_FILE + label + ".csv")):
-        df.to_csv(
-            os.path.expanduser(config.OUTPUT_FILE + label + ".csv"),
-            mode="a",
-            header=True,
-            index=False,
-        )
-    else:
-        df.to_csv(
-            os.path.expanduser(config.OUTPUT_FILE + label + ".csv"),
-            mode="a",
-            header=False,
-            index=False,
-        )
-
-
-def dropDuplicatesDoSomePostProcesingAndSaveCsv(csv_label: str):
-    df = pd.DataFrame()
-    for i in pd.read_csv(
-        os.path.expanduser(
-            f"~\Desktop\Temp\rsa_traffic_counts\TEMP_E_COUNT_{csv_label}.csv"
-        ),
-        chunksize=50000,
-        error_bad_lines=False,
-        low_memory=False,
-    ):
-        df = pd.concat([df, i])
-        df = df.drop_duplicates()
-    cols = df.columns.tolist()
-    df2 = pd.DataFrame(columns=cols)
-    df2.to_csv(
-        os.path.expanduser(
-            f"~\Desktop\Temp\rsa_traffic_counts\TEMP_E_COUNT_{csv_label}.csv"
-        ),
-        header=True,
-    )
-    df.to_csv(
-        os.path.expanduser(
-            f"~\Desktop\Temp\rsa_traffic_counts\TEMP_E_COUNT_{csv_label}.csv"
-        ),
-        mode="a",
-        header=False,
-    )
-
-
-def push_to_partitioned_table(df, table, subset) -> None:
-    yr = data['year'].unique()[0]
-    print(yr)
-    try:
-        df.to_sql(
-            table+'_'+str(yr),
-            con=config.ENGINE,
-            schema="trafc",
-            if_exists="append",
-            index=False,
-            method=psql_insert_copy,
-        )
-    except Exception:
-        df = df.drop_duplicates(subset=subset)
-        df.to_sql(
-            table+'_'+yr,
-            con=config.ENGINE,
-            schema="trafc",
-            if_exists="append",
-            index=False,
-            method=psql_insert_copy,
-        )
-
-def push_to_db(df, table, subset) -> None:
-    try:
-        df.to_sql(
-            table,
-            con=config.ENGINE,
-            schema="trafc",
-            if_exists="append",
-            index=False,
-            method=psql_insert_copy,
-        )
-    except Exception:
-        df = df.drop_duplicates(subset=subset)
-        df.to_sql(
-            table,
-            con=config.ENGINE,
-            schema="trafc",
-            if_exists="append",
-            index=False,
-            method=psql_insert_copy,
-        )
-
-def postgres_upsert(table, conn, keys, data_iter):
-    data = [dict(zip(keys, row)) for row in data_iter]
-
-    insert_statement = insert(table.table).values(data)
-    upsert_statement = insert_statement.on_conflict_do_update(
-        constraint=f"{table.table.name}_un",
-        set_={c.key: c for c in insert_statement.excluded},
-    )
-    conn.execute(upsert_statement)
-
-
-def psql_insert_copy(table, conn, keys, data_iter):
-    """
-    Execute SQL statement inserting data
-
-    Parameters
-    ----------
-    table : pandas.io.sql.SQLTable
-    conn : sqlalchemy.engine.Engine or sqlalchemy.engine.Connection
-    keys : list of str
-        Column names
-    data_iter : Iterable that iterates the values to be inserted
-    """
-    # gets a DBAPI connection that can provide a cursor
-    dbapi_conn = conn.connection
-    with dbapi_conn.cursor() as cur:
-        s_buf = StringIO()
-        writer = csv.writer(s_buf)
-        writer.writerows(data_iter)
-        s_buf.seek(0)
-
-        columns = ", ".join('"{}"'.format(k) for k in keys)
-        if table.schema:
-            table_name = "{}.{}".format(table.schema, table.name)
-        else:
-            table_name = table.name
-
-        sql = "COPY {} ({}) FROM STDIN WITH CSV".format(table_name, columns)
-        cur.copy_expert(sql=sql, file=s_buf)
-
-def header_calcs(header, data, dtype):
-    data['start_datetime'] = pd.to_datetime(data['start_datetime'])
-    if dtype == 21:
-        header['adt_total'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['header_id']]).sum().mean()
-        header['adt_positive_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().mean()
-        header['adt_positive_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().mean()
-
-        header['adtt_total'] = data['total_heavy_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['header_id']]).sum().mean()
-        header['adtt_positive_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().mean()
-        header['adtt_positive_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().mean()
-
-        header['total_vehicles'] = data['total_vehicles_type21'].groupby(data['header_id']).sum()[0]
-        header['total_vehicles_positive_direction'] = data['total_vehicles_type21'].groupby(data['direction'].loc[data['direction'] == 'P']).sum()[0]
-        header['total_vehicles_positive_direction'] = data['total_vehicles_type21'].groupby(data['direction'].loc[data['direction'] == 'N']).sum()[0]
-
-        header['total_heavy_vehicles'] = data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
-        header['total_heavy_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
-        header['total_heavy_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
-        header['truck_split_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0] / data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
-        header['truck_split_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0] / data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
-
-        header['total_light_vehicles'] = data['total_light_vehicles_type21'].groupby(data['header_id']).sum()[0]
-        header['total_light_positive_direction'] = data['total_light_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
-        header['total_light_positive_direction'] = data['total_light_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
-
-        header['short_heavy_vehicles'] = data['short_heavy_vehicles'].groupby(data['header_id']).sum()[0]
-        header['short_heavy_positive_direction'] = data['short_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
-        header['short_heavy_positive_direction'] = data['short_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
-
-        header['Medium_heavy_vehicles'] = data['medium_heavy_vehicles'].groupby(data['header_id']).sum()[0]
-        header['Medium_heavy_positive_direction'] = data['medium_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
-        header['Medium_heavy_positive_direction'] = data['medium_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
-
-        header['long_heavy_vehicles'] = data['long_heavy_vehicles'].groupby(data['header_id']).sum()[0]
-        header['long_heavy_positive_direction'] = data['long_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
-        header['long_heavy_positive_direction'] = data['long_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
-
-        header['vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire'] = data['rear_to_rear_headway_shorter_than_2_seconds'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
-        header['vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire'] = data['rear_to_rear_headway_shorter_than_2_seconds'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
-        header['vehicles_with_rear_to_rear_headway_less_than_2sec_total'] = data['rear_to_rear_headway_shorter_than_2_seconds'].groupby(data['header_id']).sum()[0]
-    
-        header['type_21_count_interval_minutes'] = data['duration_min'].mean()
-
-        header['highest_volume_per_hour_positive_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().max()
-        header['highest_volume_per_hour_negative_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().max()
-        header['highest_volume_per_hour_total'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['header_id']]).sum().max()
-
-        header['15th_highest_volume_per_hour_positive_direction'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().quantile(q=0.15,  interpolation='linear'))
-        header['15th_highest_volume_per_hour_negative_direction'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().quantile(q=0.15,  interpolation='linear'))
-        header['15th_highest_volume_per_hour_total'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['header_id']]).sum().quantile(q=0.15, interpolation='linear'))
-        
-        header['30th_highest_volume_per_hour_positive_direction'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().quantile(q=0.3,  interpolation='linear'))
-        header['30th_highest_volume_per_hour_negative_direction'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().quantile(q=0.3, interpolation='linear'))
-        header['30th_highest_volume_per_hour_total'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['header_id']]).sum().quantile(q=0.3, interpolation='linear'))
-
-        # header['average_speed_positive_direction'] = 
-        # header['average_speed_negative_direction'] = 
-        header['average_speed'] = ((
-            (header['speedbin1'] * data['speedbin1'].groupby(data['header_id']).sum()[0]) +
-            (header['speedbin2'] * data['speedbin2'].groupby(data['header_id']).sum()[0]) +
-            (header['speedbin3'] * data['speedbin3'].groupby(data['header_id']).sum()[0]) +
-            (header['speedbin4'] * data['speedbin4'].groupby(data['header_id']).sum()[0]) +
-            (header['speedbin5'] * data['speedbin5'].groupby(data['header_id']).sum()[0]) +
-            (header['speedbin6'] * data['speedbin6'].groupby(data['header_id']).sum()[0]) +
-            (header['speedbin7'] * data['speedbin7'].groupby(data['header_id']).sum()[0]) +
-            (header['speedbin8'] * data['speedbin8'].groupby(data['header_id']).sum()[0]) +
-            (header['speedbin9'] * data['speedbin9'].groupby(data['header_id']).sum()[0]) 
-            )
-            / data['sum_of_heavy_vehicle_speeds'].groupby(data['header_id']).sum()[0]
-            )
-        # header['average_speed_light_vehicles_positive_direction'] = 
-        # header['average_speed_light_vehicles_negative_direction'] = 
-        header['average_speed_light_vehicles'] = ((
-            (header['speedbin1'] * data['speedbin1'].groupby(data['header_id']).sum()[0]) +
-            (header['speedbin2'] * data['speedbin2'].groupby(data['header_id']).sum()[0]) +
-            (header['speedbin3'] * data['speedbin3'].groupby(data['header_id']).sum()[0]) +
-            (header['speedbin4'] * data['speedbin4'].groupby(data['header_id']).sum()[0]) +
-            (header['speedbin5'] * data['speedbin5'].groupby(data['header_id']).sum()[0]) +
-            (header['speedbin6'] * data['speedbin6'].groupby(data['header_id']).sum()[0]) +
-            (header['speedbin7'] * data['speedbin7'].groupby(data['header_id']).sum()[0]) +
-            (header['speedbin8'] * data['speedbin8'].groupby(data['header_id']).sum()[0]) +
-            (header['speedbin9'] * data['speedbin9'].groupby(data['header_id']).sum()[0]) -
-            data['sum_of_heavy_vehicle_speeds'].groupby(data['header_id']).sum()[0]
-            )
-            / data['sum_of_heavy_vehicle_speeds'].groupby(data['header_id']).sum()[0]
-            )
-        
-        # header['average_speed_heavy_vehicles_positive_direction'] = 
-        # header['average_speed_heavy_vehicles_negative_direction'] = 
-        # header['average_speed_heavy_vehicles'] = 
-
-        header['truck_split_positive_direction'] = (str(round(data['short_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0] / 
-        data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0])) + ' : ' +
-        str(round(data['medium_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0] / 
-        data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0])) + ' : ' +
-        str(round(data['long_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0] / 
-        data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0]))
-        )
-        header['truck_split_negative_direction'] = (str(round(data['short_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0] / 
-        data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0])) + ' : ' +
-        str(round(data['medium_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0] / 
-        data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0])) + ' : ' +
-        str(round(data['long_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0] / 
-        data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0]))
-        )
-        header['truck_split_total'] = (str(round(data['short_heavy_vehicles'].groupby(data['header_id']).sum()[0] / 
-        data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0])) + ' : ' +
-        str(round(data['medium_heavy_vehicles'].groupby(data['header_id']).sum()[0] / 
-        data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0])) + ' : ' +
-        str(round(data['long_heavy_vehicles'].groupby(data['header_id']).sum()[0] / 
-        data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]))
-        )
-
-        return header
-    elif dtype == 30:
-        if header['adt_total'].isnull():
-            header['adt_total'] = data['total_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['header_id']]).sum().mean()
-            header['adt_positive_direction'] = data['total_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().mean()
-            header['adt_positive_direction'] = data['total_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().mean()
-        else:
-            pass
-
-        if header['adtt_total'].isnull():
-            header['adtt_total'] = data['total_heavy_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['header_id']]).sum().mean()
-            header['adtt_positive_direction'] = data['total_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().mean()
-            header['adtt_positive_direction'] = data['total_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().mean()
-        else:
-            pass
-
-        if header['total_vehicles'].isnull():
-            header['total_vehicles'] = data['total_vehicles_type30'].groupby(data['header_id']).sum()[0]
-            header['total_vehicles_positive_direction'] = data['total_vehicles_type30'].groupby(data['direction'].loc[data['direction'] == 'P']).sum()[0]
-            header['total_vehicles_positive_direction'] = data['total_vehicles_type30'].groupby(data['direction'].loc[data['direction'] == 'N']).sum()[0]
-        else:
-            pass
-        
-        if header['total_heavy_vehicles'].isnull():
-            header['total_heavy_vehicles'] = data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
-            header['total_heavy_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
-            header['total_heavy_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
-            header['truck_split_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0] / data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
-            header['truck_split_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0] / data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
-        else:
-            pass
-
-        if header['total_light_vehicles'].isnull():
-            header['total_light_vehicles'] = data['total_light_vehicles_type30'].groupby(data['header_id']).sum()[0]
-            header['total_light_positive_direction'] = data['total_light_vehicles_type30'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
-            header['total_light_positive_direction'] = data['total_light_vehicles_type30'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
-        else:
-            pass
-
-        return header
-
-    elif dtype == 70:
-    
-        return header
-
-    elif dtype == 10:
-    
-        return header
-
-    elif dtype == 60:
-        
-        return header
-
-    else:
-        return header
-
-def create_database_tables():
-    conn=config.CONN
-    cur = conn.cursor()
-    cur.execute(q.CREATE_AXLE_GROU_MASS_GX)
-    cur.execute(q.CREATE_AXLE_GROUP_CONFIG_TABLE_CX)
-    cur.execute(q.CREATE_AXLE_MASS_TABLE_AX)
-    cur.execute(q.CREATE_AXLE_GROUP_MASS_TABLE_GX)
-    cur.execute(q.CREATE_AXLE_SPACING_TABLE_SX)
-    cur.execute(q.CREATE_IMAGES_TABLE_VX)
-    cur.execute(q.CREATE_TYRE_TABLE_TX)
-    cur.execute(q.CREATE_WHEEL_MASS_TABLE_WX)
-    cur.commit()
-    cur.close()
-
-
-##################################################################################################################################
-##################################################################################################################################
 #### MAIN EXECUTABLE
 def main(files: str):
     try:
-        df = to_df(files)
+        df = tools.to_df(files)
         DATA = rd.Data(df)
 
         header = DATA.header
         header["document_url"] = str(files)
 
-        data = pd.DataFrame(colums=config.DATA_COLUMN_NAMES)
+        data = pd.DataFrame(columns=config.DATA_COLUMN_NAMES)
 
         d2 = tools.dtype21(df)
         if d2 is None:
@@ -426,7 +39,7 @@ def main(files: str):
         if d2 is None:
             pass
         else:
-            d2 = data_join(d2, header)
+            d2 = tools.data_join(d2, header)
             data = data.merge(
                 d2, how="outer", on=["site_id", "start_datetime", "lane_number"]
             )
@@ -435,7 +48,7 @@ def main(files: str):
         if d2 is None:
             pass
         else:
-            data = data_join(d2, header)
+            data = tools.data_join(d2, header)
             data.drop("station_name", axis=1, inplace=True)
             data["start_datetime"] = data["start_datetime"].astype("datetime64[ns]")
             d2["start_datetime"] = d2["start_datetime"].astype("datetime64[ns]")
@@ -447,7 +60,7 @@ def main(files: str):
         if d2 is None:
             pass
         else:
-            push_to_db(d2,
+            tools.push_to_db(d2,
             "electronic_count_data_type_10",
             ["site_id", "start_datetime", "assigned_lane_number"],
             )
@@ -472,7 +85,7 @@ def main(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=postgres_upsert,
+                method=tools.postgres_upsert,
             )
 
         if ax_data.empty:
@@ -485,7 +98,7 @@ def main(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=postgres_upsert,
+                method=tools.postgres_upsert,
             )
 
         if gx_data.empty:
@@ -498,7 +111,7 @@ def main(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=postgres_upsert,
+                method=tools.postgres_upsert,
             )
 
         if sx_data.empty:
@@ -512,7 +125,7 @@ def main(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=postgres_upsert,
+                method=tools.postgres_upsert,
             )
 
         if tx_data.empty:
@@ -526,7 +139,7 @@ def main(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=postgres_upsert,
+                method=tools.postgres_upsert,
             )
 
         if cx_data.empty:
@@ -540,7 +153,7 @@ def main(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=postgres_upsert,
+                method=tools.postgres_upsert,
             )
 
         if vx_data.empty:
@@ -554,14 +167,14 @@ def main(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=postgres_upsert,
+                method=tools.postgres_upsert,
             )
 
         d2 = DATA.dtype60
         if d2 is None:
             pass
         else:
-            data = data_join(d2, header)
+            data = tools.data_join(d2, header)
             data.drop("station_name", axis=1, inplace=True)
             data = data.merge(
                 d2, how="outer", on=["site_id", "start_datetime", "lane_number"]
@@ -570,21 +183,21 @@ def main(files: str):
         data = data.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
         header = header.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
 
-        header = header_calcs(header, data, 21)
-        header = header_calcs(header, data, 30)
-        header = header_calcs(header, data, 70)
-        header = header_calcs(header, data, 60)
+        header = rh.header_calcs(header, data, 21)
+        header = rh.header_calcs(header, data, 30)
+        header = rh.header_calcs(header, data, 70)
+        header = rh.header_calcs(header, data, 60)
 
         data = data[data.columns.intersection(config.DATA_COLUMN_NAMES)]
         header = header[header.columns.intersection(config.HEADER_COLUMN_NAMES)]
 
-        push_to_partitioned_table(
+        tools.push_to_partitioned_table(
             data,
             "electronic_count_data_partitioned",
             ["site_id", "start_datetime", "lane_number"],
         )
 
-        push_to_db(
+        tools.push_to_db(
             header,
             "electronic_count_header",
             ["site_id", "start_datetime", "end_datetime"],
@@ -617,7 +230,7 @@ def main(files: str):
 
 def main_type10(files: str):
     try:
-        df = to_df(files)
+        df = tools.to_df(files)
         H = rh.Headers(df)
         H = rh.Headers(df)
         DATA = rd.Data.dtype10(df)
@@ -626,7 +239,7 @@ def main_type10(files: str):
         header["document_url"] = str(files)
 
         # data = DATA.dtype10
-        data = data_join(data, header)
+        data = tools.data_join(data, header)
         data.drop("station_name", axis=1, inplace=True)
 
         data = data.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
@@ -635,7 +248,7 @@ def main_type10(files: str):
         data = data[data.columns.intersection(config.TYPE10_DATA_COLUMN_NAMES)]
         # header = header[header.columns.intersection(config.TYPE10_HEADER_COLUMN_NAMES)]
 
-        push_to_partitioned_table(
+        tools.push_to_partitioned_table(
             data,
             "electronic_count_data_type_10",
             ["site_id", "start_datetime", "lane_number"],
@@ -681,14 +294,14 @@ def main_to_csv(files: str):
         header["document_url"] = str(files)
 
         data = DATA.dtype21
-        data = data_join(data, header)
+        data = tools.data_join(data, header)
         data.drop("station_name", axis=1, inplace=True)
 
         d2 = DATA.dtype30
         if d2 is None:
             pass
         else:
-            d2 = data_join(d2, header)
+            d2 = tools.data_join(d2, header)
             data = data.merge(
                 d2, how="outer", on=["site_id", "start_datetime", "lane_number"]
             )
@@ -697,7 +310,7 @@ def main_to_csv(files: str):
         if d2 is None:
             pass
         else:
-            data = data_join(d2, header)
+            data = tools.data_join(d2, header)
             data.drop("station_name", axis=1, inplace=True)
             data["start_datetime"] = data["start_datetime"].astype("datetime64[ns]")
             d2["start_datetime"] = d2["start_datetime"].astype("datetime64[ns]")
@@ -709,7 +322,7 @@ def main_to_csv(files: str):
         if d2 is None:
             pass
         else:
-            push_to_db(d2,
+            tools.push_to_db(d2,
             "electronic_count_data_type_10",
             ["site_id", "start_datetime", "assigned_lane_number"],
             )
@@ -734,7 +347,7 @@ def main_to_csv(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=postgres_upsert,
+                method=tools.postgres_upsert,
             )
 
         if ax_data.empty:
@@ -747,7 +360,7 @@ def main_to_csv(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=postgres_upsert,
+                method=tools.postgres_upsert,
             )
 
         if gx_data.empty:
@@ -760,7 +373,7 @@ def main_to_csv(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=postgres_upsert,
+                method=tools.postgres_upsert,
             )
 
         if sx_data.empty:
@@ -774,7 +387,7 @@ def main_to_csv(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=postgres_upsert,
+                method=tools.postgres_upsert,
             )
 
         if tx_data.empty:
@@ -788,7 +401,7 @@ def main_to_csv(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=postgres_upsert,
+                method=tools.postgres_upsert,
             )
 
         if cx_data.empty:
@@ -802,7 +415,7 @@ def main_to_csv(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=postgres_upsert,
+                method=tools.postgres_upsert,
             )
 
         if vx_data.empty:
@@ -816,14 +429,14 @@ def main_to_csv(files: str):
                 schema="trafc",
                 if_exists="append",
                 index=False,
-                method=postgres_upsert,
+                method=tools.postgres_upsert,
             )
 
         d2 = DATA.dtype60
         if d2 is None:
             pass
         else:
-            data = data_join(d2, header)
+            data = tools.data_join(d2, header)
             data.drop("station_name", axis=1, inplace=True)
             data = data.merge(
                 d2, how="outer", on=["site_id", "start_datetime", "lane_number"]
@@ -832,10 +445,10 @@ def main_to_csv(files: str):
         data = data.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
         header = header.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
 
-        header = header_calcs(header, data, 21)
-        header = header_calcs(header, data, 30)
-        header = header_calcs(header, data, 70)
-        header = header_calcs(header, data, 60)
+        header = rh.header_calcs(header, data, 21)
+        header = rh.header_calcs(header, data, 30)
+        header = rh.header_calcs(header, data, 70)
+        header = rh.header_calcs(header, data, 60)
 
         data = data[data.columns.intersection(config.DATA_COLUMN_NAMES)]
         header = header[header.columns.intersection(config.HEADER_COLUMN_NAMES)]
@@ -874,8 +487,8 @@ def main_to_csv(files: str):
 if __name__ == "__main__":
 
     filesToDo = r"C:\Users\MB2705851\Desktop\Temp\rsa_traffic_counts\SMEC RSA Files_GP PRM Sites_Dec21toFeb22"
-    if is_zip(filesToDo) == False:
-        filesToDo = getfiles(filesToDo)
+    if tools.s_zip(filesToDo) == False:
+        filesToDo = tools.getfiles(filesToDo)
     else:
         raise SystemExit
 
@@ -930,15 +543,5 @@ if __name__ == "__main__":
     # for file in files:
     # 	print('BUSY WITH : ',file)
     # 	main(file)
-
-    ########################################################################################################################################################
-    ########################################################################################################################################################
-    #### POST PROCESSING
-
-    # with config.ENGINE.connect() as con:
-    #     con.execute(
-    #         "VACUUM (FULL, VERBOSE, ANALYZE) trafc.electronic_count_data_partitioned;"
-    #     )
-    #     con.execute("VACUUM (FULL, VERBOSE, ANALYZE) trafc.electronic_count_header;")
 
     print("COMPLETE")

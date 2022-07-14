@@ -614,3 +614,26 @@ total_avg_olhv_perc_negative_direciton numeric,
 total_avg_tonperhv_negative_direciton numeric
 );
 """
+
+GET_GROSS_VEHICLE_MASS_LIMITS = """
+SELECT id, number_of_axles, kg, ton
+FROM traf_lu.gross_vehicle_mass_limits;
+"""
+
+GET_AXLE_LOAD_LIMITS = """
+SELECT id, "type", kg, ton
+FROM traf_lu.axle_load_limits;
+"""
+
+GET_HSWIM_HEADER_IDS = """
+	SELECT DISTINCT header_id from trafc.electronic_count_data_type_10 t10 
+    where not exists (select header_id from trafc.electronic_count_header_hswim h where h.header_id = t10.header_id)
+    and 
+    (
+        exists (select header_id from trafc.traffic_e_type10_wheel_mass m where m.type10_id = t10.data_id)
+        or
+        exists (select header_id from trafc.traffic_e_type10_axle_group_mass m where m.type10_id = t10.data_id)
+        or
+        exists (select header_id from trafc.traffic_e_type10_axle_mass m where m.type10_id = t10.data_id)
+    )
+    ;"""

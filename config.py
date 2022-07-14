@@ -18,7 +18,7 @@ ENGINE_URL = sa.engine.URL.create(
 )
 
 ENGINE = sa.create_engine(
-    ENGINE_URL
+    ENGINE_URL, pool_pre_ping=True
 )
 
 CONN = psycopg2.connect(database=DB_NAME,
