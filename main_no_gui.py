@@ -312,7 +312,7 @@ if __name__ == "__main__":
 
     filesToDo = config.PATH
 
-    if tools.s_zip(filesToDo) == False:
+    if tools.is_zip(filesToDo) == False:
         filesToDo = tools.getfiles(filesToDo)
     else:
         raise SystemExit
