@@ -1177,6 +1177,7 @@ def merge_summary_dataframes(join_this_df: pd.DataFrame, onto_this_df: pd.DataFr
     onto_this_df = pd.concat([onto_this_df, join_this_df], keys=["site_id", "start_datetime", "lane_number"], ignore_index=False, axis=1)
     onto_this_df = onto_this_df.droplevel(0, axis=1)
     onto_this_df = onto_this_df.T.drop_duplicates().T
+    onto_this_df = onto_this_df.loc[:,~onto_this_df.T.duplicated(keep='first')]
     return onto_this_df
 
 def data_update_type21(row):

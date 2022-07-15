@@ -47,7 +47,7 @@ def main(files: str):
             except AttributeError:
                 pass
 
-        d2 = data
+        d2 = data.copy()
         if d2 is None:
             pass
         else:
@@ -108,6 +108,7 @@ def main(files: str):
             pass
         else:
             try:
+                data = data.T.drop_duplicates().T
                 data.to_sql("electronic_count_data_partitioned",
                         con=config.ENGINE,
                         schema="trafc",
