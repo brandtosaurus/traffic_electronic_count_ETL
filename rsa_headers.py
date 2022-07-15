@@ -358,6 +358,7 @@ class Headers(object):
             headers["site_id"] = headers["site_id"].astype(str)
             try:
                 headers["type_21_count_interval_minutes"] = headers["type_21_count_interval_minutes"].round().astype(int)
+                headers["type_70_maximum_gap_milliseconds"] = headers["type_70_maximum_gap_milliseconds"].round().astype(int)
             except pd.errors.IntCastingNaNError:
                 pass
             except KeyError:
