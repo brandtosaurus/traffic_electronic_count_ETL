@@ -12,6 +12,7 @@ import tools
 
 #### MAIN EXECUTABLE
 def main(files: str):
+    partition_table_columns = list(pd.read_sql_query("SELECT * from trafc.electronic_count_data_partitioned limit 1",config.ENGINE).columns)
     electronic_count_data_type_21_columns = list(pd.read_sql_query("SELECT * from trafc.electronic_count_data_type_21 limit 1",config.ENGINE).columns)
     electronic_count_data_type_30_columns = list(pd.read_sql_query("SELECT * from trafc.electronic_count_data_type_30 limit 1",config.ENGINE).columns)
     electronic_count_data_type_60_columns = list(pd.read_sql_query("SELECT * from trafc.electronic_count_data_type_60 limit 1",config.ENGINE).columns)
@@ -26,8 +27,6 @@ def main(files: str):
 
         D = rd.Data(df, header)
         data = D.dtype21
-
-        
 
         if header is None:
             pass
@@ -85,6 +84,7 @@ def main(files: str):
         if d2 is None:
             pass
         else:
+            data = rd.merge_summary_dataframes(d2, data)
             d2 = d2[d2.columns.intersection(electronic_count_data_type_70_columns)]
             try:
                 d2.to_sql("electronic_count_data_type_70",
@@ -97,29 +97,26 @@ def main(files: str):
             except UniqueViolation:
                 pass
 
-        # d2 = D.dtype30
-        # if d2 is None:
-        #     pass
-        # else:
-        #     d2.to_sql("electronic_count_data_type_30",
-        #             con=config.ENGINE,
-        #             schema="trafc",
-        #             if_exists="append",
-        #             index=False,
-        #             method=tools.psql_insert_copy,
-        #         )
+        d2 = D.dtype30
+        if d2 is None:
+            pass
+        else:
+            data = rd.merge_summary_dataframes(d2, data)
 
-        # d2 = D.dtype60
-        # if d2 is None:
-        #     pass
-        # else:
-        #     d2.to_sql("electronic_count_data_type_60",
-        #             con=config.ENGINE,
-        #             schema="trafc",
-        #             if_exists="append",
-        #             index=False,
-        #             method=tools.psql_insert_copy,
-        #         )
+        data = data[data.columns.intersection(partition_table_columns)]
+        if data is None:
+            pass
+        else:
+            try:
+                data.to_sql("electronic_count_data_partitioned",
+                        con=config.ENGINE,
+                        schema="trafc",
+                        if_exists="append",
+                        index=False,
+                        method=tools.psql_insert_copy,
+                    )
+            except UniqueViolation:
+                pass
 
         print('DONE WITH '+file)
 
