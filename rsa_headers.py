@@ -360,6 +360,8 @@ class Headers(object):
                 headers["type_21_count_interval_minutes"] = headers["type_21_count_interval_minutes"].round().astype(int)
             except pd.errors.IntCastingNaNError:
                 pass
+            except KeyError:
+                pass
 
             try:
                 headers["instrumentation_description"] = (
