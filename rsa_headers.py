@@ -52,7 +52,7 @@ class Headers(object):
             try:
                 headers["y"] = dfh.loc[dfh[0] == "S0", 5].astype(float)
                 headers["x"] = dfh.loc[dfh[0] == "S0", 6].astype(float)
-            except Exception:
+            except:
                 pass
 
             headers["number_of_lanes"] = dfh.loc[dfh[0] == "L0", 2].astype(int)
@@ -82,6 +82,7 @@ class Headers(object):
                 headers["type_21_program_id"] = "2"
             except Exception:
                 pass
+            
             try:
                 headers["type_10_vehicle_classification_scheme_primary"] = dfh.loc[
                     dfh[0] == "10", 1
@@ -355,6 +356,10 @@ class Headers(object):
             headers["start_datetime"] = pd.to_datetime(headers["start_datetime"])
             headers["end_datetime"] = pd.to_datetime(headers["end_datetime"])
             headers["site_id"] = headers["site_id"].astype(str)
+            try:
+                headers["type_21_count_interval_minutes"] = headers["type_21_count_interval_minutes"].round().astype(int)
+            except pd.errors.IntCastingNaNError:
+                pass
 
             try:
                 headers["instrumentation_description"] = (

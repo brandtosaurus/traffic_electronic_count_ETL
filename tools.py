@@ -7,6 +7,7 @@ from typing import List
 import csv
 import os
 import zipfile
+from io import StringIO
 
 
 #### DATA TOOLS ####
@@ -31,9 +32,18 @@ def getfiles(path: str) -> List[str]:
     return src
 
 def to_df(file: str) -> pd.DataFrame:
-    df = pd.read_csv(file, header=None)
-    df = df[0].str.split("\s+|,\s+|,", expand=True)
-    return df
+    try:
+        df = pd.read_csv(file, header=None)
+        df = df[0].str.split("\s+|,\s+|,", expand=True)
+        return df
+    except Exception as e:
+        df = pd.read_csv(file, header=None, sep='\s+')
+        df = df[0].str.split("\s+|,\s+|,", expand=True)
+        return df
+    except:
+        df = pd.read_csv(file, header=None, sep='\t')
+        df = df[0].str.split("\s+|,\s+|,", expand=True)
+        return df
 
 def get_direction(lane_number, df: pd.DataFrame) -> pd.DataFrame:
     filt = df[1] == lane_number
