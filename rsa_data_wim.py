@@ -90,17 +90,19 @@ class WimData(object):
                                 ])
                                 sub_data_df = pd.concat([sub_data_df, tempdf])
                                 col += 1
-
+            else:
+                sub_data_df = pd.DataFrame(columns=['index','sub_data_type_code','offset_sensor_detection_code','mass_measurement_resolution_kg', 'number','value'])
 
 
             sub_data_df = sub_data_df.merge(ddf[['index', 'data_id']], how='left', on='index')
             
             ddf = ddf.fillna(0)
-            ddf["lane_number"] = ddf["lane_number"].astype(int)
-            max_lanes = ddf["lane_number"].max()
+            ddf["assigned_lane_number"] = ddf["assigned_lane_number"].astype(int)
+            ddf["physical_lane_number"] = ddf["physical_lane_number"].astype(int)
+            max_lanes = ddf["physical_lane_number"].max()
             try:
                 ddf["direction"] = ddf.apply(
-                lambda x: "P" if x["lane_number"] <= (int(max_lanes) / 2) else "N",
+                lambda x: "P" if x["physical_lane_number"] <= (int(max_lanes) / 2) else "N",
                 axis=1,
             )
                 direction = dfh2.loc[dfh2[0] == "L1", 1:3]

@@ -53,8 +53,11 @@ def main(file: str):
                 pass
         except AttributeError:
             pass
-
-    d2 = data.copy()
+    
+    if data is None:
+        d2 = data
+    else:
+        d2 = data.copy()
     if d2 is None:
         pass
     else:
@@ -110,11 +113,11 @@ def main(file: str):
     else:
         data = rd.merge_summary_dataframes(d2, data)
 
-    data = data[data.columns.intersection(partition_table_columns)]
     if data is None:
-        main_type10(df)
+        main_type10(df, file)
     else:
         try:
+            data = data[data.columns.intersection(partition_table_columns)]
             data = data.T.drop_duplicates().T
             data.to_sql("electronic_count_data_partitioned",
                     con=config.ENGINE,
@@ -133,9 +136,9 @@ def main(file: str):
         newline="",
     ) as f:
         write = csv.writer(f)
-        write.writerows([[files]])
+        write.writerows([[file]])
 
-def main_type10(df: pd.DataFrame):
+def main_type10(df: pd.DataFrame, file: str):
     WIM = wim.WimData(df)
     df, sub_data_df = WIM.dtype10
 
@@ -284,7 +287,7 @@ def main_type10(df: pd.DataFrame):
                 newline="",
             ) as f:
                 write = csv.writer(f)
-                write.writerows([[files]])
+                write.writerows([[file]])
 
             gc.collect()
         
@@ -297,7 +300,7 @@ def main_type10(df: pd.DataFrame):
                 newline="",
             ) as f:
                 write = csv.writer(f)
-                write.writerows([[files]])
+                write.writerows([[file]])
             pass
 
     
