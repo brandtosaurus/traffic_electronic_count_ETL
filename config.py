@@ -27,7 +27,7 @@ CONN = psycopg2.connect(database=DB_NAME,
                         host=DB_HOST,
                         port=DB_PORT)
 
-OUTPUT_FILE = r"~\Desktop\Temp\rsa_traffic_counts\TEMP_E_COUNT_"
+OUTPUT_FILE = r""
 
 FILES_COMPLETE = r"~\Desktop\Temp\rsa_traffic_counts\RSA_FILES_COMPLETE_localhost.csv"
 
@@ -260,7 +260,8 @@ TYPE10_DATA_COLUMN_NAMES = [
 "tyre_type"  
 ]
 
-TYPE10_DATA_TABLE_COL_LIST = ["data_id",
+TYPE10_DATA_TABLE_COL_LIST = [
+"data_id",
 "site_id",
 "header_id",
 "year",
@@ -298,3 +299,22 @@ TYPE10_HEADER_COLUMN_NAMES = [
     "primary_direction",
     "secondary_direction",
 ]
+
+ELECTRONIC_COUNT_DATA_TYPE21_NAME_CHANGE = {
+    'duration_min':'duration_of_summary',
+    'speedbin0':'number_of_vehicles_in_speedbin_0',
+    'speedbin1':'number_of_vehicles_in_speedbin_1', 
+    'speedbin2':'number_of_vehicles_in_speedbin_2', 
+    'speedbin3':'number_of_vehicles_in_speedbin_3', 
+    'speedbin4':'number_of_vehicles_in_speedbin_4',
+    'speedbin5':'number_of_vehicles_in_speedbin_5', 
+    'speedbin6':'number_of_vehicles_in_speedbin_6', 
+    'speedbin7':'number_of_vehicles_in_speedbin_7', 
+    'speedbin8':'number_of_vehicles_in_speedbin_8' ,
+    'speedbin9':'number_of_vehicles_in_speedbin_9',
+    'speedbin10':'number_of_vehicles_in_speedbin_10',
+    'short_heavy_vehicles':'number_of_short_heavy_vehicles',
+    'medium_heavy_vehicles':'number_of_medium_heavy_vehicles', 
+    'long_heavy_vehicles':'number_of_long_heavy_vehicles',
+    'rear_to_rear_headway_shorter_than_2_seconds':'number_of_rear_to_rear_headway_shorter_than_2_seconds'
+}

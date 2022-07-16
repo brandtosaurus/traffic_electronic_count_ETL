@@ -145,31 +145,31 @@ class Data(object):
             ddf.reset_index(inplace=True)
             ddf = ddf.fillna(0)
 
-            ddf["duration_min"] = ddf["duration_min"].astype(int)
-            ddf["lane_number"] = ddf["lane_number"].astype(int)
-            ddf["speedbin0"] = ddf["speedbin0"].astype(int)
-            ddf["speedbin1"] = ddf["speedbin1"].astype(int)
-            ddf["speedbin2"] = ddf["speedbin2"].astype(int)
-            ddf["speedbin3"] = ddf["speedbin3"].astype(int)
-            ddf["speedbin4"] = ddf["speedbin4"].astype(int)
-            ddf["speedbin5"] = ddf["speedbin5"].astype(int)
-            ddf["speedbin6"] = ddf["speedbin6"].astype(int)
-            ddf["speedbin7"] = ddf["speedbin7"].astype(int)
-            ddf["speedbin8"] = ddf["speedbin8"].astype(int)
-            ddf["speedbin9"] = ddf["speedbin9"].astype(int)
-            ddf["speedbin10"] = ddf["speedbin10"].astype(int)
+            ddf["duration_min"] = ddf["duration_min"].round().astype(int)
+            ddf["lane_number"] = ddf["lane_number"].round().astype(int)
+            ddf["speedbin0"] = ddf["speedbin0"].round().astype(int)
+            ddf["speedbin1"] = ddf["speedbin1"].round().astype(int)
+            ddf["speedbin2"] = ddf["speedbin2"].round().astype(int)
+            ddf["speedbin3"] = ddf["speedbin3"].round().astype(int)
+            ddf["speedbin4"] = ddf["speedbin4"].round().astype(int)
+            ddf["speedbin5"] = ddf["speedbin5"].round().astype(int)
+            ddf["speedbin6"] = ddf["speedbin6"].round().astype(int)
+            ddf["speedbin7"] = ddf["speedbin7"].round().astype(int)
+            ddf["speedbin8"] = ddf["speedbin8"].round().astype(int)
+            ddf["speedbin9"] = ddf["speedbin9"].round().astype(int)
+            ddf["speedbin10"] = ddf["speedbin10"].round().astype(int)
             ddf["sum_of_heavy_vehicle_speeds"] = ddf[
                 "sum_of_heavy_vehicle_speeds"
-            ].astype(int)
-            ddf["short_heavy_vehicles"] = ddf["short_heavy_vehicles"].astype(int)
-            ddf["medium_heavy_vehicles"] = ddf["medium_heavy_vehicles"].astype(int)
-            ddf["long_heavy_vehicles"] = ddf["long_heavy_vehicles"].astype(int)
+            ].round().astype(int)
+            ddf["short_heavy_vehicles"] = ddf["short_heavy_vehicles"].round().astype(int)
+            ddf["medium_heavy_vehicles"] = ddf["medium_heavy_vehicles"].round().astype(int)
+            ddf["long_heavy_vehicles"] = ddf["long_heavy_vehicles"].round().astype(int)
             ddf["rear_to_rear_headway_shorter_than_2_seconds"] = ddf[
                 "rear_to_rear_headway_shorter_than_2_seconds"
-            ].astype(int)
+            ].round().astype(int)
             ddf["rear_to_rear_headways_shorter_than_programmed_time"] = ddf[
                 "rear_to_rear_headways_shorter_than_programmed_time"
-            ].astype(int)
+            ].round().astype(int)
 
             ddf["total_heavy_vehicles_type21"] = (
                 ddf["short_heavy_vehicles"]
@@ -178,7 +178,7 @@ class Data(object):
             )
             ddf["total_heavy_vehicles_type21"] = ddf[
                 "total_heavy_vehicles_type21"
-            ].astype(int)
+            ].round().astype(int)
 
             ddf["total_light_vehicles_type21"] = (
                 ddf["speedbin1"]
@@ -197,7 +197,7 @@ class Data(object):
             )
             ddf["total_light_vehicles_type21"] = ddf[
                 "total_light_vehicles_type21"
-            ].astype(int)
+            ].round().astype(int)
 
             ddf["total_vehicles_type21"] = (
                 ddf["speedbin1"]
@@ -211,7 +211,7 @@ class Data(object):
                 + ddf["speedbin9"]
                 + ddf["speedbin10"]
             )
-            ddf["total_vehicles_type21"] = ddf["total_vehicles_type21"].astype(int)
+            ddf["total_vehicles_type21"] = ddf["total_vehicles_type21"].round().astype(int)
 
             max_lanes = ddf["lane_number"].max()
             ddf["direction"] = ddf.apply(
@@ -219,7 +219,7 @@ class Data(object):
                 axis=1,
             )
 
-            direction = dfh2.loc[dfh2[0] == "L1", 1:3].astype(int)
+            direction = dfh2.loc[dfh2[0] == "L1", 1:3].round().astype(int)
             direction = direction.drop_duplicates()
 
             ddf['end_date'] = ddf['end_datetime'].apply(lambda x: pd.to_datetime(x, format="%y%m%d").date() if len(x)==6 else pd.to_datetime(x, format="%Y%m%d").date())
@@ -267,7 +267,7 @@ class Data(object):
             
             ddf["start_datetime"] = pd.to_datetime(
                 ddf["end_datetime"]
-            ) - pd.to_timedelta(ddf["duration_min"].astype(int), unit="m")
+            ) - pd.to_timedelta(ddf["duration_min"].round().astype(int), unit="m")
             ddf['year'] = ddf['start_datetime'].dt.year
             t1 = dfh2.loc[dfh2[0] == "S0", 1].unique()
             ddf["site_id"] = str(t1[0])
@@ -417,105 +417,105 @@ class Data(object):
             ddf.reset_index(inplace=True)
             ddf=ddf.fillna(0)
 
-            ddf["duration_min"] = ddf["duration_min"].astype(int)
-            ddf["lane_number"] = ddf["lane_number"].astype(int)
+            ddf["duration_min"] = ddf["duration_min"].round().astype(int)
+            ddf["lane_number"] = ddf["lane_number"].round().astype(int)
             ddf["unknown_vehicle_error_class"] = ddf[
                 "unknown_vehicle_error_class"
-            ].astype(int)
-            ddf["light_motor_vehicles"] = ddf["light_motor_vehicles"].astype(int)
-            ddf["heavy_vehicle"] = ddf["heavy_vehicle"].astype(int)
+            ].round().astype(int)
+            ddf["light_motor_vehicles"] = ddf["light_motor_vehicles"].round().astype(int)
+            ddf["heavy_vehicle"] = ddf["heavy_vehicle"].round().astype(int)
             ddf["light_motor_vehicles_towing"] = ddf[
                 "light_motor_vehicles_towing"
-            ].astype(int)
-            ddf["two_axle_busses"] = ddf["two_axle_busses"].astype(int)
+            ].round().astype(int)
+            ddf["two_axle_busses"] = ddf["two_axle_busses"].round().astype(int)
             ddf["two_axle_6_tyre_single_units"] = ddf[
                 "two_axle_6_tyre_single_units"
-            ].astype(int)
+            ].round().astype(int)
             ddf["busses_with_3_or_4_axles"] = ddf["busses_with_3_or_4_axles"].astype(
                 int
             )
             ddf["two_axle_6_tyre_single_unit_with_light_trailer_4_axles_max"] = ddf[
                 "two_axle_6_tyre_single_unit_with_light_trailer_4_axles_max"
-            ].astype(int)
+            ].round().astype(int)
             ddf["three_axle_single_unit_including_single_axle_light_trailer"] = ddf[
                 "three_axle_single_unit_including_single_axle_light_trailer"
-            ].astype(int)
+            ].round().astype(int)
             ddf["four_or_less_axle_including_a_single_trailer"] = ddf[
                 "four_or_less_axle_including_a_single_trailer"
-            ].astype(int)
+            ].round().astype(int)
             ddf["buses_with_5_or_more_axles"] = ddf[
                 "buses_with_5_or_more_axles"
-            ].astype(int)
+            ].round().astype(int)
             ddf["three_axle_single_unit_and_light_trailer_more_than_4_axles"] = ddf[
                 "three_axle_single_unit_and_light_trailer_more_than_4_axles"
-            ].astype(int)
+            ].round().astype(int)
             ddf["five_axle_single_trailer"] = ddf["five_axle_single_trailer"].astype(
                 int
             )
-            ddf["six_axle_single_trailer"] = ddf["six_axle_single_trailer"].astype(int)
+            ddf["six_axle_single_trailer"] = ddf["six_axle_single_trailer"].round().astype(int)
             ddf["five_or_less_axle_multi_trailer"] = ddf[
                 "five_or_less_axle_multi_trailer"
-            ].astype(int)
-            ddf["six_axle_multi_trailer"] = ddf["six_axle_multi_trailer"].astype(int)
+            ].round().astype(int)
+            ddf["six_axle_multi_trailer"] = ddf["six_axle_multi_trailer"].round().astype(int)
             ddf["seven_axle_multi_trailer"] = ddf["seven_axle_multi_trailer"].astype(
                 int
             )
             ddf["eight_or_more_axle_multi_trailer"] = ddf[
                 "eight_or_more_axle_multi_trailer"
-            ].astype(int)
+            ].round().astype(int)
 
             ddf["total_light_vehicles_type30"] = (
-                ddf["motorcycle"].astype(int)
-                + ddf["light_motor_vehicles"].astype(int)
-                + ddf["light_motor_vehicles_towing"].astype(int)
+                ddf["motorcycle"].round().astype(int)
+                + ddf["light_motor_vehicles"].round().astype(int)
+                + ddf["light_motor_vehicles_towing"].round().astype(int)
             )
             ddf["total_heavy_vehicles_type30"] = (
-                ddf["two_axle_busses"].astype(int)
-                + ddf["two_axle_6_tyre_single_units"].astype(int)
-                + ddf["busses_with_3_or_4_axles"].astype(int)
+                ddf["two_axle_busses"].round().astype(int)
+                + ddf["two_axle_6_tyre_single_units"].round().astype(int)
+                + ddf["busses_with_3_or_4_axles"].round().astype(int)
                 + ddf[
                     "two_axle_6_tyre_single_unit_with_light_trailer_4_axles_max"
-                ].astype(int)
+                ].round().astype(int)
                 + ddf[
                     "three_axle_single_unit_including_single_axle_light_trailer"
-                ].astype(int)
-                + ddf["four_or_less_axle_including_a_single_trailer"].astype(int)
-                + ddf["buses_with_5_or_more_axles"].astype(int)
+                ].round().astype(int)
+                + ddf["four_or_less_axle_including_a_single_trailer"].round().astype(int)
+                + ddf["buses_with_5_or_more_axles"].round().astype(int)
                 + ddf[
                     "three_axle_single_unit_and_light_trailer_more_than_4_axles"
-                ].astype(int)
-                + ddf["five_axle_single_trailer"].astype(int)
-                + ddf["six_axle_single_trailer"].astype(int)
-                + ddf["five_or_less_axle_multi_trailer"].astype(int)
-                + ddf["six_axle_multi_trailer"].astype(int)
-                + ddf["seven_axle_multi_trailer"].astype(int)
-                + ddf["eight_or_more_axle_multi_trailer"].astype(int)
+                ].round().astype(int)
+                + ddf["five_axle_single_trailer"].round().astype(int)
+                + ddf["six_axle_single_trailer"].round().astype(int)
+                + ddf["five_or_less_axle_multi_trailer"].round().astype(int)
+                + ddf["six_axle_multi_trailer"].round().astype(int)
+                + ddf["seven_axle_multi_trailer"].round().astype(int)
+                + ddf["eight_or_more_axle_multi_trailer"].round().astype(int)
             )
 
             ddf["total_vehicles_type30"] = (
-                ddf["motorcycle"].astype(int)
-                + ddf["light_motor_vehicles"].astype(int)
-                + ddf["light_motor_vehicles_towing"].astype(int)
-                + ddf["two_axle_busses"].astype(int)
-                + ddf["two_axle_6_tyre_single_units"].astype(int)
-                + ddf["busses_with_3_or_4_axles"].astype(int)
+                ddf["motorcycle"].round().astype(int)
+                + ddf["light_motor_vehicles"].round().astype(int)
+                + ddf["light_motor_vehicles_towing"].round().astype(int)
+                + ddf["two_axle_busses"].round().astype(int)
+                + ddf["two_axle_6_tyre_single_units"].round().astype(int)
+                + ddf["busses_with_3_or_4_axles"].round().astype(int)
                 + ddf[
                     "two_axle_6_tyre_single_unit_with_light_trailer_4_axles_max"
-                ].astype(int)
+                ].round().astype(int)
                 + ddf[
                     "three_axle_single_unit_including_single_axle_light_trailer"
-                ].astype(int)
-                + ddf["four_or_less_axle_including_a_single_trailer"].astype(int)
-                + ddf["buses_with_5_or_more_axles"].astype(int)
+                ].round().astype(int)
+                + ddf["four_or_less_axle_including_a_single_trailer"].round().astype(int)
+                + ddf["buses_with_5_or_more_axles"].round().astype(int)
                 + ddf[
                     "three_axle_single_unit_and_light_trailer_more_than_4_axles"
-                ].astype(int)
-                + ddf["five_axle_single_trailer"].astype(int)
-                + ddf["six_axle_single_trailer"].astype(int)
-                + ddf["five_or_less_axle_multi_trailer"].astype(int)
-                + ddf["six_axle_multi_trailer"].astype(int)
-                + ddf["seven_axle_multi_trailer"].astype(int)
-                + ddf["eight_or_more_axle_multi_trailer"].astype(int)
+                ].round().astype(int)
+                + ddf["five_axle_single_trailer"].round().astype(int)
+                + ddf["six_axle_single_trailer"].round().astype(int)
+                + ddf["five_or_less_axle_multi_trailer"].round().astype(int)
+                + ddf["six_axle_multi_trailer"].round().astype(int)
+                + ddf["seven_axle_multi_trailer"].round().astype(int)
+                + ddf["eight_or_more_axle_multi_trailer"].round().astype(int)
             )
 
             max_lanes = ddf["lane_number"].max()
@@ -523,7 +523,7 @@ class Data(object):
                 lambda x: "P" if x["lane_number"] <= (int(max_lanes) / 2) else "N",
                 axis=1,
             )
-            direction = dfh2.loc[dfh2[0] == "L1", 1:3].astype(int)
+            direction = dfh2.loc[dfh2[0] == "L1", 1:3].round().astype(int)
             direction = direction.drop_duplicates()
 
             ddf['end_date'] = ddf['end_datetime'].apply(lambda x: pd.to_datetime(x, format="%y%m%d").date() if len(x)==6 else pd.to_datetime(x, format="%Y%m%d").date())
@@ -573,7 +573,7 @@ class Data(object):
 
             ddf["start_datetime"] = pd.to_datetime(
                 ddf["end_datetime"]
-            ) - pd.to_timedelta(ddf["duration_min"].astype(int), unit="m")
+            ) - pd.to_timedelta(ddf["duration_min"].round().astype(int), unit="m")
             ddf['year'] = ddf['start_datetime'].dt.year
             t1 = dfh2.loc[dfh2[0] == "S0", 1].unique()
             ddf["site_id"] = str(t1[0])
@@ -658,67 +658,67 @@ class Data(object):
             ddf.reset_index(inplace=True)
             ddf = ddf.fillna(0)
 
-            ddf["duration_min"] = ddf["duration_min"].astype(int)
-            ddf["lane_number"] = ddf["lane_number"].astype(int)
+            ddf["duration_min"] = ddf["duration_min"].round().astype(int)
+            ddf["lane_number"] = ddf["lane_number"].round().astype(int)
             ddf["number_of_error_vehicles"] = ddf["number_of_error_vehicles"].astype(
                 int
             )
             ddf["total_free_flowing_light_vehicles"] = ddf[
                 "total_free_flowing_light_vehicles"
-            ].astype(int)
+            ].round().astype(int)
             ddf["total_following_light_vehicles"] = ddf[
                 "total_following_light_vehicles"
-            ].astype(int)
+            ].round().astype(int)
             ddf["total_free_flowing_heavy_vehicles"] = ddf[
                 "total_free_flowing_heavy_vehicles"
-            ].astype(int)
+            ].round().astype(int)
             ddf["total_following_heavy_vehicles"] = ddf[
                 "total_following_heavy_vehicles"
-            ].astype(int)
+            ].round().astype(int)
             ddf["sum_of_inverse_of_speeds_for_free_flowing_lights"] = ddf[
                 "sum_of_inverse_of_speeds_for_free_flowing_lights"
-            ].astype(int)
+            ].round().astype(int)
             ddf["sum_of_inverse_of_speeds_for_following_lights"] = ddf[
                 "sum_of_inverse_of_speeds_for_following_lights"
-            ].astype(int)
+            ].round().astype(int)
             ddf["sum_of_inverse_of_speeds_for_free_flowing_heavies"] = ddf[
                 "sum_of_inverse_of_speeds_for_free_flowing_heavies"
-            ].astype(int)
+            ].round().astype(int)
             ddf["sum_of_inverse_of_speeds_for_following_heavies"] = ddf[
                 "sum_of_inverse_of_speeds_for_following_heavies"
-            ].astype(int)
+            ].round().astype(int)
             ddf["sum_of_speeds_for_free_flowing_lights"] = ddf[
                 "sum_of_speeds_for_free_flowing_lights"
-            ].astype(int)
+            ].round().astype(int)
             ddf["sum_of_speeds_for_following_lights"] = ddf[
                 "sum_of_speeds_for_following_lights"
-            ].astype(int)
+            ].round().astype(int)
             ddf["sum_of_speeds_for_free_flowing_heavies"] = ddf[
                 "sum_of_speeds_for_free_flowing_heavies"
-            ].astype(int)
+            ].round().astype(int)
             ddf["sum_of_speeds_for_following_heavies"] = ddf[
                 "sum_of_speeds_for_following_heavies"
-            ].astype(int)
+            ].round().astype(int)
             ddf["sum_of_squared_speeds_of_free_flowing_lights"] = ddf[
                 "sum_of_squared_speeds_of_free_flowing_lights"
-            ].astype(int)
+            ].round().astype(int)
             ddf["sum_of_squared_speeds_for_following_lights"] = ddf[
                 "sum_of_squared_speeds_for_following_lights"
-            ].astype(int)
+            ].round().astype(int)
             ddf["sum_of_squared_speeds_of_free_flowing_heavies"] = ddf[
                 "sum_of_squared_speeds_of_free_flowing_heavies"
-            ].astype(int)
+            ].round().astype(int)
             ddf["sum_of_squared_speeds_for_following_heavies"] = ddf[
                 "sum_of_squared_speeds_for_following_heavies"
-            ].astype(int)
+            ].round().astype(int)
 
-            ddf["lane_number"] = ddf["lane_number"].astype(int)
+            ddf["lane_number"] = ddf["lane_number"].round().astype(int)
             max_lanes = ddf["lane_number"].max()
             ddf["direction"] = ddf.apply(
                 lambda x: "P" if x["lane_number"] <= (int(max_lanes) / 2) else "N",
                 axis=1,
             )
-            direction = dfh2.loc[dfh2[0] == "L1", 1:3].astype(int)
+            direction = dfh2.loc[dfh2[0] == "L1", 1:3].round().astype(int)
             direction = direction.drop_duplicates()
 
             ddf['end_date'] = ddf['end_datetime'].apply(lambda x: pd.to_datetime(x, format="%y%m%d").date() if len(x)==6 else pd.to_datetime(x, format="%Y%m%d").date())
@@ -767,7 +767,7 @@ class Data(object):
 
             ddf["start_datetime"] = pd.to_datetime(
                 ddf["end_datetime"]
-            ) - pd.to_timedelta(ddf["duration_min"].astype(int), unit="m")
+            ) - pd.to_timedelta(ddf["duration_min"].round().astype(int), unit="m")
             ddf['year'] = ddf['start_datetime'].dt.year
             t1 = dfh2.loc[dfh2[0] == "S0", 1].unique()
             ddf["site_id"] = str(t1[0])
@@ -814,7 +814,7 @@ class Data(object):
             ddf["duration_min"] = data[5]
 
             ddf["lane_number"] = data[6]
-            ddf["lane_number"] = ddf["lane_number"].astype(int)
+            ddf["lane_number"] = ddf["lane_number"].round().astype(int)
 
             ddf.reset_index(inplace=True)
 
@@ -843,7 +843,7 @@ class Data(object):
                 lambda x: "P" if x["lane_number"] <= (int(max_lanes) / 2) else "N",
                 axis=1,
             )
-            direction = dfh2.loc[dfh2[0] == "L1", 1:3].astype(int)
+            direction = dfh2.loc[dfh2[0] == "L1", 1:3].round().astype(int)
             direction = direction.drop_duplicates()
 
             ddf['end_date'] = ddf['end_datetime'].apply(lambda x: pd.to_datetime(x, format="%y%m%d").date() if len(x)==6 else pd.to_datetime(x, format="%Y%m%d").date())
@@ -894,7 +894,7 @@ class Data(object):
             ddf["site_id"] = ddf["site_id"].astype(str)
             ddf["start_datetime"] = pd.to_datetime(
                 ddf["end_datetime"]
-            ) - pd.to_timedelta(ddf["duration_min"].astype(int), unit="m")
+            ) - pd.to_timedelta(ddf["duration_min"].round().astype(int), unit="m")
             ddf['year'] = ddf['start_datetime'].dt.year
             ddf = ddf.drop_duplicates()
             ddf["start_datetime"] = ddf["start_datetime"].astype("datetime64[ns]")
@@ -1100,7 +1100,7 @@ class Data(object):
                     header['total_long_heavy_vehicles'] = data.loc[data['vehicle_class_code_secondary_scheme']==4].count()[0].round().astype(int)
                     header['total_vehicles_positive_direction'] = data.loc[data['direction']=='N'].count()[0].round().astype(int)
                     header['total_vehicles_negative_direction'] = data.loc[data['direction']=='P'].count()[0].round().astype(int)
-                    header['total_vehicles'] = data.count()[0].astype(int)
+                    header['total_vehicles'] = data.count()[0].round().astype(int)
                     header['average_speed_positive_direction'] = data.loc[data['direction']=='N']['vehicle_speed'].mean().round(2)
                     header['average_speed_negative_direction'] = data.loc[data['direction']=='P']['vehicle_speed'].mean().round(2)
                     header['average_speed'] = data['vehicle_speed'].mean().round(2)
@@ -1134,12 +1134,12 @@ class Data(object):
                     header['highest_volume_per_hour_positive_direction'] = data.loc[data['direction']=='N'].groupby(pd.Grouper(key='start_datetime',freq='H')).count().max()[0]
                     header['highest_volume_per_hour_negative_direction'] = data.loc[data['direction']=='P'].groupby(pd.Grouper(key='start_datetime',freq='H')).count().max()[0]
                     header['highest_volume_per_hour_total'] = data.groupby(pd.Grouper(key='start_datetime',freq='H')).count().max()[0]
-                    header["15th_highest_volume_per_hour_positive_direction"] = data.loc[data['direction']=='N'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.15)[0].astype(int)
-                    header["15th_highest_volume_per_hour_negative_direction"] = data.loc[data['direction']=='P'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.15)[0].astype(int)
-                    header["15th_highest_volume_per_hour_total"] = data.groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.15)[0].astype(int)
-                    header["30th_highest_volume_per_hour_positive_direction"] = data.loc[data['direction']=='N'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.30)[0].astype(int)
-                    header["30th_highest_volume_per_hour_negative_direction"] = data.loc[data['direction']=='P'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.30)[0].astype(int)
-                    header["30th_highest_volume_per_hour_total"] = data.groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.30)[0].astype(int)
+                    header["15th_highest_volume_per_hour_positive_direction"] = data.loc[data['direction']=='N'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.15)[0].round().astype(int)
+                    header["15th_highest_volume_per_hour_negative_direction"] = data.loc[data['direction']=='P'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.15)[0].round().astype(int)
+                    header["15th_highest_volume_per_hour_total"] = data.groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.15)[0].round().astype(int)
+                    header["30th_highest_volume_per_hour_positive_direction"] = data.loc[data['direction']=='N'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.30)[0].round().astype(int)
+                    header["30th_highest_volume_per_hour_negative_direction"] = data.loc[data['direction']=='P'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.30)[0].round().astype(int)
+                    header["30th_highest_volume_per_hour_total"] = data.groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.30)[0].round().astype(int)
                     header["15th_percentile_speed_positive_direction"] = data.loc[data['direction']=='N']['vehicle_speed'].quantile(0.15).round(2)
                     header["15th_percentile_speed_negative_direction"] = data.loc[data['direction']=='P']['vehicle_speed'].quantile(0.15).round(2)
                     header["15th_percentile_speed_total"] = data['vehicle_speed'].quantile(0.15).round(2)

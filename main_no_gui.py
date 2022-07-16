@@ -14,13 +14,13 @@ import config
 import queries as q
 import tools
 
-partition_table_columns = list(pd.read_sql_query("SELECT * from trafc.electronic_count_data_partitioned limit 1",config.ENGINE).columns)
-electronic_count_data_type_21_columns = list(pd.read_sql_query("SELECT * from trafc.electronic_count_data_type_21 limit 1",config.ENGINE).columns)
-electronic_count_data_type_30_columns = list(pd.read_sql_query("SELECT * from trafc.electronic_count_data_type_30 limit 1",config.ENGINE).columns)
-electronic_count_data_type_60_columns = list(pd.read_sql_query("SELECT * from trafc.electronic_count_data_type_60 limit 1",config.ENGINE).columns)
-electronic_count_data_type_70_columns = list(pd.read_sql_query("SELECT * from trafc.electronic_count_data_type_70 limit 1",config.ENGINE).columns)
-header_columns = list(pd.read_sql_query("SELECT * from trafc.electronic_count_header limit 1",config.ENGINE).columns)
-electronic_count_data_type_10_columns = list(pd.read_sql_query("SELECT * from trafc.electronic_count_data_type_10 limit 1",config.ENGINE).columns)
+partition_table_columns = list(pd.read_sql_query(q.SELECT_PARTITION_TABLE_COLUMNS,config.ENGINE).columns)
+electronic_count_data_type_21_columns = list(pd.read_sql_query(q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_21_LIMIT1,config.ENGINE).columns)
+electronic_count_data_type_30_columns = list(pd.read_sql_query(q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_30_LIMIT1,config.ENGINE).columns)
+electronic_count_data_type_60_columns = list(pd.read_sql_query(q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_60_LIMIT1,config.ENGINE).columns)
+electronic_count_data_type_70_columns = list(pd.read_sql_query(q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_70_LIMIT1,config.ENGINE).columns)
+electronic_count_data_type_10_columns = list(pd.read_sql_query(q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_10_LIMIT1,config.ENGINE).columns)
+header_columns = list(pd.read_sql_query(q.SELECT_HEADER_LIMIT1,config.ENGINE).columns)
 
 #### MAIN EXECUTABLE
 def main(file: str):
@@ -32,28 +32,6 @@ def main(file: str):
     D = rd.Data(df, header)
     data = D.dtype21
 
-    if header is None:
-        pass
-    else:
-        try:
-            header = rd.Data.header_calcs(header, data, 21)
-            header = rd.Data.header_calcs(header, data, 70)
-            header = rd.Data.header_calcs(header, data, 30)
-            header = rd.Data.header_calcs(header, data, 60)
-            header = header[header.columns.intersection(header_columns)]
-            try:
-                header.to_sql("electronic_count_header",
-                        con=config.ENGINE,
-                        schema="trafc",
-                        if_exists="append",
-                        index=False,
-                        method=tools.psql_insert_copy,
-                    )
-            except UniqueViolation:
-                pass
-        except AttributeError:
-            pass
-    
     if data is None:
         d2 = data
     else:
@@ -61,23 +39,7 @@ def main(file: str):
     if d2 is None:
         pass
     else:
-        d2.rename(columns={'duration_min':'duration_of_summary',
-            'speedbin0':'number_of_vehicles_in_speedbin_0',
-            'speedbin1':'number_of_vehicles_in_speedbin_1', 
-            'speedbin2':'number_of_vehicles_in_speedbin_2', 
-            'speedbin3':'number_of_vehicles_in_speedbin_3', 
-            'speedbin4':'number_of_vehicles_in_speedbin_4',
-            'speedbin5':'number_of_vehicles_in_speedbin_5', 
-            'speedbin6':'number_of_vehicles_in_speedbin_6', 
-            'speedbin7':'number_of_vehicles_in_speedbin_7', 
-            'speedbin8':'number_of_vehicles_in_speedbin_8' ,
-            'speedbin9':'number_of_vehicles_in_speedbin_9',
-            'speedbin10':'number_of_vehicles_in_speedbin_10',
-            'short_heavy_vehicles':'number_of_short_heavy_vehicles',
-            'medium_heavy_vehicles':'number_of_medium_heavy_vehicles', 
-            'long_heavy_vehicles':'number_of_long_heavy_vehicles',
-            'rear_to_rear_headway_shorter_than_2_seconds':'number_of_rear_to_rear_headway_shorter_than_2_seconds'
-            }, inplace=True)
+        d2.rename(columns=config.ELECTRONIC_COUNT_DATA_TYPE21_NAME_CHANGE, inplace=True)
         d2 = d2[d2.columns.intersection(electronic_count_data_type_21_columns)]
         try:
             d2.to_sql("electronic_count_data_type_21",
@@ -113,6 +75,31 @@ def main(file: str):
     else:
         data = rd.merge_summary_dataframes(d2, data)
 
+    data = data.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
+    header = header.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
+
+    if header is None:
+        pass
+    else:
+        try:
+            header = rd.Data.header_calcs(header, data, 21)
+            header = rd.Data.header_calcs(header, data, 70)
+            header = rd.Data.header_calcs(header, data, 30)
+            header = rd.Data.header_calcs(header, data, 60)
+            header = header[header.columns.intersection(header_columns)]
+            try:
+                header.to_sql("electronic_count_header",
+                        con=config.ENGINE,
+                        schema="trafc",
+                        if_exists="append",
+                        index=False,
+                        method=tools.psql_insert_copy,
+                    )
+            except UniqueViolation:
+                pass
+        except AttributeError:
+            pass
+
     if data is None:
         main_type10(df, file)
     else:
@@ -138,6 +125,7 @@ def main(file: str):
         write = csv.writer(f)
         write.writerows([[file]])
 
+## TYPE 10 (INDIVIDUAL COUNT) SUB-FUNCTION (REFERENCED IN MAIN FUNCTION)
 def main_type10(df: pd.DataFrame, file: str):
     WIM = wim.WimData(df)
     df, sub_data_df = WIM.dtype10

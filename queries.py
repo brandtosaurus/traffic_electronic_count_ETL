@@ -637,3 +637,31 @@ GET_HSWIM_HEADER_IDS = """
         exists (select header_id from trafc.traffic_e_type10_axle_mass m where m.type10_id = t10.data_id)
     )
     ;"""
+
+SELECT_PARTITION_TABLE_LIMIT1 = """
+	SELECT * from trafc.electronic_count_data_partitioned limit 1
+"""
+
+SELECT_ELECTRONIC_COUNT_DATA_TYPE_21_LIMIT1 = """
+	SELECT * from trafc.electronic_count_data_type_21 limit 1
+"""
+
+SELECT_ELECTRONIC_COUNT_DATA_TYPE_30_LIMIT1 = """
+	SELECT * from trafc.electronic_count_data_type_30 limit 1
+"""
+
+SELECT_ELECTRONIC_COUNT_DATA_TYPE_60_LIMIT1 = """
+	SELECT * from trafc.electronic_count_data_type_60 limit 1
+"""
+
+SELECT_ELECTRONIC_COUNT_DATA_TYPE_70_COLUMNS = """
+	SELECT * from trafc.electronic_count_data_type_70 limit 1
+"""
+
+SELECT_ELECTRONIC_COUNT_DATA_TYPE_10_LIMIT1 = """
+	SELECT * from trafc.electronic_count_data_type_10 limit 1
+"""
+
+SELECT_HEADER_LIMIT1 = """
+	SELECT * from trafc.electronic_count_header limit 1
+"""

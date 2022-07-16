@@ -110,14 +110,14 @@ class WimData(object):
             except:
                 pass
 
-            if ddf["start_datetime"].map(len).isin([8]).all():
+            if ddf["departure_date"].map(len).isin([8]).all():
                 ddf["start_datetime"] = pd.to_datetime(
-                    ddf["start_datetime"] + ddf["departure_time"],
+                    ddf["departure_date"] + ddf["departure_time"],
                     format="%Y%m%d%H%M%S%f",
                 )
-            elif ddf["start_datetime"].map(len).isin([6]).all():
+            elif ddf["departure_date"].map(len).isin([6]).all():
                 ddf["start_datetime"] = pd.to_datetime(
-                    ddf["start_datetime"] + ddf["departure_time"],
+                    ddf["departure_date"] + ddf["departure_time"],
                     format="%y%m%d%H%M%S%f",
                 )
             ddf['year'] = ddf['start_datetime'].dt.year
@@ -125,7 +125,7 @@ class WimData(object):
             ddf["site_id"] = str(t1[0])
             ddf["site_id"] = ddf["site_id"].astype(str)
 
-            ddf = ddf.drop(["departure_time"], axis=1)
+            ddf['departure_time'] = pd.to_datetime(ddf['departure_time'], format='%H%M%S%f')
 
             ddf = ddf.drop_duplicates()
             ddf["start_datetime"] = ddf["start_datetime"].astype("datetime64[ns]")
