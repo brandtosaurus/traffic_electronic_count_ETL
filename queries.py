@@ -654,7 +654,7 @@ SELECT_ELECTRONIC_COUNT_DATA_TYPE_60_LIMIT1 = """
 	SELECT * from trafc.electronic_count_data_type_60 limit 1
 """
 
-SELECT_ELECTRONIC_COUNT_DATA_TYPE_70_COLUMNS = """
+SELECT_ELECTRONIC_COUNT_DATA_TYPE_70_LIMIT1 = """
 	SELECT * from trafc.electronic_count_data_type_70 limit 1
 """
 
@@ -664,4 +664,20 @@ SELECT_ELECTRONIC_COUNT_DATA_TYPE_10_LIMIT1 = """
 
 SELECT_HEADER_LIMIT1 = """
 	SELECT * from trafc.electronic_count_header limit 1
+"""
+
+SELECT_CLASSIFICAITON_SCHEME_8 = """
+	SELECT * FROM traf_lu.vehicle_classes_scheme08;
+"""
+
+SELECT_CLASSIFICAITON_SCHEME_1 = """
+	SELECT * FROM traf_lu.vehicle_classes_scheme01 ;
+"""
+
+SELECT_CLASSIFICAITON_SCHEME_5 = """
+	SELECT * FROM traf_lu.vehicle_classes_scheme05 ;
+"""
+
+SELECT_CLASSIFICAITON_SCHEME_9 = """
+	SELECT * FROM traf_lu.vehicle_classes_scheme09 ;
 """

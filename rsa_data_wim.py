@@ -1,13 +1,14 @@
 import pandas as pd
 import numpy as np
 import config
+import rsa_data_summary as rd
 
 import uuid
 
 class WimData(object):
-    def __init__(self, df) -> None:
+    def __init__(self, df: pd.DataFrame, header: pd.DataFrame) -> None:
         self.dtype10, self.dtype10_sub_data = WimData.dtype10(df)
-        self.dtype10 = WimData.join_header_id(self.dtype10)
+        self.dtype10 = rd.Data.join_header_id(self.dtype10, header)
         self.type10_separate_table = WimData.type10_separate_table(df)
 
     def dtype10(df: pd.DataFrame) -> pd.DataFrame:
@@ -98,6 +99,7 @@ class WimData(object):
             
             ddf = ddf.fillna(0)
             ddf["assigned_lane_number"] = ddf["assigned_lane_number"].astype(int)
+            ddf["lane_number"] = ddf["assigned_lane_number"].astype(int)
             ddf["physical_lane_number"] = ddf["physical_lane_number"].astype(int)
             max_lanes = ddf["physical_lane_number"].max()
             try:

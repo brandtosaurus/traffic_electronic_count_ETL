@@ -1,5 +1,6 @@
 import csv
 import os
+from tkinter.tix import InputOnly
 import tqdm
 import traceback
 import pandas as pd
@@ -14,7 +15,7 @@ import config
 import queries as q
 import tools
 
-partition_table_columns = list(pd.read_sql_query(q.SELECT_PARTITION_TABLE_COLUMNS,config.ENGINE).columns)
+partition_table_columns = list(pd.read_sql_query(q.SELECT_PARTITION_TABLE_LIMIT1,config.ENGINE).columns)
 electronic_count_data_type_21_columns = list(pd.read_sql_query(q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_21_LIMIT1,config.ENGINE).columns)
 electronic_count_data_type_30_columns = list(pd.read_sql_query(q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_30_LIMIT1,config.ENGINE).columns)
 electronic_count_data_type_60_columns = list(pd.read_sql_query(q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_60_LIMIT1,config.ENGINE).columns)
@@ -30,7 +31,7 @@ def main(file: str):
     lanes = H.lanes
 
     D = rd.Data(df, header)
-    data = D.dtype21
+    data = D.dtype21.reset_index(inplace=True)
 
     if data is None:
         d2 = data
@@ -75,13 +76,15 @@ def main(file: str):
     else:
         data = rd.merge_summary_dataframes(d2, data)
 
-    data = data.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
-    header = header.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
+    
+    
 
     if header is None:
         pass
     else:
         try:
+            data.reset_index(inplace=True)
+            header = header.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
             header = rd.Data.header_calcs(header, data, 21)
             header = rd.Data.header_calcs(header, data, 70)
             header = rd.Data.header_calcs(header, data, 30)
@@ -101,9 +104,10 @@ def main(file: str):
             pass
 
     if data is None:
-        main_type10(df, file)
+        main_type10(df, file, header)
     else:
         try:
+            data = data.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
             data = data[data.columns.intersection(partition_table_columns)]
             data = data.T.drop_duplicates().T
             data.to_sql("electronic_count_data_partitioned",
@@ -126,8 +130,8 @@ def main(file: str):
         write.writerows([[file]])
 
 ## TYPE 10 (INDIVIDUAL COUNT) SUB-FUNCTION (REFERENCED IN MAIN FUNCTION)
-def main_type10(df: pd.DataFrame, file: str):
-    WIM = wim.WimData(df)
+def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
+    WIM = wim.WimData(df, header)
     df, sub_data_df = WIM.dtype10
 
     if df is None:
@@ -291,13 +295,8 @@ def main_type10(df: pd.DataFrame, file: str):
                 write.writerows([[file]])
             pass
 
-    
-
-
-
 ##################################################################################################################################
 ##################################################################################################################################
-
 
 if __name__ == "__main__":
 
