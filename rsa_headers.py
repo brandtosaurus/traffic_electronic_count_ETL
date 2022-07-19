@@ -43,9 +43,9 @@ class Headers(object):
 
         # adds a day if the hour is zero hour and changes string to dtetime.date
         header_start_end[1] = header_start_end[1].apply(lambda x: pd.to_datetime(x.str[:8], format="%Y%m%d").date() + timedelta(days=1)
-        if x[2]=='0000000' else pd.to_datetime(x, format="%Y%m%d").date())
+        if x[2] in ['0'.zfill(7),'24'.zfill(7)] else pd.to_datetime(x, format="%Y%m%d").date())
         header_start_end[3] = header_start_end[3].apply(lambda x: pd.to_datetime(x.str[:8], format="%Y%m%d").date() + timedelta(days=1)
-        if x[4]=='0000000' else pd.to_datetime(x, format="%Y%m%d").date())
+        if x[4] in ['0'.zfill(7),'24'.zfill(7)] else pd.to_datetime(x, format="%Y%m%d").date())
 
         # changes time string into datetime.time
         header_start_end[2] = header_start_end[2].apply(lambda x: pd.to_datetime(x, format="%H%M%S%f").time())
