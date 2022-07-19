@@ -411,7 +411,7 @@ if __name__ == "__main__":
     # for file in filesToDo:
     #     main(file)
 
-    def run():
+    def run(filesToDo):
         filesToDo = files(filesToDo)
         pool = mp.Pool(int(mp.cpu_count()))
         for _ in tqdm.tqdm(pool.imap_unordered(main, filesToDo), total=len(filesToDo)):
@@ -421,10 +421,10 @@ if __name__ == "__main__":
 
     ######### MIULTIPROCESSING ###########
     try:
-        run()
+        run(filesToDo)
     except Exception as e:
         print(e)
         time.sleep(10)
-        run()
+        run(filesToDo)
 
     print("COMPLETE")

@@ -29,26 +29,29 @@ class Headers(object):
     def headers(df: pd.DataFrame, file: str) -> pd.DataFrame:
         header_start_end = df.loc[df[0].isin(["D1","D3"]), 0:4].copy()
 
+        # adds centry to year if it is not there
         header_start_end[1] = header_start_end[1].apply(lambda x: str(date.today())[:2] + x if len(x)==6 else x)
         header_start_end[3] = header_start_end[3].apply(lambda x: str(date.today())[:2] + x if len(x)==6 else x)
 
+        # index 2 and 4 are time, this makes the time uniform length
         header_start_end[2] = header_start_end[2].str.pad(width=7,side='right',fillchar="0")
         header_start_end[4] = header_start_end[4].str.pad(width=7,side='right',fillchar="0")
 
+        # this filters for time = 24H00m and makes it zero hour
         header_start_end[2].loc[header_start_end[2].str[:2] == '24'] = ('0').zfill(7)
         header_start_end[4].loc[header_start_end[4].str[:2] == '24'] = ('0').zfill(7)
 
-        header_start_end[1] = header_start_end[1].apply(lambda x: str(date.today())[:2] + x if len(x)==6 else x)
-        header_start_end[3] = header_start_end[3].apply(lambda x: str(date.today())[:2] + x if len(x)==6 else x)
+        # adds a day if the hour is zero hour and changes string to dtetime.date
+        header_start_end[1] = header_start_end[1].apply(lambda x: pd.to_datetime(x.str[:8], format="%Y%m%d").date() + timedelta(days=1)
+        if x[2]=='0000000' else pd.to_datetime(x, format="%Y%m%d").date())
+        header_start_end[3] = header_start_end[3].apply(lambda x: pd.to_datetime(x.str[:8], format="%Y%m%d").date() + timedelta(days=1)
+        if x[4]=='0000000' else pd.to_datetime(x, format="%Y%m%d").date())
 
-        header_start_end[1] = header_start_end[1].apply(lambda x: pd.to_datetime(x, format="%Y%m%d").date() + timedelta(days=1)
-        if x[2]=='2400000' else pd.to_datetime(x, format="%Y%m%d").date())
-        header_start_end[3] = header_start_end[3].apply(lambda x: pd.to_datetime(x, format="%Y%m%d").date() + timedelta(days=1)
-        if x[4]=='2400000' else pd.to_datetime(x, format="%Y%m%d").date())
-
+        # changes time string into datetime.time
         header_start_end[2] = header_start_end[2].apply(lambda x: pd.to_datetime(x, format="%H%M%S%f").time())
         header_start_end[4] = header_start_end[4].apply(lambda x: pd.to_datetime(x, format="%H%M%S%f").time())
 
+        # creates start_datetime and end_datetime
         try:
             header_start_end["start_datetime"] = pd.to_datetime((header_start_end[1].astype(str)+header_start_end[2].astype(str)), 
                 format='%Y-%m-%d%H:%M:%S')
