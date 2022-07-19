@@ -13,9 +13,6 @@ class Data(object):
         self.dtype21 = Data.join(header, Data.dtype21(df))
         self.dtype30 = Data.join(header, Data.dtype30(df))
         self.dtype70 = Data.join(header, Data.dtype70(df))
-        # self.dtype21 = Data.dtype21(df)
-        # self.dtype30 = Data.dtype30(df)
-        # self.dtype70 = Data.dtype70(df)
         # self.dtype60 = Data.join(header, Data.dtype60(df))
         self.electronic_count_data_type_30 = Data.electronic_count_data_type_30(df)
         
@@ -1016,7 +1013,7 @@ class Data(object):
                     speed_limit = speed_limit['max_speed'].iloc[0]
                 except IndexError:
                     speed_limit = 60
-
+                data['start_datetime'] = pd.to_datetime(data['start_datetime'])
                 if dtype == 21:
                     try:
                         header['adt_total'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['header_id']]).sum().mean().round().astype(int)
@@ -1073,7 +1070,8 @@ class Data(object):
 
                         # header['average_speed_positive_direction'] = 
                         # header['average_speed_negative_direction'] = 
-                        header['average_speed'] = (int((
+                        try:
+                            header['average_speed'] = (int((
                             (header['speedbin1'] * data['speedbin1'].groupby(data['header_id']).sum()[0]) +
                             (header['speedbin2'] * data['speedbin2'].groupby(data['header_id']).sum()[0]) +
                             (header['speedbin3'] * data['speedbin3'].groupby(data['header_id']).sum()[0]) +
@@ -1083,6 +1081,20 @@ class Data(object):
                             (header['speedbin7'] * data['speedbin7'].groupby(data['header_id']).sum()[0]) +
                             (header['speedbin8'] * data['speedbin8'].groupby(data['header_id']).sum()[0]) +
                             (header['speedbin9'] * data['speedbin9'].groupby(data['header_id']).sum()[0]) 
+                            ))
+                            / data['sum_of_heavy_vehicle_speeds'].astype(int).groupby(data['header_id']).sum()[0]
+                            )
+                        except TypeError:
+                            header['average_speed'] = (((
+                            (header['speedbin1'] * data['speedbin1'].astype(int).groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin2'] * data['speedbin2'].astype(int).groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin3'] * data['speedbin3'].astype(int).groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin4'] * data['speedbin4'].astype(int).groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin5'] * data['speedbin5'].astype(int).groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin6'] * data['speedbin6'].astype(int).groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin7'] * data['speedbin7'].astype(int).groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin8'] * data['speedbin8'].astype(int).groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin9'] * data['speedbin9'].astype(int).groupby(data['header_id']).sum()[0]) 
                             ))
                             / data['sum_of_heavy_vehicle_speeds'].astype(int).groupby(data['header_id']).sum()[0]
                             )
@@ -1136,7 +1148,7 @@ class Data(object):
                         pass
 
                     return header
-
+                
                 elif dtype == 30:
                     try:
                         if header['adt_total'].isnull().all():
@@ -1268,10 +1280,9 @@ class Data(object):
                     
                     return header
                 else:
-                    pass
-
+                    return header
             except IndexError:
-                pass
+                return header
 
 def process_dates_and_times(df: pd.DataFrame, date_length: int, time_length: int, duration_min: int):
     df[3] = df[3].astype(str)
