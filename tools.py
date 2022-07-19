@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from pandasql import sqldf
 import config
 from sqlalchemy.dialects.postgresql import insert
@@ -36,12 +37,12 @@ def to_df(file: str) -> pd.DataFrame:
         df = pd.read_csv(file, header=None)
         df = df[0].str.split("\s+|,\s+|,", expand=True)
         return df
-    except Exception as e:
-        df = pd.read_csv(file, header=None, sep='\s+')
+    except pd.errors.ParserError:
+        df = pd.read_csv(file, header=None, sep='\s+', low_memory=False)
         df = df[0].str.split("\s+|,\s+|,", expand=True)
         return df
     except:
-        df = pd.read_csv(file, header=None, sep='\t')
+        df = pd.read_csv(file, header=None, sep='\t', low_memory=False)
         df = df[0].str.split("\s+|,\s+|,", expand=True)
         return df
 
@@ -64,7 +65,7 @@ def join_header_id(d2, header):
         pass
     else:
         data = data_join(d2, header)
-        data.drop("station_name", axis=1, inplace=True)
+        # data.drop("station_name", axis=1, inplace=True)
         data["start_datetime"] = data["start_datetime"].astype("datetime64[ns]")
         d2["start_datetime"] = d2["start_datetime"].astype("datetime64[ns]")
         data = data.merge(
@@ -87,7 +88,7 @@ def join(header: pd.DataFrame, data: pd.DataFrame) -> pd.DataFrame:
         df = pd.DataFrame()
     else:
         q = """
-        SELECT header.header_id, header.station_name, data.*
+        SELECT header.header_id, data.*
         FROM header
         LEFT JOIN data ON data.start_datetime WHERE data.start_datetime >= header.start_datetime AND data.end_datetime <= header.end_datetime;
         """
@@ -188,8 +189,7 @@ def save_to_temp_csv(df: pd.DataFrame, label: str):
         )
 
 def push_to_partitioned_table(df, table, subset) -> None:
-    yr = data['year'].unique()[0]
-    print(yr)
+    yr = df['year'].unique()[0]
     try:
         df.to_sql(
             table+'_'+str(yr),
@@ -261,4 +261,9 @@ def dropDuplicatesDoSomePostProcesingAndSaveCsv(csv_label: str):
         mode="a",
         header=False,
     )
+
+def convert_float_to_int(df):
+    m = df.select_dtypes(np.number)
+    df[m.columns]= m.round().astype('Int64')
+    return df
 

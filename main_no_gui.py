@@ -1,12 +1,11 @@
 import csv
 import os
-from tkinter.tix import InputOnly
 import tqdm
 import traceback
 import pandas as pd
 import numpy as np
 import multiprocessing as mp
-from psycopg2.errors import UniqueViolation
+# from psycopg2.errors import UniqueViolation, InterfaceError
 
 import rsa_data_summary as rd
 import rsa_data_wim as wim
@@ -14,6 +13,16 @@ import rsa_headers as rh
 import config
 import queries as q
 import tools
+
+import time
+from functools import wraps
+import psycopg2, psycopg2.extensions
+
+from typing import List
+
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+pd.options.mode.chained_assignment = None
 
 partition_table_columns = list(pd.read_sql_query(q.SELECT_PARTITION_TABLE_LIMIT1,config.ENGINE).columns)
 electronic_count_data_type_21_columns = list(pd.read_sql_query(q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_21_LIMIT1,config.ENGINE).columns)
@@ -23,111 +32,187 @@ electronic_count_data_type_70_columns = list(pd.read_sql_query(q.SELECT_ELECTRON
 electronic_count_data_type_10_columns = list(pd.read_sql_query(q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_10_LIMIT1,config.ENGINE).columns)
 header_columns = list(pd.read_sql_query(q.SELECT_HEADER_LIMIT1,config.ENGINE).columns)
 
+def retry(fn):
+    @wraps(fn)
+    def wrapper(*args, **kw):
+        cls = args[0]
+        for x in range(cls._reconnectTries):
+            print(x, cls._reconnectTries)
+            try:
+                return fn(*args, **kw)
+            except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+                print ("\nDatabase Connection [InterfaceError or OperationalError]")
+                print ("Idle for %s seconds" % (cls._reconnectIdle))
+                time.sleep(cls._reconnectIdle)
+                cls._connect()
+    return wrapper
+
 #### MAIN EXECUTABLE
 def main(file: str):
-    df = tools.to_df(file)
-    H = rh.Headers(df, file)
-    header = H.header
-    lanes = H.lanes
+    try:
+        print("--- Busy With "+file)
+        df = tools.to_df(file)
+        H = rh.Headers(df, file)
+        header = H.header_df
+        # lanes = H.lanes
 
-    D = rd.Data(df, header)
-    data = D.dtype21.reset_index(inplace=True)
+        D = rd.Data(df, header)
+        data = D.dtype21
 
-    if data is None:
-        d2 = data
-    else:
-        d2 = data.copy()
-    if d2 is None:
-        pass
-    else:
-        d2.rename(columns=config.ELECTRONIC_COUNT_DATA_TYPE21_NAME_CHANGE, inplace=True)
-        d2 = d2[d2.columns.intersection(electronic_count_data_type_21_columns)]
-        try:
-            d2.to_sql("electronic_count_data_type_21",
+        if data is None:
+            data = D.dtype30
+            if data is None:
+                data = pd.DataFrame(columns = partition_table_columns)
+            else:
+                d2 = data.copy()
+                data = rd.merge_summary_dataframes(d2, data)
+        else:
+            data = data.reset_index(drop=True)
+            d2 = data.copy()
+            if d2 is None:
+                pass
+            else:
+                d2.rename(columns=config.ELECTRONIC_COUNT_DATA_TYPE21_NAME_CHANGE, inplace=True)
+                d2 = d2[d2.columns.intersection(electronic_count_data_type_21_columns)]
+                try:
+                    d2.to_sql("electronic_count_data_type_21",
+                            con=config.ENGINE,
+                            schema="trafc",
+                            if_exists="append",
+                            index=False,
+                            method=tools.psql_insert_copy,
+                        )
+                except psycopg2.errors.UniqueViolation:
+                    pass
+                except psycopg2.InterfaceError:
+                    time.sleep(10)
+                    main(file)
+
+        d2 = D.dtype70
+        if d2 is None:
+            pass
+        else:
+            data = rd.merge_summary_dataframes(d2, data)
+            d2 = d2[d2.columns.intersection(electronic_count_data_type_70_columns)]
+            try:
+                d2.to_sql("electronic_count_data_type_70",
                     con=config.ENGINE,
                     schema="trafc",
                     if_exists="append",
                     index=False,
                     method=tools.psql_insert_copy,
                 )
-        except UniqueViolation:
+            except psycopg2.errors.UniqueViolation:
+                pass
+            except psycopg2.InterfaceError:
+                time.sleep(10)
+                main(file)
+
+        d2 = D.electronic_count_data_type_30
+        if d2 is None:
             pass
-
-    d2 = D.dtype70
-    if d2 is None:
-        pass
-    else:
-        data = rd.merge_summary_dataframes(d2, data)
-        d2 = d2[d2.columns.intersection(electronic_count_data_type_70_columns)]
-        try:
-            d2.to_sql("electronic_count_data_type_70",
-                con=config.ENGINE,
-                schema="trafc",
-                if_exists="append",
-                index=False,
-                method=tools.psql_insert_copy,
-            )
-        except UniqueViolation:
-            pass
-
-    d2 = D.dtype30
-    if d2 is None:
-        pass
-    else:
-        data = rd.merge_summary_dataframes(d2, data)
-
-    
-    
-
-    if header is None:
-        pass
-    else:
-        try:
-            data.reset_index(inplace=True)
-            header = header.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
-            header = rd.Data.header_calcs(header, data, 21)
-            header = rd.Data.header_calcs(header, data, 70)
-            header = rd.Data.header_calcs(header, data, 30)
-            header = rd.Data.header_calcs(header, data, 60)
-            header = header[header.columns.intersection(header_columns)]
+        else:
             try:
-                header.to_sql("electronic_count_header",
+                d2.to_sql("electronic_count_data_type_30",
+                    con=config.ENGINE,
+                    schema="trafc",
+                    if_exists="append",
+                    index=False,
+                    method=tools.psql_insert_copy,
+                )
+            except psycopg2.errors.UniqueViolation:
+                pass
+            except psycopg2.InterfaceError:
+                time.sleep(10)
+                main(file)   
+
+        if header is None:
+            pass
+        else:
+            try:
+                data.reset_index(drop=True, inplace=True)
+                header = header.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
+                header = rd.Data.header_calcs(header, data, 21)
+                # header = rd.Data.header_calcs(header, data, 70)
+                header = rd.Data.header_calcs(header, data, 30)
+                # header = rd.Data.header_calcs(header, data, 60)
+                header = header[header.columns.intersection(header_columns)]
+                header = header.loc[:,~header.columns.duplicated()]
+                try:
+                    header.to_sql("electronic_count_header_test",
+                            con=config.ENGINE,
+                            schema="trafc",
+                            if_exists="append",
+                            index=False,
+                            method=tools.psql_insert_copy,
+                        )
+                except psycopg2.errors.UniqueViolation:
+                    pass
+                try:
+                    header.to_sql("electronic_count_header",
+                            con=config.ENGINE,
+                            schema="trafc",
+                            if_exists="append",
+                            index=False,
+                            method=tools.psql_insert_copy,
+                        )
+                except psycopg2.errors.UniqueViolation:
+                    try:
+                        for index, row in header.iterrows():
+                            qry = f"""update trafc.electronic_count_header set 
+                            document_url = '{file}'
+                            where site_id = '{row['site_id']}'
+                            and start_datetime = '{row['start_datetime']}'
+                            and end_datetime = '{row['end_datetime']}'
+                            and document_url is null;
+                            """
+                            with config.ENGINE.connect() as conn:
+                                conn.execute(qry)
+                    except Exception as e:
+                        print(e)
+                        raise Exception("error with updating document_url in main file")
+                    pass
+                except psycopg2.InterfaceError:
+                    time.sleep(10)
+                    main(file)
+            except AttributeError:
+                pass
+     
+                
+        if data is None:
+            main_type10(df, file, header)
+        else:
+            try:
+                data = data.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
+                data = data[data.columns.intersection(partition_table_columns)]
+                data = data.loc[:,~data.columns.duplicated()]
+                data.loc[:,data.columns.difference(config.DATA_IMPORTANT_COLUMNS)] = data.loc[:,data.columns.difference(config.DATA_IMPORTANT_COLUMNS)].convert_dtypes()
+                data.to_sql("electronic_count_data_partitioned",
                         con=config.ENGINE,
                         schema="trafc",
                         if_exists="append",
                         index=False,
                         method=tools.psql_insert_copy,
                     )
-            except UniqueViolation:
+            except psycopg2.InterfaceError:
+                time.sleep(10)
+                main(file)
+            except psycopg2.errors.UniqueViolation:
                 pass
-        except AttributeError:
-            pass
 
-    if data is None:
-        main_type10(df, file, header)
-    else:
-        try:
-            data = data.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
-            data = data[data.columns.intersection(partition_table_columns)]
-            data = data.T.drop_duplicates().T
-            data.to_sql("electronic_count_data_partitioned",
-                    con=config.ENGINE,
-                    schema="trafc",
-                    if_exists="append",
-                    index=False,
-                    method=tools.psql_insert_copy,
-                )
-        except UniqueViolation:
-            pass
 
-    print('DONE WITH '+file)
-    with open(
-        os.path.expanduser(config.FILES_COMPLETE),
-        "a",
-        newline="",
-    ) as f:
-        write = csv.writer(f)
-        write.writerows([[file]])
+        print('DONE WITH '+file)
+        with open(
+            os.path.expanduser(config.FILES_COMPLETE),
+            "a",
+            newline="",
+        ) as f:
+            write = csv.writer(f)
+            write.writerows([[file]])
+
+    except psycopg2.InterfaceError:
+        time.sleep(10)
+        main(file)
 
 ## TYPE 10 (INDIVIDUAL COUNT) SUB-FUNCTION (REFERENCED IN MAIN FUNCTION)
 def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
@@ -144,7 +229,7 @@ def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
                 "electronic_count_data_type_10",
                 ["site_id", "start_datetime", "assigned_lane_number"],
                 )
-            except UniqueViolation:
+            except psycopg2.errors.UniqueViolation:
                 pass
 
             sub_data_df = sub_data_df.replace(r'^\s*$', np.NaN, regex=True)
@@ -170,7 +255,7 @@ def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
                         index=False,
                         method=tools.psql_insert_copy,
                     )
-                except UniqueViolation:
+                except psycopg2.errors.UniqueViolation:
                     pass
 
             if ax_data.empty:
@@ -186,7 +271,7 @@ def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
                         index=False,
                         method=tools.psql_insert_copy,
                     )
-                except UniqueViolation:
+                except psycopg2.errors.UniqueViolation:
                     pass
 
             if gx_data.empty:
@@ -202,7 +287,7 @@ def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
                         index=False,
                         method=tools.psql_insert_copy,
                     )
-                except UniqueViolation:
+                except psycopg2.errors.UniqueViolation:
                     pass
 
             if sx_data.empty:
@@ -219,7 +304,7 @@ def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
                         index=False,
                         method=tools.psql_insert_copy,
                     )
-                except UniqueViolation:
+                except psycopg2.errors.UniqueViolation:
                     pass
 
             if tx_data.empty:
@@ -236,7 +321,7 @@ def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
                         index=False,
                         method=tools.psql_insert_copy,
                     )
-                except UniqueViolation:
+                except psycopg2.errors.UniqueViolation:
                     pass
 
             if cx_data.empty:
@@ -253,7 +338,7 @@ def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
                         index=False,
                         method=tools.psql_insert_copy,
                     )
-                except UniqueViolation:
+                except psycopg2.errors.UniqueViolation:
                     pass
 
             if vx_data.empty:
@@ -270,7 +355,7 @@ def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
                         index=False,
                         method=tools.psql_insert_copy,
                     )
-                except UniqueViolation:
+                except psycopg2.errors.UniqueViolation:
                     pass
             
             with open(
@@ -280,8 +365,6 @@ def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
             ) as f:
                 write = csv.writer(f)
                 write.writerows([[file]])
-
-            gc.collect()
         
         except Exception as e:
             print(e)
@@ -295,13 +378,7 @@ def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
                 write.writerows([[file]])
             pass
 
-##################################################################################################################################
-##################################################################################################################################
-
-if __name__ == "__main__":
-
-    filesToDo = config.PATH
-
+def files(filesToDo: str) -> List:
     if tools.is_zip(filesToDo) == False:
         filesToDo = tools.getfiles(filesToDo)
     else:
@@ -320,7 +397,7 @@ if __name__ == "__main__":
     except Exception:
         fileComplete = []
 
-    files = [i for i in filesToDo if i not in fileComplete]
+    filesToDo = [i for i in filesToDo if i not in fileComplete]
 
     if not os.path.exists(os.path.expanduser(config.PATH)):
         os.makedirs(os.path.expanduser(config.PATH))
@@ -331,10 +408,24 @@ if __name__ == "__main__":
             "w",
         ) as f:
             pass
+    return filesToDo
 
-    ########### MIULTIPROCESSING ###########
+##################################################################################################################################
+##################################################################################################################################
+
+if __name__ == "__main__":
+
+    filesToDo = r"C:\PQ410"
+
+    filesToDo = files(filesToDo)
+
+    # for file in filesToDo:
+    #     print('---busy with '+ file)
+    #     main(file)
+
+    ########## MIULTIPROCESSING ###########
     pool = mp.Pool(int(mp.cpu_count()))
-    for _ in tqdm.tqdm(pool.imap_unordered(main, files), total=len(files)):
+    for _ in tqdm.tqdm(pool.imap_unordered(main, filesToDo), total=len(filesToDo)):
         pass
     pool.close()
     pool.join()

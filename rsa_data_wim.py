@@ -20,8 +20,7 @@ class WimData(object):
         )
 
         if data.empty:
-            print("data empty")
-            print(data)
+            print("wim data df empty")
         else:
             num_of_fields = int(data.iloc[:,1].unique()[0])
             ddf = data.iloc[:,: 2 + num_of_fields]
@@ -99,7 +98,7 @@ class WimData(object):
             
             ddf = ddf.fillna(0)
             ddf["assigned_lane_number"] = ddf["assigned_lane_number"].astype(int)
-            ddf["lane_number"] = ddf["assigned_lane_number"].astype(int)
+            ddf["lane_number"] = ddf["physical_lane_number"].astype(int)
             ddf["physical_lane_number"] = ddf["physical_lane_number"].astype(int)
             max_lanes = ddf["physical_lane_number"].max()
             try:
@@ -137,7 +136,6 @@ class WimData(object):
             sub_data_df = sub_data_df.drop("index", axis=1)
 
             scols = ddf.select_dtypes('object').columns
-            
             ddf[scols] = ddf[scols].apply(pd.to_numeric, axis=1, errors='ignore')
 
             ddf = ddf[ddf.columns.intersection(config.TYPE10_DATA_TABLE_COL_LIST)]
@@ -152,8 +150,7 @@ class WimData(object):
             axis=1, how="all"
         )
         if data.empty:
-            print("data empty")
-            print(data)
+            print("wim data df empty")
         else:
             ddf = data.iloc[:, 4:]
             ddf = pd.DataFrame(ddf).dropna(axis=1, how="all")
@@ -647,7 +644,7 @@ def wim_stations_header_insert_dfs(SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, W
     df3 = df3.fillna(0)
     return df, df2, df3
 
-def wim_stations_header_insert(header_id, df, df2, df3):
+def wim_stations_header_upsert(header_id, df, df2, df3):
     try:
         egrl_percent = round((((df.loc[df['edit_code']==2].count()[0])/(df.count()[0]))*100),0) 
     except:
@@ -844,7 +841,7 @@ def wim_stations_header_insert(header_id, df, df2, df3):
     total_avg_olhv_perc_negative_direciton = 0
     total_avg_tonperhv_negative_direciton = round(((df3.loc[df3['direction']=='N']['wheel_mass']*2).sum()/1000)/df.loc[df['group']=='Heavy'].count()[0],2)
 
-    INSERT_STRING = f"""
+    UPSERT_STRING = f"""
     insert into trafc.electronic_count_header_hswim (
         header_id,
         egrl_percent,
@@ -1222,7 +1219,7 @@ def wim_stations_header_insert(header_id, df, df2, df3):
             total_avg_tonperhv_negative_direciton = coalesce(excluded.total_avg_tonperhv_negative_direciton,electronic_count_header_hswim.total_avg_tonperhv_negative_direciton)
         ;
     """
-    return INSERT_STRING
+    return UPSERT_STRING
 
 def wim_stations_header_update(header_id):
     SELECT_TYPE10_QRY = f"""SELECT 

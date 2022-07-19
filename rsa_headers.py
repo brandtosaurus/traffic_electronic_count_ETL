@@ -1,11 +1,13 @@
 import pandas as pd
-from datetime import timedelta
+import numpy as np
+from datetime import timedelta, date
 import uuid
 
 class Headers(object):
     def __init__(self, df: pd.DataFrame, file: str):
         self.df = Headers.get_head(df)
-        self.header = Headers.headers(self.df, file)
+        self.header_df = Headers.headers(self.df, file)
+        # self.headers_old = Headers.headers_insert_min(self.df, file)
         self.lanes = Headers.lanes(self.df)
 
     def get_head(df) -> pd.DataFrame:
@@ -21,392 +23,135 @@ class Headers(object):
                     & (df[1].isin(["1", "8", "5", "9", "01", "08", "05", "09"]))
                 )
             ]
-        ).dropna(axis=1, how="all")
-        df["index"] = df.index
-        breaks = df["index"].diff() != 1
-        groups = breaks.cumsum()
-        df["newindex"] = groups
-        df = df.set_index("newindex")
-        df = df.drop(columns=["index"])
+        ).dropna(axis=1, how="all").reset_index(drop=True)
         return df
 
-    def headers(dfh: pd.DataFrame, file: str) -> pd.DataFrame:
-        if not dfh.empty:
-            headers = pd.DataFrame()
-            headers["site_id"] = dfh.loc[dfh[0] == "S0", 1].astype(str)
-            if not dfh.loc[dfh[0] == "S1", 1:].empty:
-                headers["station_name"] = (
-                    dfh.loc[dfh[0] == "S1", 1:]
-                    .dropna(axis=1)
-                    .apply(" ".join, axis=1)
-                    .astype(str)
-                )
-            else:
-                headers["station_name"] = (
-                    dfh.loc[dfh[0] == "S0", 2:]
-                    .dropna(axis=1)
-                    .apply(" ".join, axis=1)
-                    .astype(str)
-                )
+    def headers(df: pd.DataFrame, file: str) -> pd.DataFrame:
+        header_start_end = df.loc[df[0].isin(["D1","D3"]), 0:4].copy()
 
-            try:
-                headers["y"] = dfh.loc[dfh[0] == "S0", 5].astype(float)
-                headers["x"] = dfh.loc[dfh[0] == "S0", 6].astype(float)
-            except:
-                pass
+        header_start_end[1] = header_start_end[1].apply(lambda x: str(date.today())[:2] + x if len(x)==6 else x)
+        header_start_end[3] = header_start_end[3].apply(lambda x: str(date.today())[:2] + x if len(x)==6 else x)
 
-            headers["number_of_lanes"] = dfh.loc[dfh[0] == "L0", 2].astype(int)
-            headers["primary_direction"] = int(dfh.loc[dfh[0] == 'L1', 2].unique()[0])
-            try:
-                headers["secondary_direction"] = dfh.loc[dfh[0] == 'L'+ headers["number_of_lanes"].iloc[0].astype(str), 2].astype(int) 
-            except:
-                headers["secondary_direction"] = int(dfh.loc[dfh[0] == 'L1', 2].unique()[1])
-                
+        header_start_end[2] = header_start_end[2].str.pad(width=7,side='right',fillchar="0")
+        header_start_end[4] = header_start_end[4].str.pad(width=7,side='right',fillchar="0")
 
-            try:
-                headers["speedbin1"] = dfh.loc[dfh[0] == "21", 4].astype(int)
-                headers["speedbin2"] = dfh.loc[dfh[0] == "21", 5].astype(int)
-                headers["speedbin3"] = dfh.loc[dfh[0] == "21", 6].astype(int)
-                headers["speedbin4"] = dfh.loc[dfh[0] == "21", 7].astype(int)
-                headers["speedbin5"] = dfh.loc[dfh[0] == "21", 8].astype(int)
-                headers["speedbin6"] = dfh.loc[dfh[0] == "21", 9].astype(int)
-                headers["speedbin7"] = dfh.loc[dfh[0] == "21", 10].astype(int)
-                headers["speedbin8"] = dfh.loc[dfh[0] == "21", 11].astype(int)
-                headers["speedbin9"] = dfh.loc[dfh[0] == "21", 12].astype(int)
-                headers["type_21_count_interval_minutes"] = dfh.loc[
-                    dfh[0] == "21", 1
-                ].astype(int)
-                headers["type_21_programmable_rear_to_rear_headway_bin"] = dfh.loc[
-                    dfh[0] == "21", 3
-                ].astype(int)
-                headers["type_21_program_id"] = "2"
-            except Exception:
-                pass
-            
-            try:
-                headers["type_10_vehicle_classification_scheme_primary"] = dfh.loc[
-                    dfh[0] == "10", 1
-                ].astype(int)
-                headers["type_10_vehicle_classification_scheme_secondary"] = dfh.loc[
-                    dfh[0] == "10", 2
-                ].astype(int)
-                headers["type_10_maximum_gap_milliseconds"] = dfh.loc[
-                    dfh[0] == "10", 3
-                ].astype(int)
-                headers["type_10_maximum_differential_speed"] = dfh.loc[
-                    dfh[0] == "10", 4
-                ].astype(int)
-            except Exception:
-                pass
-            try:
-                headers["type_30_summary_interval_minutes"] = dfh.loc[
-                    dfh[0] == "30", 2
-                ].astype(int)
-                headers["type_30_vehicle_classification_scheme"] = dfh.loc[
-                    dfh[0] == "30", 3
-                ].astype(int)
-            except Exception:
-                pass
-            try:
-                headers["type_70_summary_interval_minutes"] = dfh.loc[
-                    dfh[0] == "70", 1
-                ].astype(int)
-                headers["type_70_vehicle_classification_scheme"] = dfh.loc[
-                    dfh[0] == "70", 2
-                ].astype(int)
-                headers["type_70_maximum_gap_milliseconds"] = dfh.loc[
-                    dfh[0] == "70", 3
-                ].astype(int)
-                headers["type_70_maximum_differential_speed"] = dfh.loc[
-                    dfh[0] == "70", 4
-                ].astype(int)
-                headers["type_70_error_bin_code"] = dfh.loc[dfh[0] == "70", 5].astype(
-                    int
-                )
-            except Exception:
-                pass
+        header_start_end[2].loc[header_start_end[2].str[:2] == '24'] = ('0').zfill(7)
+        header_start_end[4].loc[header_start_end[4].str[:2] == '24'] = ('0').zfill(7)
 
-            if not dfh.loc[dfh[0] == "D3", 1].empty:
-                headers["start_datetime"] = dfh.loc[dfh[0] == "D3", 1].astype(str)
-                headers["start_time"] = dfh.loc[dfh[0] == "D3", 2].astype(str)
-                headers["end_datetime"] = dfh.loc[dfh[0] == "D3", 3].astype(str)
-                headers["end_time"] = dfh.loc[dfh[0] == "D3", 4].astype(str)
-            else:
-                headers["start_datetime"] = dfh.loc[dfh[0] == "D1", 1].astype(str)
-                headers["start_time"] = dfh.loc[dfh[0] == "D1", 2].astype(str)
-                headers["end_datetime"] = dfh.loc[dfh[0] == "D1", 3].astype(str)
-                headers["end_time"] = dfh.loc[dfh[0] == "D1", 4].astype(str)
+        header_start_end[1] = header_start_end[1].apply(lambda x: str(date.today())[:2] + x if len(x)==6 else x)
+        header_start_end[3] = header_start_end[3].apply(lambda x: str(date.today())[:2] + x if len(x)==6 else x)
 
-            try:
+        header_start_end[1] = header_start_end[1].apply(lambda x: pd.to_datetime(x, format="%Y%m%d").date() + timedelta(days=1)
+        if x[2]=='2400000' else pd.to_datetime(x, format="%Y%m%d").date())
+        header_start_end[3] = header_start_end[3].apply(lambda x: pd.to_datetime(x, format="%Y%m%d").date() + timedelta(days=1)
+        if x[4]=='2400000' else pd.to_datetime(x, format="%Y%m%d").date())
 
-                for idx, row in headers.iterrows():
-                    if len(row['start_datetime']) == 6 and len(row['start_time']) == 6:
-                        row['start_datetime'] = pd.to_datetime(row['start_datetime'] + row['start_time'], format='%y%m%d%H%M%S')
-                    elif len(row['start_datetime']) == 8 and len(row['start_time']) == 6:
-                        row['start_datetime'] = pd.to_datetime(row['start_datetime'] + row['start_time'], format='%Y%m%d%H%M%S')
-                    elif len(row['start_datetime']) == 6 and len(row['start_time']) == 8:
-                        row['start_datetime'] = pd.to_datetime(row['start_datetime'] + row['start_time'], format='%y%m%d%H%M%S%f')
-                    elif len(row['start_datetime']) == 8 and len(row['start_time']) == 8:
-                        row['start_datetime'] = pd.to_datetime(row['start_datetime'] + row['start_time'], format='%Y%m%d%H%M%S%f')
+        header_start_end[2] = header_start_end[2].apply(lambda x: pd.to_datetime(x, format="%H%M%S%f").time())
+        header_start_end[4] = header_start_end[4].apply(lambda x: pd.to_datetime(x, format="%H%M%S%f").time())
 
-                    if len(row['end_datetime']) == 6 and row['end_time'].strip('0') == '24':
-                        row['end_datetime'] = pd.to_datetime(row['end_datetime'], format='%y%m%d')+timedelta(days=1)
-                    elif len(row['end_datetime']) ==8 and row['end_time'].strip('0') == '24':
-                        row['end_datetime'] = pd.to_datetime(row['end_datetime'], format='%Y%m%d')+timedelta(days=1)
-                    elif len(row['end_datetime']) == 6 and len(row['end_time']) == 6:
-                        row['start_datetime'] = pd.to_datetime(row['end_datetime'] + row['end_time'], format='%y%m%d%H%M%S')
-                    elif len(row['end_datetime']) == 8 and len(row['end_time']) == 6:
-                        row['start_datetime'] = pd.to_datetime(row['end_datetime'] + row['end_time'], format='%Y%m%d%H%M%S')
-                    elif len(row['end_datetime']) == 6 and len(row['end_time']) == 8:
-                        row['start_datetime'] = pd.to_datetime(row['end_datetime'] + row['end_time'], format='%y%m%d%H%M%S%f')
-                    elif len(row['end_datetime']) == 8 and len(row['end_time']) == 8:
-                        row['start_datetime'] = pd.to_datetime(row['end_datetime'] + row['end_time'], format='%Y%m%d%H%M%S%f')
+        try:
+            header_start_end["start_datetime"] = pd.to_datetime((header_start_end[1].astype(str)+header_start_end[2].astype(str)), 
+                format='%Y-%m-%d%H:%M:%S')
+            header_start_end["end_datetime"] = pd.to_datetime((header_start_end[3].astype(str)+header_start_end[4].astype(str)), 
+                format='%Y-%m-%d%H:%M:%S')
+        except ValueError:
+            header_start_end["start_datetime"] = pd.to_datetime((header_start_end[1].astype(str)+header_start_end[2].astype(str)).str[:18], 
+                format='%Y-%m-%d%H:%M:%S')
+            header_start_end["end_datetime"] = pd.to_datetime((header_start_end[3].astype(str)+header_start_end[4].astype(str)).str[:18], 
+                format='%Y-%m-%d%H:%M:%S') + timedelta(seconds=1)
 
-            except:
-            
-                headers["end_datetime"] = headers.apply(
-                    lambda x: pd.to_datetime(
-                        x["end_datetime"] + x["end_time"], format="%y%m%d%H%M%S"
-                    )
-                    if (
-                        x["end_time"] != "240000"
-                        and len(x["end_datetime"]) == 6
-                        and len(x["end_time"]) == 6
-                    )
-                    else (
-                        pd.to_datetime(
-                            x["end_datetime"] + x["end_time"], format="%y%m%d%H%M%S%f"
-                        )
-                        if (
-                            x["end_time"] != "24000000"
-                            and len(x["end_datetime"]) == 6
-                            and len(x["end_time"]) == 8
-                        )
-                        else (
-                            pd.to_datetime(
-                                x["end_datetime"] + x["end_time"], format="%Y%m%d%H%M%S"
-                            )
-                            if (
-                                x["end_time"] != "240000"
-                                and len(x["end_datetime"]) == 8
-                                and len(x["end_time"]) == 6
-                            )
-                            else (
-                                pd.to_datetime(
-                                    x["end_datetime"] + x["end_time"],
-                                    format="%Y%m%d%H%M%S%f",
-                                )
-                                if (
-                                    x["end_time"] != "24000000"
-                                    and len(x["end_datetime"]) == 8
-                                    and len(x["end_time"]) == 8
-                                )
-                                else (
-                                    pd.to_datetime(x["end_datetime"], format="%y%m%d")
-                                    + timedelta(days=1)
-                                    if (
-                                        x["end_time"] == "240000"
-                                        and len(x["end_datetime"]) == 6
-                                        and len(x["end_time"]) == 6
-                                    )
-                                    else (
-                                        pd.to_datetime(x["end_datetime"], format="%y%m%d")
-                                        + timedelta(days=1)
-                                        if (
-                                            x["end_time"] == "24000000"
-                                            and len(x["end_datetime"]) == 6
-                                            and len(x["end_time"]) == 8
-                                        )
-                                        else (
-                                            pd.to_datetime(
-                                                x["end_datetime"], format="%Y%m%d"
-                                            )
-                                            + timedelta(days=1)
-                                            if (
-                                                x["end_time"] == "240000"
-                                                and len(x["end_datetime"]) == 8
-                                                and len(x["end_time"]) == 6
-                                            )
-                                            else (
-                                                pd.to_datetime(
-                                                    x["end_datetime"], format="%Y%m%d"
-                                                )
-                                                + timedelta(days=1)
-                                                if (
-                                                    x["end_time"] == "24000000"
-                                                    and len(x["end_datetime"]) == 8
-                                                    and len(x["end_time"]) == 8
-                                                )
-                                                else (pd.to_datetime(
-                                                x["end_datetime"] + x["end_time"], format="%y%m%d%H%M%S%f"
-                                                if (len(x["end_datetime"]) == 6 
-                                                    and len(x["end_time"]) == 7)
-                                                    else pd.to_datetime(
-                                                        x["end_datetime"] + x["end_time"]
-                                                    ))
-                                                )
-                                            )
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    axis=1,
-                )
 
-                headers["start_datetime"] = headers.apply(
-                lambda x: pd.to_datetime(
-                    x["start_datetime"] + x["start_time"], format="%y%m%d%H%M%S"
-                )
-                if (
-                    x["start_time"] != "240000"
-                    and len(x["start_datetime"]) == 6
-                    and len(x["start_time"]) == 6
-                )
-                else (
-                    pd.to_datetime(
-                        x["start_datetime"] + x["start_time"], format="%y%m%d%H%M%S%f"
-                    )
-                    if (
-                        x["start_time"] != "24000000"
-                        and len(x["start_datetime"]) == 6
-                        and len(x["start_time"]) == 8
-                    )
-                    else (
-                        pd.to_datetime(
-                            x["start_datetime"] + x["start_time"], format="%Y%m%d%H%M%S"
-                        )
-                        if (
-                            x["start_time"] != "240000"
-                            and len(x["start_datetime"]) == 8
-                            and len(x["start_time"]) == 6
-                        )
-                        else (
-                            pd.to_datetime(
-                                x["start_datetime"] + x["start_time"],
-                                format="%Y%m%d%H%M%S%f",
-                            )
-                            if (
-                                x["start_time"] != "24000000"
-                                and len(x["start_datetime"]) == 8
-                                and len(x["start_time"]) == 8
-                            )
-                            else (
-                                pd.to_datetime(x["start_datetime"], format="%y%m%d")
-                                + timedelta(days=1)
-                                if (
-                                    x["start_time"] == "240000"
-                                    and len(x["start_datetime"]) == 6
-                                    and len(x["start_time"]) == 6
-                                )
-                                else (
-                                    pd.to_datetime(x["start_datetime"], format="%y%m%d")
-                                    + timedelta(days=1)
-                                    if (
-                                        x["start_time"] == "24000000"
-                                        and len(x["start_datetime"]) == 6
-                                        and len(x["start_time"]) == 8
-                                    )
-                                    else (
-                                        pd.to_datetime(
-                                            x["start_datetime"], format="%Y%m%d"
-                                        )
-                                        + timedelta(days=1)
-                                        if (
-                                            x["start_time"] == "240000"
-                                            and len(x["start_datetime"]) == 8
-                                            and len(x["start_time"]) == 6
-                                        )
-                                        else (
-                                            pd.to_datetime(
-                                                x["start_datetime"], format="%Y%m%d"
-                                            )
-                                            + timedelta(days=1)
-                                            if (
-                                                x["start_time"] == "24000000"
-                                                and len(x["start_datetime"]) == 8
-                                                and len(x["start_time"]) == 8
-                                            )
-                                            else (
-                                            pd.to_datetime(
-                                                x["start_datetime"] + x["start_time"], format="%y%m%d%H%M%S%f"
-                                            )
-                                            if (
-                                                len(x["start_datetime"]) == 6
-                                                and len(x["start_time"]) == 7
-                                            )
-                                                else pd.to_datetime(
-                                                    x["start_datetime"] + x["start_time"]
-                                                )
-                                            )
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    )
-                ),
-                axis=1,
-            )
+        header_start_end = header_start_end.iloc[:,1:].drop_duplicates()
 
-            headers = headers.drop(["start_time"], axis=1)
-            headers = headers.drop(["end_time"], axis=1)
+        headers = pd.DataFrame()
+        headers['start_datetime'] = header_start_end.groupby(header_start_end['start_datetime'].dt.year).min()['start_datetime']
+        headers['end_datetime'] = header_start_end.groupby(header_start_end['end_datetime'].dt.year).max()['end_datetime']
+        headers['site_id'] = df.loc[df[0] == "S0",1].drop_duplicates().reset_index(drop=True)[0]
+        headers['document_url'] = file
 
-            headers["start_datetime"] = pd.to_datetime(headers["start_datetime"])
-            headers["end_datetime"] = pd.to_datetime(headers["end_datetime"])
-            headers["site_id"] = headers["site_id"].astype(str)
-            try:
-                headers["type_21_count_interval_minutes"] = headers["type_21_count_interval_minutes"].round().astype(int)
-                headers["type_70_maximum_gap_milliseconds"] = headers["type_70_maximum_gap_milliseconds"].round().astype(int)
-            except pd.errors.IntCastingNaNError:
-                pass
-            except KeyError:
-                pass
+        headers["header_id"] = ""
+        headers["header_id"] = headers["header_id"].apply(
+                    lambda x: str(uuid.uuid4()))
+        
+        headers['year'] = headers['start_datetime'].dt.year
 
-            try:
-                headers["instrumentation_description"] = (
-                    dfh.loc[dfh[0] == "I0", 1:]
-                    .dropna(axis=1)
-                    .apply(" ".join, axis=1)
-                    .astype(str)
-                )
-            except Exception:
-                headers["instrumentation_description"] = None
+        headers["number_of_lanes"] = int(df.loc[df[0] == "L0", 2].drop_duplicates().reset_index(drop=True)[0])
+        
+        station_name = df.loc[df[0].isin(["S0"]), 3:].reset_index(drop=True).drop_duplicates().dropna(axis=1)
+        headers["station_name"] = station_name[station_name.columns].apply(lambda row: ' '.join(row.values.astype(str)), axis=1)
 
-            try:
-                headers["type_30_summary_interval_minutes"] = headers[
-                    "type_21_count_interval_minutes"
-                ]
-            except Exception:
-                pass
-            try:
-                headers["type_70_summary_interval_minutes"] = headers[
-                    "type_21_count_interval_minutes"
-                ]
-                headers["type_70_vehicle_classification_scheme"] = headers[
-                    "type_21_count_interval_minutes"
-                ]
-                headers["type_70_vehicle_classification_scheme"] = headers[
-                    "type_21_count_interval_minutes"
-                ]
-            except Exception:
-                pass
+        t21 = df.loc[df[0]=="21"].dropna(axis=1).drop_duplicates().reset_index().copy()
+        t21 = t21.iloc[:,(t21.shape[1])-9:].astype(int)
+        t21.columns = range(t21.columns.size)
+        t21 = t21.rename(columns={
+            0:'speedbin1',
+            1:'speedbin2',
+            2:'speedbin3',
+            3:'speedbin4',
+            4:'speedbin5',
+            5:'speedbin6',
+            6:'speedbin7',
+            7:'speedbin8',
+            8:'speedbin9'})
 
-            headers = headers.fillna(method="ffill")
-            headers = headers.fillna(method="bfill")
-
-            headers = headers.drop_duplicates(ignore_index=True)
-
-            headers['document_url'] = file
-
-            headers["header_id"] = ""
-            headers["header_id"] = headers["header_id"].apply(
-                lambda x: str(uuid.uuid4())
-            )
-
-        else:
+        headers = pd.concat([headers,t21],ignore_index=True,axis=0).bfill().ffill().drop_duplicates()
+        
+        try:
+            headers["type_21_count_interval_minutes"] = int(df.loc[df[0]=="21",1].drop_duplicates().reset_index(drop=True)[0])
+            headers["type_30_summary_interval_minutes"] = int(df.loc[df[0]=="21",1].drop_duplicates().reset_index(drop=True)[0])
+            headers["type_70_summary_interval_minutes"] = int(df.loc[df[0]=="21",1].drop_duplicates().reset_index(drop=True)[0])
+        except KeyError:
             pass
+        try:
+            headers["type_30_summary_interval_minutes"] = int(df.loc[df[0]=="30",1].drop_duplicates().reset_index(drop=True)[0])
+            headers["type_21_count_interval_minutes"] = int(df.loc[df[0]=="30",1].drop_duplicates().reset_index(drop=True)[0])
+            headers["type_70_summary_interval_minutes"] = int(df.loc[df[0]=="30",1].drop_duplicates().reset_index(drop=True)[0])
+            headers["type_30_vehicle_classification_scheme"] = int(df.loc[df[0] == "30", 3].drop_duplicates().reset_index(drop=True)[0])
+        except KeyError:
+            pass
+        try:
+            headers["type_30_summary_interval_minutes"] = int(df.loc[df[0]=="70",1].drop_duplicates().reset_index(drop=True)[0])
+            headers["type_21_count_interval_minutes"] = int(df.loc[df[0]=="70",1].drop_duplicates().reset_index(drop=True)[0])
+            headers["type_70_summary_interval_minutes"] = int(df.loc[df[0]=="70",1].drop_duplicates().reset_index(drop=True)[0])
+        except KeyError:
+            pass
+
+        try:
+            headers['dir1_id'] = int(df[df[0]=="L1"].dropna(axis=1).drop_duplicates().reset_index(drop=True)[2].min())
+            headers['dir2_id'] = int(df[df[0]=="L1"].dropna(axis=1).drop_duplicates().reset_index(drop=True)[2].max())
+        except (KeyError, ValueError):
+            headers['dir1_id'] = 0
+            headers['dir2_id'] = 4
+
+        try:
+            headers["type_70_vehicle_classification_scheme"] = int(df.loc[
+                df[0] == "70", 2].drop_duplicates().reset_index(drop=True)[0])
+            headers["type_70_maximum_gap_milliseconds"] = int(df.loc[
+                df[0] == "70", 3].drop_duplicates().reset_index(drop=True)[0])
+            headers["type_70_maximum_differential_speed"] = int(df.loc[
+                df[0] == "70", 4].drop_duplicates().reset_index(drop=True)[0])
+            headers["type_70_error_bin_code"] = int(df.loc[
+                df[0] == "70", 5].drop_duplicates().reset_index(drop=True)[0])
+        except KeyError:
+            pass
+
+        try:
+            headers["type_10_vehicle_classification_scheme_primary"] = int(df.loc[
+                df[0] == "10", 1].drop_duplicates().reset_index(drop=True)[0])
+            headers["type_10_vehicle_classification_scheme_secondary"] = int(df.loc[
+                df[0] == "10", 2].drop_duplicates().reset_index(drop=True)[0])
+            headers["type_10_maximum_gap_milliseconds"] = int(df.loc[
+                df[0] == "10", 3].drop_duplicates().reset_index(drop=True)[0])
+            headers["type_10_maximum_differential_speed"] = int(df.loc[
+                df[0] == "10", 4].drop_duplicates().reset_index(drop=True)[0])
+        except KeyError:
+            pass
+
+        headers = headers.reset_index(drop=True)
+
+        m = headers.select_dtypes(np.number)
+        headers[m.columns] = m.round().astype('Int32')
+
         return headers
 
     def lanes(dfh: pd.DataFrame) -> pd.DataFrame:
@@ -848,93 +593,93 @@ def header_update(row):
         """
     return qry
 
-def header_update_2(header_out):
+def header_update_2(df: pd.DataFrame) -> str:
     qry = f"""update
         trafc.electronic_count_header
     set
-        type_21_count_interval_minutes = {header_out['type_21_count_interval_minutes'][0]},
-        type_21_programmable_rear_to_rear_headway_bin = {header_out['type_21_programmable_rear_to_rear_headway_bin'][0]},
-        type_21_program_id = {header_out['type_21_program_id'][0]},
-        speedbin1 = {header_out['speedbin1'][0]},
-        speedbin2 = {header_out['speedbin2'][0]},
-        speedbin3 = {header_out['speedbin3'][0]},
-        speedbin4 = {header_out['speedbin4'][0]},
-        speedbin5 = {header_out['speedbin5'][0]},
-        speedbin6 = {header_out['speedbin6'][0]},
-        speedbin7 = {header_out['speedbin7'][0]},
-        speedbin8 = {header_out['speedbin8'][0]},
-        speedbin9 = {header_out['speedbin9'][0]},
-        total_light_positive_direction = {header_out['total_light_positive_direction'][0]},
-        total_light_negative_direction = {header_out['total_light_negative_direction'][0]},
-        total_light_vehicles = {header_out['total_light_vehicles'][0]},
-        total_heavy_positive_direction = {header_out['total_heavy_positive_direction'][0]},
-        total_heavy_negative_direction = {header_out['total_heavy_negative_direction'][0]},
-        total_heavy_vehicles = {header_out['total_heavy_vehicles'][0]},
-        total_short_heavy_positive_direction = {header_out['total_short_heavy_positive_direction'][0]},
-        total_short_heavy_negative_direction = {header_out['total_short_heavy_negative_direction'][0]},
-        total_short_heavy_vehicles = {header_out['total_short_heavy_vehicles'][0]},
-        total_medium_heavy_positive_direction = {header_out['total_medium_heavy_positive_direction'][0]},
-        total_medium_heavy_negative_direction = {header_out['total_medium_heavy_negative_direction'][0]},
-        total_medium_heavy_vehicles = {header_out['total_medium_heavy_vehicles'][0]},
-        total_long_heavy_positive_direction = {header_out['total_long_heavy_positive_direction'][0]},
-        total_long_heavy_negative_direction = {header_out['total_long_heavy_negative_direction'][0]},
-        total_long_heavy_vehicles = {header_out['total_long_heavy_vehicles'][0]},
-        total_vehicles_positive_direction = {header_out['total_vehicles_positive_direction'][0]},
-        total_vehicles_negative_direction = {header_out['total_vehicles_negative_direction'][0]},
-        total_vehicles = {header_out['total_vehicles'][0]},
-        average_speed_positive_direction = {header_out['average_speed_positive_direction'][0]},
-        average_speed_negative_direction = {header_out['average_speed_negative_direction'][0]},
-        average_speed = {header_out['average_speed'][0]},
-        average_speed_light_vehicles_positive_direction = {header_out['average_speed_light_vehicles_positive_direction'][0]},
-        average_speed_light_vehicles_negative_direction = {header_out['average_speed_light_vehicles_negative_direction'][0]},
-        average_speed_light_vehicles = {header_out['average_speed_light_vehicles'][0]},
-        average_speed_heavy_vehicles_positive_direction = {header_out['average_speed_heavy_vehicles_positive_direction'][0]},
-        average_speed_heavy_vehicles_negative_direction = {header_out['average_speed_heavy_vehicles_negative_direction'][0]},
-        average_speed_heavy_vehicles = {header_out['average_speed_heavy_vehicles'][0]},
-        truck_split_positive_direction = '{header_out['truck_split_positive_direction'][0]}',
-        truck_split_negative_direction = '{header_out['truck_split_negative_direction'][0]}',
-        truck_split_total = '{header_out['truck_split_total'][0]}',
-        estimated_axles_per_truck_positive_direction = {header_out['estimated_axles_per_truck_positive_direction'][0]},
-        estimated_axles_per_truck_negative_direction = {header_out['estimated_axles_per_truck_negative_direction'][0]},
-        estimated_axles_per_truck_total = {header_out['estimated_axles_per_truck_total'][0]},
-        percentage_speeding_positive_direction = {header_out['percentage_speeding_positive_direction'][0]},
-        percentage_speeding_negative_direction = {header_out['percentage_speeding_negative_direction'][0]},
-        percentage_speeding_total = {header_out['percentage_speeding_total'][0]},
-        vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire = {header_out['vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire'][0]},
-        vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire = {header_out['vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire'][0]},
-        vehicles_with_rear_to_rear_headway_less_than_2sec_total = {header_out['vehicles_with_rear_to_rear_headway_less_than_2sec_total'][0]},
-        estimated_e80_positive_direction = {header_out['estimated_e80_positive_direction'][0]},
-        estimated_e80_negative_direction = {header_out['estimated_e80_negative_direction'][0]},
-        estimated_e80_on_road = {header_out['estimated_e80_on_road'][0]},
-        adt_positive_direction = {header_out['adt_positive_direction'][0]},
-        adt_negative_direction = {header_out['adt_negative_direction'][0]},
-        adt_total = {header_out['adt_total'][0]},
-        adtt_positive_direction = {header_out['adtt_positive_direction'][0]},
-        adtt_negative_direction = {header_out['adtt_negative_direction'][0]},
-        adtt_total = {header_out['adtt_total'][0]},
-        highest_volume_per_hour_positive_direction = {header_out['highest_volume_per_hour_positive_direction'][0]},
-        highest_volume_per_hour_negative_direction = {header_out['highest_volume_per_hour_negative_direction'][0]},
-        highest_volume_per_hour_total = {header_out['highest_volume_per_hour_total'][0]},
-        "15th_highest_volume_per_hour_positive_direction" = {header_out['15th_highest_volume_per_hour_positive_direction'][0]},
-        "15th_highest_volume_per_hour_negative_direction" = {header_out['15th_highest_volume_per_hour_negative_direction'][0]},
-        "15th_highest_volume_per_hour_total" = {header_out['15th_highest_volume_per_hour_total'][0]},
-        "30th_highest_volume_per_hour_positive_direction" = {header_out['30th_highest_volume_per_hour_positive_direction'][0]},
-        "30th_highest_volume_per_hour_negative_direction" = {header_out['30th_highest_volume_per_hour_negative_direction'][0]},
-        "30th_highest_volume_per_hour_total" = {header_out['30th_highest_volume_per_hour_total'][0]},
-        "15th_percentile_speed_positive_direction" = {header_out['15th_percentile_speed_positive_direction'][0]},
-        "15th_percentile_speed_negative_direction" = {header_out['15th_percentile_speed_negative_direction'][0]},
-        "15th_percentile_speed_total" = {header_out['15th_percentile_speed_total'][0]},
-        "85th_percentile_speed_positive_direction" = {header_out['85th_percentile_speed_positive_direction'][0]},
-        "85th_percentile_speed_negative_direction" = {header_out['85th_percentile_speed_negative_direction'][0]},
-        "85th_percentile_speed_total" = {header_out['85th_percentile_speed_total'][0]},
-        "year" = {header_out['year'][0]},
-        avg_weekday_traffic = {header_out['avg_weekday_traffic'][0]},
-        number_of_days_counted = {header_out['number_of_days_counted'][0]},
-        duration_hours = {header_out['duration_hours'][0]}
+        type_21_count_interval_minutes = {df['type_21_count_interval_minutes'][0]},
+        type_21_programmable_rear_to_rear_headway_bin = {df['type_21_programmable_rear_to_rear_headway_bin'][0]},
+        type_21_program_id = {df['type_21_program_id'][0]},
+        speedbin1 = {df['speedbin1'][0]},
+        speedbin2 = {df['speedbin2'][0]},
+        speedbin3 = {df['speedbin3'][0]},
+        speedbin4 = {df['speedbin4'][0]},
+        speedbin5 = {df['speedbin5'][0]},
+        speedbin6 = {df['speedbin6'][0]},
+        speedbin7 = {df['speedbin7'][0]},
+        speedbin8 = {df['speedbin8'][0]},
+        speedbin9 = {df['speedbin9'][0]},
+        total_light_positive_direction = {df['total_light_positive_direction'][0]},
+        total_light_negative_direction = {df['total_light_negative_direction'][0]},
+        total_light_vehicles = {df['total_light_vehicles'][0]},
+        total_heavy_positive_direction = {df['total_heavy_positive_direction'][0]},
+        total_heavy_negative_direction = {df['total_heavy_negative_direction'][0]},
+        total_heavy_vehicles = {df['total_heavy_vehicles'][0]},
+        total_short_heavy_positive_direction = {df['total_short_heavy_positive_direction'][0]},
+        total_short_heavy_negative_direction = {df['total_short_heavy_negative_direction'][0]},
+        total_short_heavy_vehicles = {df['total_short_heavy_vehicles'][0]},
+        total_medium_heavy_positive_direction = {df['total_medium_heavy_positive_direction'][0]},
+        total_medium_heavy_negative_direction = {df['total_medium_heavy_negative_direction'][0]},
+        total_medium_heavy_vehicles = {df['total_medium_heavy_vehicles'][0]},
+        total_long_heavy_positive_direction = {df['total_long_heavy_positive_direction'][0]},
+        total_long_heavy_negative_direction = {df['total_long_heavy_negative_direction'][0]},
+        total_long_heavy_vehicles = {df['total_long_heavy_vehicles'][0]},
+        total_vehicles_positive_direction = {df['total_vehicles_positive_direction'][0]},
+        total_vehicles_negative_direction = {df['total_vehicles_negative_direction'][0]},
+        total_vehicles = {df['total_vehicles'][0]},
+        average_speed_positive_direction = {df['average_speed_positive_direction'][0]},
+        average_speed_negative_direction = {df['average_speed_negative_direction'][0]},
+        average_speed = {df['average_speed'][0]},
+        average_speed_light_vehicles_positive_direction = {df['average_speed_light_vehicles_positive_direction'][0]},
+        average_speed_light_vehicles_negative_direction = {df['average_speed_light_vehicles_negative_direction'][0]},
+        average_speed_light_vehicles = {df['average_speed_light_vehicles'][0]},
+        average_speed_heavy_vehicles_positive_direction = {df['average_speed_heavy_vehicles_positive_direction'][0]},
+        average_speed_heavy_vehicles_negative_direction = {df['average_speed_heavy_vehicles_negative_direction'][0]},
+        average_speed_heavy_vehicles = {df['average_speed_heavy_vehicles'][0]},
+        truck_split_positive_direction = '{df['truck_split_positive_direction'][0]}',
+        truck_split_negative_direction = '{df['truck_split_negative_direction'][0]}',
+        truck_split_total = '{df['truck_split_total'][0]}',
+        estimated_axles_per_truck_positive_direction = {df['estimated_axles_per_truck_positive_direction'][0]},
+        estimated_axles_per_truck_negative_direction = {df['estimated_axles_per_truck_negative_direction'][0]},
+        estimated_axles_per_truck_total = {df['estimated_axles_per_truck_total'][0]},
+        percentage_speeding_positive_direction = {df['percentage_speeding_positive_direction'][0]},
+        percentage_speeding_negative_direction = {df['percentage_speeding_negative_direction'][0]},
+        percentage_speeding_total = {df['percentage_speeding_total'][0]},
+        vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire = {df['vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire'][0]},
+        vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire = {df['vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire'][0]},
+        vehicles_with_rear_to_rear_headway_less_than_2sec_total = {df['vehicles_with_rear_to_rear_headway_less_than_2sec_total'][0]},
+        estimated_e80_positive_direction = {df['estimated_e80_positive_direction'][0]},
+        estimated_e80_negative_direction = {df['estimated_e80_negative_direction'][0]},
+        estimated_e80_on_road = {df['estimated_e80_on_road'][0]},
+        adt_positive_direction = {df['adt_positive_direction'][0]},
+        adt_negative_direction = {df['adt_negative_direction'][0]},
+        adt_total = {df['adt_total'][0]},
+        adtt_positive_direction = {df['adtt_positive_direction'][0]},
+        adtt_negative_direction = {df['adtt_negative_direction'][0]},
+        adtt_total = {df['adtt_total'][0]},
+        highest_volume_per_hour_positive_direction = {df['highest_volume_per_hour_positive_direction'][0]},
+        highest_volume_per_hour_negative_direction = {df['highest_volume_per_hour_negative_direction'][0]},
+        highest_volume_per_hour_total = {df['highest_volume_per_hour_total'][0]},
+        "15th_highest_volume_per_hour_positive_direction" = {df['15th_highest_volume_per_hour_positive_direction'][0]},
+        "15th_highest_volume_per_hour_negative_direction" = {df['15th_highest_volume_per_hour_negative_direction'][0]},
+        "15th_highest_volume_per_hour_total" = {df['15th_highest_volume_per_hour_total'][0]},
+        "30th_highest_volume_per_hour_positive_direction" = {df['30th_highest_volume_per_hour_positive_direction'][0]},
+        "30th_highest_volume_per_hour_negative_direction" = {df['30th_highest_volume_per_hour_negative_direction'][0]},
+        "30th_highest_volume_per_hour_total" = {df['30th_highest_volume_per_hour_total'][0]},
+        "15th_percentile_speed_positive_direction" = {df['15th_percentile_speed_positive_direction'][0]},
+        "15th_percentile_speed_negative_direction" = {df['15th_percentile_speed_negative_direction'][0]},
+        "15th_percentile_speed_total" = {df['15th_percentile_speed_total'][0]},
+        "85th_percentile_speed_positive_direction" = {df['85th_percentile_speed_positive_direction'][0]},
+        "85th_percentile_speed_negative_direction" = {df['85th_percentile_speed_negative_direction'][0]},
+        "85th_percentile_speed_total" = {df['85th_percentile_speed_total'][0]},
+        "year" = {df['year'][0]},
+        avg_weekday_traffic = {df['avg_weekday_traffic'][0]},
+        number_of_days_counted = {df['number_of_days_counted'][0]},
+        duration_hours = {df['duration_hours'][0]}
     where
-        site_id = '{header_out['site_id'][0]}'
-        and start_datetime = '{header_out['start_datetime'][0]}'
-        and end_datetime = '{header_out['end_datetime'][0]}'
+        site_id = '{df['site_id'][0]}'
+        and start_datetime = '{df['start_datetime'][0]}'
+        and end_datetime = '{df['end_datetime'][0]}'
     on conflict on constraint electronic_count_header_un do update set
     id = coalesce(excluded.id,id),
     header_id = coalesce(excluded.header_id,header_id),
@@ -1042,4 +787,3 @@ def header_update_2(header_out):
     ;
     """
     return qry
-

@@ -2,7 +2,7 @@ import pandas as pd
 from pandasql import sqldf
 import config
 from sqlalchemy.dialects.postgresql import insert
-from datetime import timedelta
+from datetime import timedelta, date
 import queries as q
 
 #################################################################################################################################################################################################################################
@@ -13,7 +13,11 @@ class Data(object):
         self.dtype21 = Data.join(header, Data.dtype21(df))
         self.dtype30 = Data.join(header, Data.dtype30(df))
         self.dtype70 = Data.join(header, Data.dtype70(df))
-        self.dtype60 = Data.join(header, Data.dtype60(df))
+        # self.dtype21 = Data.dtype21(df)
+        # self.dtype30 = Data.dtype30(df)
+        # self.dtype70 = Data.dtype70(df)
+        # self.dtype60 = Data.join(header, Data.dtype60(df))
+        self.electronic_count_data_type_30 = Data.electronic_count_data_type_30(df)
         
 
 #### DATA TOOLS ####
@@ -54,7 +58,7 @@ class Data(object):
             pass
         else:
             q = """
-            SELECT header.header_id, header.station_name, data.*
+            SELECT header.header_id, data.*
             FROM header
             LEFT JOIN data ON data.start_datetime WHERE 
             data.start_datetime >= header.start_datetime AND data.end_datetime <= header.end_datetime
@@ -82,7 +86,7 @@ class Data(object):
         data = df.loc[(df[0] == "21") & (df[1].isin(["0", "1", "2", "3", "4"]))].dropna(
             axis=1, how="all"
         ).reset_index(drop=True)
-        dfh2 = pd.DataFrame(df.loc[(df[0].isin(["S0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8"]))]).dropna(
+        dfh = pd.DataFrame(df.loc[(df[0].isin(["S0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8"]))]).dropna(
             axis=1, how="all"
         ).reset_index(drop=True)
 
@@ -220,7 +224,7 @@ class Data(object):
                 axis=1,
             )
 
-            direction = dfh2.loc[dfh2[0] == "L1", 1:3].astype(int)
+            direction = dfh.loc[dfh[0] == "L1", 1:3].astype(int)
             direction = direction.drop_duplicates()
 
             ddf['end_date'] = ddf['end_datetime'].apply(lambda x: pd.to_datetime(x, format="%y%m%d").date() if len(x)==6 else pd.to_datetime(x, format="%Y%m%d").date())
@@ -270,8 +274,7 @@ class Data(object):
                 ddf["end_datetime"]
             ) - pd.to_timedelta(ddf["duration_min"].astype(int), unit="m")
             ddf['year'] = ddf['start_datetime'].dt.year
-            t1 = dfh2.loc[dfh2[0] == "S0", 1].unique()
-            ddf["site_id"] = str(t1[0])
+            ddf["site_id"] = str(dfh[dfh[0]=="S0"].reset_index(drop=True).iloc[0,1]).zfill(4)
 
             ddf = ddf.drop_duplicates()
             ddf["start_datetime"] = ddf["start_datetime"].astype("datetime64[ns]")
@@ -289,7 +292,7 @@ class Data(object):
         data = df.loc[(df[0] == "30") & (df[1].isin(["0", "1", "2", "3", "4"]))].dropna(
             axis=1, how="all"
         ).reset_index(drop=True)
-        dfh2 = pd.DataFrame(df.loc[(df[0].isin(["S0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8"]))]).dropna(
+        dfh = pd.DataFrame(df.loc[(df[0].isin(["S0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8"]))]).dropna(
             axis=1, how="all"
         ).reset_index(drop=True)
         if data.empty:
@@ -524,7 +527,7 @@ class Data(object):
                 lambda x: "P" if x["lane_number"] <= (int(max_lanes) / 2) else "N",
                 axis=1,
             )
-            direction = dfh2.loc[dfh2[0] == "L1", 1:3].astype(int)
+            direction = dfh.loc[dfh[0] == "L1", 1:3].astype(int)
             direction = direction.drop_duplicates()
 
             ddf['end_date'] = ddf['end_datetime'].apply(lambda x: pd.to_datetime(x, format="%y%m%d").date() if len(x)==6 else pd.to_datetime(x, format="%Y%m%d").date())
@@ -576,8 +579,8 @@ class Data(object):
                 ddf["end_datetime"]
             ) - pd.to_timedelta(ddf["duration_min"].astype(int), unit="m")
             ddf['year'] = ddf['start_datetime'].dt.year
-            t1 = dfh2.loc[dfh2[0] == "S0", 1].unique()
-            ddf["site_id"] = str(t1[0])
+            # t1 = dfh.loc[dfh[0] == "S0", 1].unique()
+            ddf["site_id"] = str(dfh[dfh[0]=="S0"].reset_index(drop=True).iloc[0,1]).zfill(4)
 
             ddf = ddf.drop_duplicates()
             ddf["start_datetime"] = ddf["start_datetime"].astype("datetime64[ns]")
@@ -595,7 +598,7 @@ class Data(object):
         data = df.loc[(df[0] == "30") & (df[1].isin(["0", "1", "2", "3", "4"]))].dropna(
                     axis=1, how="all"
                 ).reset_index(drop=True)
-        dfh2 = pd.DataFrame(df.loc[(df[0].isin(["S0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8"]))]).dropna(
+        dfh = pd.DataFrame(df.loc[(df[0].isin(["S0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8"]))]).dropna(
             axis=1, how="all"
         ).reset_index(drop=True)
         header = df.loc[(df[0] == "30") & (~df[1].isin(["0", "1", "2", "3", "4"]))].dropna(
@@ -605,8 +608,12 @@ class Data(object):
         if data.empty:
             pass
         else:
-            dir_1 = dfh2.iloc[1:,2].astype(int).min()
-            dir_2 = dfh2.iloc[1:,2].astype(int).max()
+            try:
+                dir_1 = dfh.iloc[1:,2].astype(int).min()
+                dir_2 = dfh.iloc[1:,2].astype(int).max()
+            except (TypeError,ValueError):
+                dir_1 = 0
+                dir_2 = 4
 
             if header.shape[1] > 3:
                 summary_interval = header.iloc[0,2]
@@ -623,24 +630,19 @@ class Data(object):
                 ddf = data.iloc[:, 1:].reset_index(drop=True)
                 ddf = pd.DataFrame(ddf).dropna(axis=1, how="all").reset_index(drop=True)
 
-                site_id = dfh2.iloc[1,1]
+                try:
+                    site_id = str(dfh[dfh[0]=="S0"].reset_index(drop=True).iloc[0,1]).zfill(4)
+                except IndexError:
+                    site_id = dfh.loc[df[0]=="S0",1]
+   
                 time_length = len(ddf[2][0])
                 date_length = len(ddf[2][0])
-                duration = int(ddf[4][0])
+                duration_min = int(ddf[4][0])
                 ddf[4] = ddf[4].astype(int)
                 ddf[5] = ddf[5].astype(int)
                 max_lanes = ddf[5].max()
 
-                ddf[3].loc[ddf[3].str[:2] == '24'] = ('0').zfill(time_length)
-                
-                ddf[2] = ddf[2].apply(lambda x: pd.to_datetime(x, format="%y%m%d").date() 
-                    if len(x)==6 else pd.to_datetime(x, format="%Y%m%d").date())
-
-                ddf[2].loc[ddf[3] == ('0').zfill(time_length)] = ddf[2]+timedelta(days=1)
-
-                ddf[3] = ddf[3].apply(lambda x: pd.to_datetime(x, format="%H%M").time()
-                    if len(x)==4 
-                    else pd.to_datetime(x, format="%H%M%S").time())
+                ddf = process_dates_and_times(ddf, date_length, time_length, duration_min)
 
                 ddf = ddf.apply(pd.to_numeric, errors='ignore')
                     
@@ -656,18 +658,18 @@ class Data(object):
                 ddf['vehicle_classification_scheme'] = int(classification_scheme)
 
                 ddf['start_datetime'] = pd.to_datetime(ddf[2].astype(str)+ddf[3].astype(str), 
-                    format='%Y-%m-%d%H:%M:%S') - timedelta(minutes=duration)
+                    format='%Y-%m-%d%H:%M:%S') - timedelta(minutes=duration_min)
                 
                 ddf.columns = ddf.columns.astype(str)
 
                 df3 = pd.DataFrame(columns=['edit_code', 'start_datetime', 'end_date', 'end_time', 
-                    'duration_min', 'lane_number', 'number_of_vehicles', 'class_number', 'direction', 'compas_heading'])
+                    'duration_of_summary', 'lane_number', 'number_of_vehicles', 'class_number', 'direction', 'compas_heading'])
                 for lane_no in range(max_lanes):
                     for i in range(1,int(number_of_data_records)):
                         i=i+5
                         join_to_df3 = ddf.loc[ddf['5'] == lane_no, ['1', 'start_datetime','2', '3', '4', '5',str(i), 'direction', 'compas_heading']]
                         join_to_df3['class_number'] = i-5
-                        join_to_df3.rename(columns={'1':"edit_code",'2':"end_date",'3':"end_time",'4':"duration_min",'5':'lane_number', str(i): 'number_of_vehicles'}, inplace=True)
+                        join_to_df3.rename(columns={'1':"edit_code",'2':"end_date",'3':"end_time",'4':"duration_of_summary",'5':'lane_number', str(i): 'number_of_vehicles'}, inplace=True)
                         df3 = pd.concat([df3,join_to_df3],keys=['start_datetime','lane_number','number_of_vehicles','class_number'],ignore_index=True, axis=0)
                 df3['classification_scheme'] = int(classification_scheme)
                 df3['site_id'] = site_id
@@ -680,7 +682,7 @@ class Data(object):
         data = df.loc[(df[0] == "70") & (df[1].isin(["0", "1", "2", "3", "4"]))].dropna(
             axis=1, how="all"
         ).reset_index(drop=True)
-        dfh2 = pd.DataFrame(df.loc[(df[0].isin(["S0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8"]))]).dropna(
+        dfh = pd.DataFrame(df.loc[(df[0].isin(["S0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8"]))]).dropna(
             axis=1, how="all"
         ).reset_index(drop=True)
         if data.empty:
@@ -688,7 +690,17 @@ class Data(object):
         else:
             if data[1].all() == "1":
                 ddf = data.iloc[:, 3:]
-                ddf = pd.DataFrame(ddf).dropna(axis=1, how="all")
+                ddf = pd.DataFrame(ddf).dropna(axis=1, how="all").reset_index(drop=True)
+
+                # time_length = len(ddf[2][0])
+                # date_length = len(ddf[2][0])
+                # duration_min = int(ddf[4][0])
+                # ddf[4] = ddf[4].astype(int)
+                # ddf[5] = ddf[5].astype(int)
+                # max_lanes = ddf[5].max()
+
+                # ddf = process_dates_and_times(ddf, date_length, time_length, duration_min)
+
                 ddf.columns = [
                     "end_datetime",
                     "end_time",
@@ -715,13 +727,12 @@ class Data(object):
 
             else:  # data[1].all() == '0':
                 ddf = data.iloc[:, 2:]
-                ddf = pd.DataFrame(ddf).dropna(axis=1, how="all")
+                ddf = pd.DataFrame(ddf).dropna(axis=1, how="all").reset_index(drop=True)
                 ddf.columns = [
                     "end_datetime",
                     "end_time",
                     "duration_min",
                     "lane_number",
-                    # 			 'number_of_error_vehicles',
                     "total_free_flowing_light_vehicles",
                     "total_following_light_vehicles",
                     "total_free_flowing_heavy_vehicles",
@@ -741,7 +752,7 @@ class Data(object):
                 ]
                 ddf["number_of_error_vehicles"] = 0
             
-            ddf.reset_index(inplace=True)
+            ddf.reset_index(drop=True,inplace=True)
             ddf = ddf.fillna(0)
 
             ddf["duration_min"] = ddf["duration_min"].astype(int)
@@ -804,7 +815,7 @@ class Data(object):
                 lambda x: "P" if x["lane_number"] <= (int(max_lanes) / 2) else "N",
                 axis=1,
             )
-            direction = dfh2.loc[dfh2[0] == "L1", 1:3].astype(int)
+            direction = dfh.loc[dfh[0] == "L1", 1:3].astype(int)
             direction = direction.drop_duplicates()
 
             ddf['end_date'] = ddf['end_datetime'].apply(lambda x: pd.to_datetime(x, format="%y%m%d").date() if len(x)==6 else pd.to_datetime(x, format="%Y%m%d").date())
@@ -855,8 +866,8 @@ class Data(object):
                 ddf["end_datetime"]
             ) - pd.to_timedelta(ddf["duration_min"].astype(int), unit="m")
             ddf['year'] = ddf['start_datetime'].dt.year
-            t1 = dfh2.loc[dfh2[0] == "S0", 1].unique()
-            ddf["site_id"] = str(t1[0])
+            # t1 = dfh.loc[dfh[0] == "S0", 1].unique()
+            ddf["site_id"] = str(dfh[dfh[0]=="S0"].reset_index(drop=True).iloc[0,1]).zfill(4)
             ddf["site_id"] = ddf["site_id"].astype(str)
 
             ddf = ddf.drop_duplicates()
@@ -872,7 +883,7 @@ class Data(object):
             return ddf
 
     def dtype60(df: pd.DataFrame) -> pd.DataFrame:
-        data = df.loc[(df[0] == "60") & (df[1].isin(["15", "17", "19"]))].dropna(
+        data = df.loc[(df[0] == "60") & (df[1].isin(["0", "1", "2", "3", "4"]))].dropna(
             axis=1, how="all"
         ).reset_index(drop=True)
         dfh = pd.DataFrame(
@@ -881,7 +892,7 @@ class Data(object):
                 & (~df[1].isin(["0", "1", "2", "3", "4"]))
             ]
         ).dropna(axis=1, how="all")
-        dfh2 = pd.DataFrame(df.loc[(df[0].isin(["S0", "L1"]))]).dropna(
+        dfh = pd.DataFrame(df.loc[(df[0].isin(["S0", "L1"]))]).dropna(
             axis=1, how="all"
         ).reset_index(drop=True)
 
@@ -929,7 +940,7 @@ class Data(object):
                 lambda x: "P" if x["lane_number"] <= (int(max_lanes) / 2) else "N",
                 axis=1,
             )
-            direction = dfh2.loc[dfh2[0] == "L1", 1:3].astype(int)
+            direction = dfh.loc[dfh[0] == "L1", 1:3].astype(int)
             direction = direction.drop_duplicates()
 
             ddf['end_date'] = ddf['end_datetime'].apply(lambda x: pd.to_datetime(x, format="%y%m%d").date() if len(x)==6 else pd.to_datetime(x, format="%Y%m%d").date())
@@ -975,8 +986,8 @@ class Data(object):
                 axis=1,
             )
 
-            t1 = dfh2.loc[dfh2[0] == "S0", 1].unique()
-            ddf["site_id"] = str(t1[0])
+            # t1 = dfh.loc[dfh[0] == "S0", 1].unique()
+            ddf["site_id"] = str(dfh[dfh[0]=="S0"].reset_index(drop=True).iloc[0,1]).zfill(4)
             ddf["site_id"] = ddf["site_id"].astype(str)
             ddf["start_datetime"] = pd.to_datetime(
                 ddf["end_datetime"]
@@ -999,175 +1010,190 @@ class Data(object):
             pass
         else:
             try:
-                speed_limit_qry = f"select max_speed from trafc.countstation where tcname = '{data['site_id'][0]}' ;"
-                speed_limit = pd.read_sql_query(speed_limit_qry,config.ENGINE)
-                speed_limit = speed_limit['max_speed'][0]
-                data['start_datetime'] = pd.to_datetime(data['start_datetime'])
+                speed_limit_qry = f"select max_speed from trafc.countstation where tcname = '{data['site_id'].iloc[0]}' ;"
+                speed_limit = pd.read_sql_query(speed_limit_qry,config.ENGINE).reset_index(drop=True)
+                try:
+                    speed_limit = speed_limit['max_speed'].iloc[0]
+                except IndexError:
+                    speed_limit = 60
+
                 if dtype == 21:
-                    header['adt_total'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['header_id']]).sum().mean().round().astype(int)
-                    header['adt_positive_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().mean().round().astype(int)
-                    header['adt_positive_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().mean().round().astype(int)
-
-                    header['adtt_total'] = data['total_heavy_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['header_id']]).sum().mean().round().astype(int)
-                    header['adtt_positive_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().mean().round().astype(int)
-                    header['adtt_positive_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().mean().round().astype(int)
-
-                    header['total_vehicles'] = data['total_vehicles_type21'].groupby(data['header_id']).sum()[0]
-                    header['total_vehicles_positive_direction'] = data['total_vehicles_type21'].groupby(data['direction'].loc[data['direction'] == 'P']).sum()[0]
-                    header['total_vehicles_positive_direction'] = data['total_vehicles_type21'].groupby(data['direction'].loc[data['direction'] == 'N']).sum()[0]
-
-                    header['total_heavy_vehicles'] = data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
-                    header['total_heavy_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
-                    header['total_heavy_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
-                    header['truck_split_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0] / data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
-                    header['truck_split_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0] / data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
-
-                    header['total_light_vehicles'] = data['total_light_vehicles_type21'].groupby(data['header_id']).sum()[0]
-                    header['total_light_positive_direction'] = data['total_light_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
-                    header['total_light_positive_direction'] = data['total_light_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
-
-                    header['short_heavy_vehicles'] = data['short_heavy_vehicles'].groupby(data['header_id']).sum()[0]
-                    header['short_heavy_positive_direction'] = data['short_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
-                    header['short_heavy_positive_direction'] = data['short_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
-
-                    header['Medium_heavy_vehicles'] = data['medium_heavy_vehicles'].groupby(data['header_id']).sum()[0]
-                    header['Medium_heavy_positive_direction'] = data['medium_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
-                    header['Medium_heavy_positive_direction'] = data['medium_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
-
-                    header['long_heavy_vehicles'] = data['long_heavy_vehicles'].groupby(data['header_id']).sum()[0]
-                    header['long_heavy_positive_direction'] = data['long_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
-                    header['long_heavy_positive_direction'] = data['long_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
-
-                    header['vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire'] = data['rear_to_rear_headway_shorter_than_2_seconds'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
-                    header['vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire'] = data['rear_to_rear_headway_shorter_than_2_seconds'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
-                    header['vehicles_with_rear_to_rear_headway_less_than_2sec_total'] = data['rear_to_rear_headway_shorter_than_2_seconds'].groupby(data['header_id']).sum()[0]
-                
-                    header['type_21_count_interval_minutes'] = data['duration_min'].mean()
-
-                    header['highest_volume_per_hour_positive_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().max()
-                    header['highest_volume_per_hour_negative_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().max()
-                    header['highest_volume_per_hour_total'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['header_id']]).sum().max()
-
-                    header['15th_highest_volume_per_hour_positive_direction'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().quantile(q=0.15,  interpolation='linear'))
-                    header['15th_highest_volume_per_hour_negative_direction'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().quantile(q=0.15,  interpolation='linear'))
-                    header['15th_highest_volume_per_hour_total'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['header_id']]).sum().quantile(q=0.15, interpolation='linear'))
-                    
-                    header['30th_highest_volume_per_hour_positive_direction'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().quantile(q=0.3,  interpolation='linear'))
-                    header['30th_highest_volume_per_hour_negative_direction'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().quantile(q=0.3, interpolation='linear'))
-                    header['30th_highest_volume_per_hour_total'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['header_id']]).sum().quantile(q=0.3, interpolation='linear'))
-
-                    # header['average_speed_positive_direction'] = 
-                    # header['average_speed_negative_direction'] = 
-                    header['average_speed'] = ((
-                        (header['speedbin1'] * data['speedbin1'].groupby(data['header_id']).sum()[0]) +
-                        (header['speedbin2'] * data['speedbin2'].groupby(data['header_id']).sum()[0]) +
-                        (header['speedbin3'] * data['speedbin3'].groupby(data['header_id']).sum()[0]) +
-                        (header['speedbin4'] * data['speedbin4'].groupby(data['header_id']).sum()[0]) +
-                        (header['speedbin5'] * data['speedbin5'].groupby(data['header_id']).sum()[0]) +
-                        (header['speedbin6'] * data['speedbin6'].groupby(data['header_id']).sum()[0]) +
-                        (header['speedbin7'] * data['speedbin7'].groupby(data['header_id']).sum()[0]) +
-                        (header['speedbin8'] * data['speedbin8'].groupby(data['header_id']).sum()[0]) +
-                        (header['speedbin9'] * data['speedbin9'].groupby(data['header_id']).sum()[0]) 
-                        )
-                        / data['sum_of_heavy_vehicle_speeds'].groupby(data['header_id']).sum()[0]
-                        )
-                    # header['average_speed_light_vehicles_positive_direction'] = 
-                    # header['average_speed_light_vehicles_negative_direction'] = 
-                    header['average_speed_light_vehicles'] = ((
-                        (header['speedbin1'] * data['speedbin1'].groupby(data['header_id']).sum()[0]) +
-                        (header['speedbin2'] * data['speedbin2'].groupby(data['header_id']).sum()[0]) +
-                        (header['speedbin3'] * data['speedbin3'].groupby(data['header_id']).sum()[0]) +
-                        (header['speedbin4'] * data['speedbin4'].groupby(data['header_id']).sum()[0]) +
-                        (header['speedbin5'] * data['speedbin5'].groupby(data['header_id']).sum()[0]) +
-                        (header['speedbin6'] * data['speedbin6'].groupby(data['header_id']).sum()[0]) +
-                        (header['speedbin7'] * data['speedbin7'].groupby(data['header_id']).sum()[0]) +
-                        (header['speedbin8'] * data['speedbin8'].groupby(data['header_id']).sum()[0]) +
-                        (header['speedbin9'] * data['speedbin9'].groupby(data['header_id']).sum()[0]) -
-                        data['sum_of_heavy_vehicle_speeds'].groupby(data['header_id']).sum()[0]
-                        )
-                        / data['sum_of_heavy_vehicle_speeds'].groupby(data['header_id']).sum()[0]
-                        )
-                    
-                    # header['average_speed_heavy_vehicles_positive_direction'] = 
-                    # header['average_speed_heavy_vehicles_negative_direction'] = 
-                    # header['average_speed_heavy_vehicles'] = 
-
-                    header['truck_split_positive_direction'] = (str(round(data['short_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0] / 
-                    data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0]*100)) + ' : ' +
-                    str(round(data['medium_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0] / 
-                    data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0]*100)) + ' : ' +
-                    str(round(data['long_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0] / 
-                    data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0]*100))
-                    )
-                    header['truck_split_negative_direction'] = (str(round(data['short_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0] / 
-                    data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0]*100)) + ' : ' +
-                    str(round(data['medium_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0] / 
-                    data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0]*100)) + ' : ' +
-                    str(round(data['long_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0] / 
-                    data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0]*100))
-                    )
-                    header['truck_split_total'] = (str(round(data['short_heavy_vehicles'].groupby(data['header_id']).sum()[0] / 
-                    data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]*100)) + ' : ' +
-                    str(round(data['medium_heavy_vehicles'].groupby(data['header_id']).sum()[0] / 
-                    data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]*100)) + ' : ' +
-                    str(round(data['long_heavy_vehicles'].groupby(data['header_id']).sum()[0] / 
-                    data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]*100))
-                    )
                     try:
-                        header["type_21_count_interval_minutes"] = header["type_21_count_interval_minutes"].round().astype(int)
-                        header['type_30_vehicle_classification_scheme'] = header['type_30_vehicle_classification_scheme'].round().astype(int)
-                        header['type_70_maximum_gap_milliseconds'] = header['type_70_maximum_gap_milliseconds'].round().astype(int)
-                    except pd.errors.IntCastingNaNError:
-                        pass
-                elif dtype == 30:
-                    if header['adt_total'].isnull().all():
-                        header['adt_total'] = data['total_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['header_id']]).sum().mean()
-                        header['adt_positive_direction'] = data['total_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().mean()
-                        header['adt_positive_direction'] = data['total_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().mean()
-                    else:
-                        pass
+                        header['adt_total'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['header_id']]).sum().mean().round().astype(int)
+                        header['adt_positive_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().mean().round().astype(int)
+                        header['adt_positive_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().mean().round().astype(int)
 
-                    if header['adtt_total'].isnull().all():
-                        header['adtt_total'] = data['total_heavy_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['header_id']]).sum().mean()
-                        header['adtt_positive_direction'] = data['total_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().mean()
-                        header['adtt_positive_direction'] = data['total_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().mean()
-                    else:
-                        pass
+                        header['adtt_total'] = data['total_heavy_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['header_id']]).sum().mean().round().astype(int)
+                        header['adtt_positive_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().mean().round().astype(int)
+                        header['adtt_positive_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().mean().round().astype(int)
 
-                    if header['total_vehicles'].isnull().all():
-                        header['total_vehicles'] = data['total_vehicles_type30'].groupby(data['header_id']).sum()[0]
-                        header['total_vehicles_positive_direction'] = data['total_vehicles_type30'].groupby(data['direction'].loc[data['direction'] == 'P']).sum()[0]
-                        header['total_vehicles_positive_direction'] = data['total_vehicles_type30'].groupby(data['direction'].loc[data['direction'] == 'N']).sum()[0]
-                    else:
-                        pass
-                    
-                    if header['total_heavy_vehicles'].isnull().all():
+                        header['total_vehicles'] = data['total_vehicles_type21'].groupby(data['header_id']).sum()[0]
+                        header['total_vehicles_positive_direction'] = data['total_vehicles_type21'].groupby(data['direction'].loc[data['direction'] == 'P']).sum()[0]
+                        header['total_vehicles_positive_direction'] = data['total_vehicles_type21'].groupby(data['direction'].loc[data['direction'] == 'N']).sum()[0]
+
                         header['total_heavy_vehicles'] = data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
                         header['total_heavy_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
                         header['total_heavy_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
                         header['truck_split_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0] / data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
                         header['truck_split_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0] / data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
-                    else:
-                        pass
 
-                    if header['total_light_vehicles'].isnull().all():
-                        header['total_light_vehicles'] = data['total_light_vehicles_type30'].groupby(data['header_id']).sum()[0]
-                        header['total_light_positive_direction'] = data['total_light_vehicles_type30'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
-                        header['total_light_positive_direction'] = data['total_light_vehicles_type30'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
-                    else:
-                        pass
+                        header['total_light_vehicles'] = data['total_light_vehicles_type21'].groupby(data['header_id']).sum()[0]
+                        header['total_light_positive_direction'] = data['total_light_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
+                        header['total_light_positive_direction'] = data['total_light_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
+
+                        header['short_heavy_vehicles'] = data['short_heavy_vehicles'].groupby(data['header_id']).sum()[0]
+                        header['short_heavy_positive_direction'] = data['short_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
+                        header['short_heavy_positive_direction'] = data['short_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
+
+                        header['Medium_heavy_vehicles'] = data['medium_heavy_vehicles'].groupby(data['header_id']).sum()[0]
+                        header['Medium_heavy_positive_direction'] = data['medium_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
+                        header['Medium_heavy_positive_direction'] = data['medium_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
+
+                        header['long_heavy_vehicles'] = data['long_heavy_vehicles'].groupby(data['header_id']).sum()[0]
+                        header['long_heavy_positive_direction'] = data['long_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
+                        header['long_heavy_positive_direction'] = data['long_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
+
+                        header['vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire'] = data['rear_to_rear_headway_shorter_than_2_seconds'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
+                        header['vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire'] = data['rear_to_rear_headway_shorter_than_2_seconds'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
+                        header['vehicles_with_rear_to_rear_headway_less_than_2sec_total'] = data['rear_to_rear_headway_shorter_than_2_seconds'].groupby(data['header_id']).sum()[0]
                     
+                        header['type_21_count_interval_minutes'] = data['duration_min'].mean()
+
+                        header['highest_volume_per_hour_positive_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().max()
+                        header['highest_volume_per_hour_negative_direction'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().max()
+                        header['highest_volume_per_hour_total'] = data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['header_id']]).sum().max()
+
+                        header['15th_highest_volume_per_hour_positive_direction'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().quantile(q=0.15,  interpolation='linear'))
+                        header['15th_highest_volume_per_hour_negative_direction'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().quantile(q=0.15,  interpolation='linear'))
+                        header['15th_highest_volume_per_hour_total'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['header_id']]).sum().quantile(q=0.15, interpolation='linear'))
+                        
+                        header['30th_highest_volume_per_hour_positive_direction'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().quantile(q=0.3,  interpolation='linear'))
+                        header['30th_highest_volume_per_hour_negative_direction'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().quantile(q=0.3, interpolation='linear'))
+                        header['30th_highest_volume_per_hour_total'] = round(data['total_vehicles_type21'].groupby([data['start_datetime'].dt.to_period('H'), data['header_id']]).sum().quantile(q=0.3, interpolation='linear'))
+
+                        # header['average_speed_positive_direction'] = 
+                        # header['average_speed_negative_direction'] = 
+                        header['average_speed'] = (int((
+                            (header['speedbin1'] * data['speedbin1'].groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin2'] * data['speedbin2'].groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin3'] * data['speedbin3'].groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin4'] * data['speedbin4'].groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin5'] * data['speedbin5'].groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin6'] * data['speedbin6'].groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin7'] * data['speedbin7'].groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin8'] * data['speedbin8'].groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin9'] * data['speedbin9'].groupby(data['header_id']).sum()[0]) 
+                            ))
+                            / data['sum_of_heavy_vehicle_speeds'].astype(int).groupby(data['header_id']).sum()[0]
+                            )
+                        # header['average_speed_light_vehicles_positive_direction'] = 
+                        # header['average_speed_light_vehicles_negative_direction'] = 
+                        header['average_speed_light_vehicles'] = ((
+                            (header['speedbin1'] * data['speedbin1'].groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin2'] * data['speedbin2'].groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin3'] * data['speedbin3'].groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin4'] * data['speedbin4'].groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin5'] * data['speedbin5'].groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin6'] * data['speedbin6'].groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin7'] * data['speedbin7'].groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin8'] * data['speedbin8'].groupby(data['header_id']).sum()[0]) +
+                            (header['speedbin9'] * data['speedbin9'].groupby(data['header_id']).sum()[0]) -
+                            data['sum_of_heavy_vehicle_speeds'].groupby(data['header_id']).sum()[0]
+                            )
+                            / data['sum_of_heavy_vehicle_speeds'].groupby(data['header_id']).sum()[0]
+                            )
+                        
+                        # header['average_speed_heavy_vehicles_positive_direction'] = 
+                        # header['average_speed_heavy_vehicles_negative_direction'] = 
+                        # header['average_speed_heavy_vehicles'] = 
+
+                        header['truck_split_positive_direction'] = (str(round(data['short_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0] / 
+                        data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0]*100)) + ' : ' +
+                        str(round(data['medium_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0] / 
+                        data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0]*100)) + ' : ' +
+                        str(round(data['long_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0] / 
+                        data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'P']]).sum()[0]*100))
+                        )
+                        header['truck_split_negative_direction'] = (str(round(data['short_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0] / 
+                        data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0]*100)) + ' : ' +
+                        str(round(data['medium_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0] / 
+                        data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0]*100)) + ' : ' +
+                        str(round(data['long_heavy_vehicles'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0] / 
+                        data['total_heavy_vehicles_type21'].groupby([data['header_id'], data['direction'].loc[data['direction'] == 'N']]).sum()[0]*100))
+                        )
+                        header['truck_split_total'] = (str(round(data['short_heavy_vehicles'].groupby(data['header_id']).sum()[0] / 
+                        data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]*100)) + ' : ' +
+                        str(round(data['medium_heavy_vehicles'].groupby(data['header_id']).sum()[0] / 
+                        data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]*100)) + ' : ' +
+                        str(round(data['long_heavy_vehicles'].groupby(data['header_id']).sum()[0] / 
+                        data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]*100))
+                        )
+                    except KeyError:
+                        pass
                     try:
                         header["type_21_count_interval_minutes"] = header["type_21_count_interval_minutes"].round().astype(int)
-                        header['type_30_vehicle_classification_scheme'] = header['type_30_vehicle_classification_scheme'].round().astype(int)
-                        header['type_70_maximum_gap_milliseconds'] = header['type_70_maximum_gap_milliseconds'].round().astype(int)
-                    except pd.errors.IntCastingNaNError:
+                    except (KeyError, pd.errors.IntCastingNaNError):
                         pass
 
-                elif dtype == 70:
-                
                     return header
 
+                elif dtype == 30:
+                    try:
+                        if header['adt_total'].isnull().all():
+                            header['adt_total'] = data['total_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['header_id']]).sum().mean()
+                            header['adt_positive_direction'] = data['total_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().mean()
+                            header['adt_positive_direction'] = data['total_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().mean()
+                        else:
+                            pass
+
+                        if header['adtt_total'].isnull().all():
+                            header['adtt_total'] = data['total_heavy_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['header_id']]).sum().mean()
+                            header['adtt_positive_direction'] = data['total_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum().mean()
+                            header['adtt_positive_direction'] = data['total_vehicles_type30'].groupby([data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum().mean()
+                        else:
+                            pass
+
+                        if header['total_vehicles'].isnull().all():
+                            header['total_vehicles'] = data['total_vehicles_type30'].groupby(data['header_id']).sum()[0]
+                            header['total_vehicles_positive_direction'] = data['total_vehicles_type30'].groupby(data['direction'].loc[data['direction'] == 'P']).sum()[0]
+                            header['total_vehicles_positive_direction'] = data['total_vehicles_type30'].groupby(data['direction'].loc[data['direction'] == 'N']).sum()[0]
+                        else:
+                            pass
+                        
+                        if header['total_heavy_vehicles'].isnull().all():
+                            header['total_heavy_vehicles'] = data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
+                            header['total_heavy_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
+                            header['total_heavy_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
+                            header['truck_split_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0] / data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
+                            header['truck_split_positive_direction'] = data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0] / data['total_heavy_vehicles_type21'].groupby(data['header_id']).sum()[0]
+                        else:
+                            pass
+
+                        if header['total_light_vehicles'].isnull().all():
+                            header['total_light_vehicles'] = data['total_light_vehicles_type30'].groupby(data['header_id']).sum()[0]
+                            header['total_light_positive_direction'] = data['total_light_vehicles_type30'].groupby([data['direction'].loc[data['direction'] == 'P'], data['header_id']]).sum()[0]
+                            header['total_light_positive_direction'] = data['total_light_vehicles_type30'].groupby([data['direction'].loc[data['direction'] == 'N'], data['header_id']]).sum()[0]
+                        else:
+                            pass
+                    except KeyError:
+                        pass
+                        
+                    try:
+                        header['type_30_vehicle_classification_scheme'] = header['type_30_vehicle_classification_scheme'].round().astype(int)
+                    except (KeyError, pd.errors.IntCastingNaNError):
+                        pass
+
+                    return header
+
+                elif dtype == 70:
+
+                    try:
+                        header['type_70_maximum_gap_milliseconds'] = header['type_70_maximum_gap_milliseconds'].round().astype(int)
+                    except (KeyError, pd.errors.IntCastingNaNError):
+                        pass
+                    
+                    return header
+                
                 elif dtype == 10:
                     header['total_light_positive_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']<=1)&(data['direction']=='N')].count()[0].round().astype(int)
                     header['total_light_negative_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']<=1)&(data['direction']=='P')].count()[0].round().astype(int)
@@ -1236,28 +1262,52 @@ class Data(object):
                     header['number_of_days_counted'] = data.groupby([data['start_datetime'].dt.to_period('D')]).count().count()[0]
                     header['duration_hours'] = data.groupby([data['start_datetime'].dt.to_period('H')]).count().count()[0]
 
-                    try:
-                        header["type_21_count_interval_minutes"] = header["type_21_count_interval_minutes"].round().astype(int)
-                        header['type_30_vehicle_classification_scheme'] = header['type_30_vehicle_classification_scheme'].round().astype(int)
-                        header['type_70_maximum_gap_milliseconds'] = header['type_70_maximum_gap_milliseconds'].round().astype(int)
-                    except pd.errors.IntCastingNaNError:
-                        pass
                     return header
 
                 elif dtype == 60:
                     
                     return header
-
                 else:
+                    pass
 
-                    try:
-                        header["type_21_count_interval_minutes"] = header["type_21_count_interval_minutes"].round().astype(int)
-                        header['type_30_vehicle_classification_scheme'] = header['type_30_vehicle_classification_scheme'].round().astype(int)
-                        header['type_70_maximum_gap_milliseconds'] = header['type_70_maximum_gap_milliseconds'].round().astype(int)
-                    except pd.errors.IntCastingNaNError:
-                        pass
             except IndexError:
                 pass
+
+def process_dates_and_times(df: pd.DataFrame, date_length: int, time_length: int, duration_min: int):
+    df[3] = df[3].astype(str)
+    df[3].loc[df[3].str[:2] == '24'] = ('0').zfill(7)
+
+    if date_length == 6:
+        df[2] = str(date.today())[:2] + df[2]
+        df[2] = df[2].apply(lambda x: pd.to_datetime(x, format="%Y%m%d").date() + timedelta(days=1)
+            if x[3] == '2400000' else pd.to_datetime(x, format="%Y%m%d").date())
+    elif date_length == 8:
+        df[2] = df[2].apply(lambda x: pd.to_datetime(x, format="%Y%m%d").date() + timedelta(days=1)
+            if x[3] == '2400000' else pd.to_datetime(x, format="%Y%m%d").date())
+    else:
+        raise Exception("DATA Date length abnormal")
+
+    if time_length < 7:
+        df[3] = df[3].str.pad(width=7,side='right',fillchar="0")
+        df[3] = df[3].apply(lambda x: pd.to_datetime(x, format="%H%M%S%f").time())
+    else:
+        df[3] = df[3].apply(lambda x: pd.to_datetime(x, format="%H%M%S%f").time())
+
+    if (df[2].astype(str)+df[3].astype(str)).map(len).isin([20]).all():
+        df['end_datetime'] = pd.to_datetime(df[2].astype(str)+df[3].astype(str), 
+            format='%Y-%m-%d%H:%M:%S.%f')
+    else:
+        df['end_datetime'] = pd.to_datetime((df[2].astype(str)+df[3].astype(str))[:18], 
+            format='%Y-%m-%d%H:%M:%S')
+
+    if (df[2].astype(str)+df[3].astype(str)).map(len).isin([20]).all():
+        df['start_datetime'] = pd.to_datetime(df[2].astype(str)+df[3].astype(str), 
+            format='%Y-%m-%d%H:%M:%S.%f') - timedelta(minutes=duration_min)
+    else:
+        df['start_datetime'] = pd.to_datetime((df[2].astype(str)+df[3].astype(str))[:18], 
+            format='%Y-%m-%d%H:%M:%S') - timedelta(minutes=duration_min)
+
+    return df
 
 def merge_summary_dataframes(join_this_df: pd.DataFrame, onto_this_df: pd.DataFrame) -> pd.DataFrame:
     onto_this_df = pd.concat([onto_this_df, join_this_df], keys=["site_id", "start_datetime", "lane_number"], ignore_index=False, axis=1)
@@ -1475,3 +1525,9 @@ def select_classification_scheme(classification_scheme):
     else:
         vc_df = None
     return vc_df
+
+def convert_columns_to_int(df):
+    # df.columns = df.columns.astype(str)
+    # for col_name, col_value in df.iteritems():
+    #     df = 
+    return df
