@@ -5,9 +5,9 @@ import traceback
 import pandas as pd
 import numpy as np
 import multiprocessing as mp
-from psycopg2.errors import UniqueViolation
+from psycopg2.errors import UniqueViolation, NotNullViolation
 
-import rsa_data_summary as rd
+import rsa_data_summary as rds
 import rsa_data_wim as wim
 import rsa_headers as rh
 import config
@@ -24,201 +24,212 @@ import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 pd.options.mode.chained_assignment = None
 
-partition_table_columns = list(pd.read_sql_query(q.SELECT_PARTITION_TABLE_LIMIT1,config.ENGINE).columns)
-electronic_count_data_type_21_columns = list(pd.read_sql_query(q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_21_LIMIT1,config.ENGINE).columns)
-electronic_count_data_type_30_columns = list(pd.read_sql_query(q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_30_LIMIT1,config.ENGINE).columns)
-electronic_count_data_type_60_columns = list(pd.read_sql_query(q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_60_LIMIT1,config.ENGINE).columns)
-electronic_count_data_type_70_columns = list(pd.read_sql_query(q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_70_LIMIT1,config.ENGINE).columns)
-electronic_count_data_type_10_columns = list(pd.read_sql_query(q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_10_LIMIT1,config.ENGINE).columns)
-header_columns = list(pd.read_sql_query(q.SELECT_HEADER_LIMIT1,config.ENGINE).columns)
+pt_cols = list(pd.read_sql_query(q.SELECT_PARTITION_TABLE_LIMIT1,config.ENGINE).columns)
+t21_cols = list(pd.read_sql_query(q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_21_LIMIT1,config.ENGINE).columns)
+t30_cols = list(pd.read_sql_query(q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_30_LIMIT1,config.ENGINE).columns)
+t60_cols = list(pd.read_sql_query(q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_60_LIMIT1,config.ENGINE).columns)
+t70_cols = list(pd.read_sql_query(q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_70_LIMIT1,config.ENGINE).columns)
+t10_cols = list(pd.read_sql_query(q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_10_LIMIT1,config.ENGINE).columns)
+h_cols = list(pd.read_sql_query(q.SELECT_HEADER_LIMIT1,config.ENGINE).columns)
+lane_cols = list(pd.read_sql_query(q.SELECT_LANES_LIMIT1,config.ENGINE).columns)
 
-def retry(fn):
-    @wraps(fn)
-    def wrapper(*args, **kw):
-        cls = args[0]
-        for x in range(cls._reconnectTries):
-            print(x, cls._reconnectTries)
-            try:
-                return fn(*args, **kw)
-            except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-                print ("\nDatabase Connection [InterfaceError or OperationalError]")
-                print ("Idle for %s seconds" % (cls._reconnectIdle))
-                time.sleep(cls._reconnectIdle)
-                cls._connect()
-    return wrapper
+# def retry(fn):
+#     @wraps(fn)
+#     def wrapper(*args, **kw):
+#         cls = args[0]
+#         for x in range(cls._reconnectTries):
+#             print(x, cls._reconnectTries)
+#             try:
+#                 return fn(*args, **kw)
+#             except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
+#                 print ("\nDatabase Connection [InterfaceError or OperationalError]")
+#                 print ("Idle for %s seconds" % (cls._reconnectIdle))
+#                 time.sleep(cls._reconnectIdle)
+#                 cls._connect()
+#     return wrapper
 
 #### MAIN EXECUTABLE
 def main(file: str):
     print("--- Busy With "+file)
     df = tools.to_df(file)
-    H = rh.Headers(df, file)
-    header = H.header_df
-    # lanes = H.lanes
-
-    D = rd.Data(df, header)
-    data = D.dtype21
-
-    if data is None:
-        data = D.dtype30
-        if data is None:
-            data = pd.DataFrame(columns = partition_table_columns)
-        else:
-            d2 = data.copy()
-            data = rd.merge_summary_dataframes(d2, data)
-    else:
-        data = data.reset_index(drop=True)
-        d2 = data.copy()
-        if d2 is None:
-            pass
-        else:
-            d2.rename(columns=config.ELECTRONIC_COUNT_DATA_TYPE21_NAME_CHANGE, inplace=True)
-            d2 = d2[d2.columns.intersection(electronic_count_data_type_21_columns)]
-            try:
-                d2.to_sql("electronic_count_data_type_21",
-                        con=config.ENGINE,
-                        schema="trafc",
-                        if_exists="append",
-                        index=False,
-                        method=tools.psql_insert_copy,
-                    )
-            except UniqueViolation:
-                pass
-            
-    d2 = D.dtype70
-    if d2 is None:
+    if df is None:
         pass
     else:
-        data = rd.merge_summary_dataframes(d2, data)
-        d2 = d2[d2.columns.intersection(electronic_count_data_type_70_columns)]
-        try:
-            d2.to_sql("electronic_count_data_type_70",
-                con=config.ENGINE,
-                schema="trafc",
-                if_exists="append",
-                index=False,
-                method=tools.psql_insert_copy,
-            )
-        except UniqueViolation:
-            pass
+        header = rh.header(rh.get_head(df), file)
         
-    d2 = D.electronic_count_data_type_30
-    if d2 is None:
-        pass
-    else:
+        lanes = rh.lanes(header)
+        lanes = d2[lanes.columns.intersection(lane_cols)]
         try:
-            d2.to_sql("electronic_count_data_type_30",
-                con=config.ENGINE,
-                schema="trafc",
-                if_exists="append",
-                index=False,
-                method=tools.psql_insert_copy,
-            )
-        except UniqueViolation:
-            pass
-            
-    if data is None:
-        dtype10_data = main_type10(df, file, header)
-    else:
-        dtype10_data = None
-        try:
-            # data = data.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
-            data = data.loc[:,~data.columns.duplicated()]
-            data = data[data.columns.intersection(partition_table_columns)]
-            data.loc[:,data.columns.difference(config.DATA_IMPORTANT_COLUMNS)] = data.loc[:,data.columns.difference(config.DATA_IMPORTANT_COLUMNS)].convert_dtypes()
-            try:
-                data.to_sql("electronic_count_data_partitioned",
+            lanes.to_sql("traffic_lane_configuration",
                     con=config.ENGINE,
                     schema="trafc",
                     if_exists="append",
                     index=False,
                     method=tools.psql_insert_copy,
                 )
-            except UniqueViolation:
-                pass                
-        except:
+        except (UniqueViolation, NotNullViolation):
             pass
-        
-    if header is None:
-        pass
-    else:
-        try:
-            data.reset_index(drop=True, inplace=True)
-            data = data.loc[:,~data.columns.duplicated()]
-            header = header.loc[:,~header.columns.duplicated()]
-            # header = header.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
-            header = rd.Data.header_calcs(header, data, 21)
-            # header = rd.Data.header_calcs(header, data, 70)
-            header = rd.Data.header_calcs(header, data, 30)
-            # header = rd.Data.header_calcs(header, data, 60)
-            if dtype10_data is None:
+
+
+        data = rds.join(header, rds.type_21(df))
+
+        if data is None:
+            data = rds.join(header, rds.type_30(df))
+            if data is None:
+                data = pd.DataFrame(columns = pt_cols)
+            else:
+                d2 = data.copy()
+                data = rds.merge_summary_dataframes(d2, data)
+        else:
+            data = data.reset_index(drop=True)
+            d2 = data.copy()
+            if d2 is None:
                 pass
             else:
-                header = rd.Data.header_calcs(header, dtype10_data, 10)
-            header = header[header.columns.intersection(header_columns)]
-            try:
-                header.to_sql("electronic_count_header_test",
-                        con=config.ENGINE,
-                        schema="trafc",
-                        if_exists="append",
-                        index=False,
-                        method=tools.psql_insert_copy,
-                    )
-            except UniqueViolation:
-                pass
-            try:
-                header.to_sql("electronic_count_header",
-                        con=config.ENGINE,
-                        schema="trafc",
-                        if_exists="append",
-                        index=False,
-                        method=tools.psql_insert_copy,
-                    )
-            except UniqueViolation:
+                d2.rename(columns=config.ELECTRONIC_COUNT_DATA_TYPE21_NAME_CHANGE, inplace=True)
+                d2 = d2[d2.columns.intersection(t21_cols)]
                 try:
-                    for index, row in header.iterrows():
-                        qry = f"""update trafc.electronic_count_header set 
-                        document_url = '{file}'
-                        where site_id = '{row['site_id']}'
-                        and start_datetime = '{row['start_datetime']}'
-                        and end_datetime = '{row['end_datetime']}'
-                        and document_url is null;
-                        """
-                        with config.ENGINE.connect() as conn:
-                            conn.execute(qry)
-                except Exception as e:
-                    print(e)
-                    raise Exception("error with updating document_url in main file")
+                    d2.to_sql("electronic_count_data_type_21",
+                            con=config.ENGINE,
+                            schema="trafc",
+                            if_exists="append",
+                            index=False,
+                            method=tools.psql_insert_copy,
+                        )
+                except (UniqueViolation, NotNullViolation):
+                    pass
+                
+        d2 = rds.type_70
+        if d2 is None:
+            pass
+        else:
+            data = rds.merge_summary_dataframes(d2, data)
+            d2 = d2[d2.columns.intersection(t70_cols)]
+            try:
+                d2.to_sql("electronic_count_data_type_70",
+                    con=config.ENGINE,
+                    schema="trafc",
+                    if_exists="append",
+                    index=False,
+                    method=tools.psql_insert_copy,
+                )
+            except (UniqueViolation, NotNullViolation):
                 pass
             
-        except AttributeError:
-            raise Exception("Issue with HEADER")
+        d2 = rds.electronic_count_data_type_30
+        if d2 is None:
+            pass
+        else:
+            try:
+                d2.to_sql("electronic_count_data_type_30",
+                    con=config.ENGINE,
+                    schema="trafc",
+                    if_exists="append",
+                    index=False,
+                    method=tools.psql_insert_copy,
+                )
+            except (UniqueViolation, NotNullViolation):
+                pass
+                
+        if data is None:
+            type_10_data = main_type10(df, file, header)
+        else:
+            type_10_data = None
+            try:
+                data = data.loc[:,~data.columns.duplicated()]
+                data = data[data.columns.intersection(pt_cols)]
+                data.loc[:,data.columns.difference(config.DATA_IMPORTANT_COLUMNS)] = data.loc[:,data.columns.difference(config.DATA_IMPORTANT_COLUMNS)].convert_dtypes()
+                try:
+                    data.to_sql("electronic_count_data_partitioned",
+                        con=config.ENGINE,
+                        schema="trafc",
+                        if_exists="append",
+                        index=False,
+                        method=tools.psql_insert_copy,
+                    )
+                except (UniqueViolation, NotNullViolation):
+                    pass                
+            except:
+                pass
+            
+        if header is None:
+            pass
+        else:
+            try:
+                data.reset_index(drop=True, inplace=True)
+                data = data.loc[:,~data.columns.duplicated()]
+                header = header.loc[:,~header.columns.duplicated()]
+                # header = header.rename(columns=(lambda x: x[:-2] if '_x' in x else x))
+                header =  rds.header_calcs(header, data, 21)
+                # header =  rds.header_calcs(header, data, 70)tes
+                header =  rds.header_calcs(header, data, 30)
+                # header =  rds.header_calcs(header, data, 60)
+                if type_10_data is None:
+                    pass
+                else:
+                    header =  rds.header_calcs(header, type_10_data, 10)
+                header = header[header.columns.intersection(h_cols)]
+                try:
+                    header.to_sql("electronic_count_header_test",
+                            con=config.ENGINE,
+                            schema="trafc",
+                            if_exists="append",
+                            index=False,
+                            method=tools.psql_insert_copy,
+                        )
+                except (UniqueViolation, NotNullViolation):
+                    pass
+                try:
+                    header.to_sql("electronic_count_header",
+                            con=config.ENGINE,
+                            schema="trafc",
+                            if_exists="append",
+                            index=False,
+                            method=tools.psql_insert_copy,
+                        )
+                except (UniqueViolation, NotNullViolation):
+                    try:
+                        for index, row in header.iterrows():
+                            qry = f"""update trafc.electronic_count_header set 
+                            document_url = '{file}'
+                            where site_id = '{row['site_id']}'
+                            and start_datetime = '{row['start_datetime']}'
+                            and end_datetime = '{row['end_datetime']}'
+                            and document_url is null;
+                            """
+                            with config.ENGINE.connect() as conn:
+                                conn.execute(qry)
+                    except Exception as e:
+                        print(e)
+                        raise Exception("error with updating document_url in main file")
+                
+            except AttributeError as exc:
+                raise Exception("Issue with HEADER "+exc) from exc
 
-    print('DONE WITH '+file)
-    with open(
-        os.path.expanduser(config.FILES_COMPLETE),
-        "a",
-        newline="",
-    ) as f:
-        write = csv.writer(f)
-        write.writerows([[file]])
+        print('DONE WITH '+file)
+        with open(
+            os.path.expanduser(config.FILES_COMPLETE),
+            "a",
+            newline="",
+        ) as f:
+            write = csv.writer(f)
+            write.writerows([[file]])
 
 
 ## TYPE 10 (INDIVIDUAL COUNT) SUB-FUNCTION (REFERENCED IN MAIN FUNCTION)
 def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
-    WIM = wim.WimData(df, header)
-    df, sub_data_df = WIM.dtype10
-
+    df, sub_data_df = wim.type_10(df)
     if df is None:
         pass
     else:
         try:
-            df = df[df.columns.intersection(electronic_count_data_type_10_columns)]
+            df = df[df.columns.intersection(t10_cols)]
             try:
                 tools.push_to_db(df,
                 "electronic_count_data_type_10",
                 ["site_id", "start_datetime", "assigned_lane_number"],
                 )
-            except UniqueViolation:
+            except (UniqueViolation, NotNullViolation):
                 pass
             
             sub_data_df = sub_data_df.replace(r'^\s*$', np.NaN, regex=True)
@@ -244,7 +255,7 @@ def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
                         index=False,
                         method=tools.psql_insert_copy,
                     )
-                except UniqueViolation:
+                except (UniqueViolation, NotNullViolation):
                     pass
                 
             if ax_data.empty:
@@ -260,7 +271,7 @@ def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
                         index=False,
                         method=tools.psql_insert_copy,
                     )
-                except UniqueViolation:
+                except (UniqueViolation, NotNullViolation):
                     pass
                 
             if gx_data.empty:
@@ -276,7 +287,7 @@ def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
                         index=False,
                         method=tools.psql_insert_copy,
                     )
-                except UniqueViolation:
+                except (UniqueViolation, NotNullViolation):
                     pass
                 
             if sx_data.empty:
@@ -293,7 +304,7 @@ def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
                         index=False,
                         method=tools.psql_insert_copy,
                     )
-                except UniqueViolation:
+                except (UniqueViolation, NotNullViolation):
                     pass
                 
             if tx_data.empty:
@@ -310,7 +321,7 @@ def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
                         index=False,
                         method=tools.psql_insert_copy,
                     )
-                except UniqueViolation:
+                except (UniqueViolation, NotNullViolation):
                     pass
                 
             if cx_data.empty:
@@ -327,7 +338,7 @@ def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
                         index=False,
                         method=tools.psql_insert_copy,
                     )
-                except UniqueViolation:
+                except (UniqueViolation, NotNullViolation):
                     pass
                 
             if vx_data.empty:
@@ -344,14 +355,10 @@ def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
                         index=False,
                         method=tools.psql_insert_copy,
                     )
-                except UniqueViolation:
+                except (UniqueViolation, NotNullViolation):
                     pass
                             
-            with open(
-                os.path.expanduser(config.FILES_COMPLETE),
-                "a",
-                newline="",
-            ) as f:
+            with open(os.path.expanduser(config.FILES_COMPLETE),"a",newline="",) as f:
                 write = csv.writer(f)
                 write.writerows([[file]])
         
@@ -369,9 +376,9 @@ def main_type10(df: pd.DataFrame, file: str, header: pd.DataFrame):
                 write.writerows([[file]])
             pass
 
-def files(filesToDo: str) -> List:
-    if tools.is_zip(filesToDo) == False:
-        filesToDo = tools.getfiles(filesToDo)
+def get_files(files: str) -> List:
+    if tools.is_zip(files) == False:
+        files = tools.getfiles(files)
     else:
         raise SystemExit
 
@@ -388,7 +395,7 @@ def files(filesToDo: str) -> List:
     except Exception:
         fileComplete = []
 
-    filesToDo = [i for i in filesToDo if i not in fileComplete]
+    files = [i for i in files if i not in fileComplete]
 
     if not os.path.exists(os.path.expanduser(config.PATH)):
         os.makedirs(os.path.expanduser(config.PATH))
@@ -399,32 +406,37 @@ def files(filesToDo: str) -> List:
             "w",
         ) as f:
             pass
-    return filesToDo
+    return files
+
+# Multiprocessing
+def run_multiprocess(path):
+    files = get_files(path)
+    pool = mp.Pool(int(mp.cpu_count()))
+    for _ in tqdm.tqdm(pool.imap_unordered(main, files), total=len(files)):
+        pass
+    pool.close()
+    pool.join()
+
+def run_individually(path):
+    files = get_files(path)
+    for file in files:
+        main(file)
 
 ##################################################################################################################################
 ##################################################################################################################################
 
 if __name__ == "__main__":
 
-    filesToDo = r"C:\PQ410"
+    PATH = r"C:\PQ410"
+    # PATH = r"C:\FTP\Syntell"
 
-    # for file in filesToDo:
-    #     main(file)
+    # try:
+    #     run_multiprocess(PATH)
+    # except Exception as e:
+    #     print(e)
+    #     time.sleep(10)
+    #     run_multiprocess(PATH)
 
-    def run(filesToDo):
-        filesToDo = files(filesToDo)
-        pool = mp.Pool(int(mp.cpu_count()))
-        for _ in tqdm.tqdm(pool.imap_unordered(main, filesToDo), total=len(filesToDo)):
-            pass
-        pool.close()
-        pool.join()
-
-    ######### MIULTIPROCESSING ###########
-    try:
-        run(filesToDo)
-    except Exception as e:
-        print(e)
-        time.sleep(10)
-        run(filesToDo)
+    run_individually(PATH)
 
     print("COMPLETE")

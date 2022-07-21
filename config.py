@@ -8,6 +8,8 @@ DB_PASS = "Lin3@r1in3!431"
 DB_HOST = "linearline.dedicated.co.za"
 DB_PORT = "5432"
 
+TRAFFIC_SCHEMA = 'trafc'
+
 ENGINE_URL = sa.engine.URL.create(
     "postgresql",
     username=DB_USER,
@@ -26,6 +28,8 @@ CONN = psycopg2.connect(database=DB_NAME,
                         password=DB_PASS,
                         host=DB_HOST,
                         port=DB_PORT)
+
+
 
 OUTPUT_FILE = r""
 

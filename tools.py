@@ -9,6 +9,7 @@ import csv
 import os
 import zipfile
 from io import StringIO
+import queries as q
 
 
 #### DATA TOOLS ####
@@ -35,15 +36,14 @@ def getfiles(path: str) -> List[str]:
 def to_df(file: str) -> pd.DataFrame:
     try:
         df = pd.read_csv(file, header=None)
-        df = df[0].str.split("\s+|,\s+|,", expand=True)
+        df = df[0].str.split("\s+|,\s+|,|;|;\s+", expand=True)
         return df
-    except pd.errors.ParserError:
-        df = pd.read_csv(file, header=None, sep='\s+', low_memory=False)
-        df = df[0].str.split("\s+|,\s+|,", expand=True)
+    except (pd.errors.ParserError, AttributeError, ValueError):
+        df = pd.read_csv(file, header=None, sep="\s+|\n|\t|,")
+        df = df[0].str.split("\s+|,\s+|,|;|;\s+", expand=True)
         return df
     except:
-        df = pd.read_csv(file, header=None, sep='\t', low_memory=False)
-        df = df[0].str.split("\s+|,\s+|,", expand=True)
+        df = None
         return df
 
 def get_direction(lane_number, df: pd.DataFrame) -> pd.DataFrame:
@@ -132,7 +132,7 @@ def push_to_db(df, table, subset) -> None:
 def create_database_tables():
     conn=config.CONN
     cur = conn.cursor()
-    cur.execute(q.CREATE_AXLE_GROU_MASS_GX)
+    cur.execute(q.CREATE_AXLE_GROUP_MASS_TABLE_GX)
     cur.execute(q.CREATE_AXLE_GROUP_CONFIG_TABLE_CX)
     cur.execute(q.CREATE_AXLE_MASS_TABLE_AX)
     cur.execute(q.CREATE_AXLE_GROUP_MASS_TABLE_GX)
@@ -233,34 +233,6 @@ def create_database_tables():
     cur.execute(q.CREATE_WHEEL_MASS_TABLE_WX)
     cur.commit()
     cur.close()
-
-def dropDuplicatesDoSomePostProcesingAndSaveCsv(csv_label: str):
-    df = pd.DataFrame()
-    for i in pd.read_csv(
-        os.path.expanduser(
-            f"~\Desktop\Temp\rsa_traffic_counts\TEMP_E_COUNT_{csv_label}.csv"
-        ),
-        chunksize=50000,
-        error_bad_lines=False,
-        low_memory=False,
-    ):
-        df = pd.concat([df, i])
-        df = df.drop_duplicates()
-    cols = df.columns.tolist()
-    df2 = pd.DataFrame(columns=cols)
-    df2.to_csv(
-        os.path.expanduser(
-            f"~\Desktop\Temp\rsa_traffic_counts\TEMP_E_COUNT_{csv_label}.csv"
-        ),
-        header=True,
-    )
-    df.to_csv(
-        os.path.expanduser(
-            f"~\Desktop\Temp\rsa_traffic_counts\TEMP_E_COUNT_{csv_label}.csv"
-        ),
-        mode="a",
-        header=False,
-    )
 
 def convert_float_to_int(df):
     m = df.select_dtypes(np.number)

@@ -3,168 +3,232 @@ import numpy as np
 from datetime import timedelta, date
 import uuid
 
-class Headers(object):
-    def __init__(self, df: pd.DataFrame, file: str):
-        self.df = Headers.get_head(df)
-        self.header_df = Headers.headers(self.df, file)
-        # self.headers_old = Headers.headers_insert_min(self.df, file)
-        self.lanes = Headers.lanes(self.df)
+# class Headers(object):
+#     def __init__(self, df: pd.DataFrame, file: str):
+#         self.df = Headers.get_head(df)
+#         self.header_df = Headers.headers(self.df, file)
+#         # self.headers_old = Headers.headers_insert_min(self.df, file)
+#         self.lanes = Headers.lanes(self.df)
 
-    def get_head(df) -> pd.DataFrame:
-        df = pd.DataFrame(
-            df.loc[
-                (df[0].isin(["H0", "S0", "I0", "S1", "D0", "D1", "D3", "L0", "L1", "L2", "L3","L4" ,"L5","L6","L7","L8","L9","L10","L11","L12"]))
-                | (
-                    (df[0].isin(["21", "70", "30", "13", "60"]))
-                    & (~df[1].isin(["0", "1", "2", "3", "4"]))
-                )
-                | (
-                    (df[0].isin(["10"]))
-                    & (df[1].isin(["1", "8", "5", "9", "01", "08", "05", "09"]))
-                )
-            ]
-        ).dropna(axis=1, how="all").reset_index(drop=True)
-        return df
+def get_head(df) -> pd.DataFrame:
+    df = pd.DataFrame(df.loc[
+            (df[0].isin(["H0", "S0", "I0", "S1", "D0", "D1", "D3", "L0", "L1", "L2", "L3","L4" ,"L5","L6","L7","L8","L9","L10","L11","L12"]))
+            | (
+                (df[0].isin(["21", "70", "30", "13", "60"]))
+                & (~df[1].isin(["0", "1", "2", "3", "4"]))
+            )
+            | (
+                (df[0].isin(["10"]))
+                & (df[1].isin(["1", "8", "5", "9", "01", "08", "05", "09"]))
+            )
+        ]
+    ).dropna(axis=1, how="all").reset_index(drop=True)
+    return df
 
-    def headers(df: pd.DataFrame, file: str) -> pd.DataFrame:
-        header_start_end = df.loc[df[0].isin(["D1","D3"]), 0:4].copy()
+def header(df: pd.DataFrame, file: str) -> pd.DataFrame:
+    header_start_end = df.loc[df[0].isin(["D1","D3"]), 0:4].reset_index(drop=True).copy()
 
-        # adds centry to year if it is not there
-        header_start_end[1] = header_start_end[1].apply(lambda x: str(date.today())[:2] + x if len(x)==6 else x)
-        header_start_end[3] = header_start_end[3].apply(lambda x: str(date.today())[:2] + x if len(x)==6 else x)
+    # adds century to year if it is not there
+    header_start_end[1] = header_start_end[1].apply(lambda x: str(date.today())[:2] + x if len(x)==6 else x)
+    header_start_end[3] = header_start_end[3].apply(lambda x: str(date.today())[:2] + x if len(x)==6 else x)
 
-        # index 2 and 4 are time, this makes the time uniform length
-        header_start_end[2] = header_start_end[2].str.pad(width=7,side='right',fillchar="0")
-        header_start_end[4] = header_start_end[4].str.pad(width=7,side='right',fillchar="0")
+    header_start_end[1] = header_start_end[1].str.pad(width=8, side='right', fillchar="0")
+    header_start_end[3] = header_start_end[3].str.pad(width=8, side='right', fillchar="0")
 
-        # this filters for time = 24H00m and makes it zero hour
-        header_start_end[2].loc[header_start_end[2].str[:2] == '24'] = ('0').zfill(7)
-        header_start_end[4].loc[header_start_end[4].str[:2] == '24'] = ('0').zfill(7)
+    # index 2 and 4 are time, this makes the time uniform length
+    header_start_end[2] = header_start_end[2].str.pad(width=7,side='right',fillchar="0")
+    header_start_end[4] = header_start_end[4].str.pad(width=7,side='right',fillchar="0")
 
-        # adds a day if the hour is zero hour and changes string to dtetime.date
-        header_start_end[1] = header_start_end[1].apply(lambda x: pd.to_datetime(x.str[:8], format="%Y%m%d").date() + timedelta(days=1)
+    # this filters for time = 24H00m and makes it zero hour
+    header_start_end[2].loc[header_start_end[2].str[:2] == '24'] = ('0').zfill(7)
+    header_start_end[4].loc[header_start_end[4].str[:2] == '24'] = ('0').zfill(7)
+
+    # adds a day if the hour is zero hour and changes string to dtetime.date
+    try:
+        header_start_end[1] = header_start_end[1].apply(lambda x: pd.to_datetime(x, format="%Y%m%d").date() + timedelta(days=1)
         if x[2] in ['0'.zfill(7),'24'.zfill(7)] else pd.to_datetime(x, format="%Y%m%d").date())
-        header_start_end[3] = header_start_end[3].apply(lambda x: pd.to_datetime(x.str[:8], format="%Y%m%d").date() + timedelta(days=1)
+        header_start_end[3] = header_start_end[3].apply(lambda x: pd.to_datetime(x, format="%Y%m%d").date() + timedelta(days=1)
         if x[4] in ['0'.zfill(7),'24'.zfill(7)] else pd.to_datetime(x, format="%Y%m%d").date())
+    # except ValueError:
+    #     header_start_end[1] = header_start_end[1].apply(lambda x: pd.to_datetime(x[:8], format="%Y%m%d").date() + timedelta(days=1)
+    #     if x[2] in ['0'.zfill(7),'24'.zfill(7)] else pd.to_datetime(x[:8], format="%Y%m%d").date())
+    #     header_start_end[3] = header_start_end[3].apply(lambda x: pd.to_datetime(x[:8], format="%Y%m%d").date() + timedelta(days=1)
+    #     if x[4] in ['0'.zfill(7),'24'.zfill(7)] else pd.to_datetime(x[:8], format="%Y%m%d").date())
+    except:
+        pass
 
-        # changes time string into datetime.time
+# changes time string into datetime.time
+    try:
         header_start_end[2] = header_start_end[2].apply(lambda x: pd.to_datetime(x, format="%H%M%S%f").time())
         header_start_end[4] = header_start_end[4].apply(lambda x: pd.to_datetime(x, format="%H%M%S%f").time())
+    except ValueError:
+        header_start_end[2] = header_start_end[2].apply(lambda x: pd.to_datetime(x[:7], format="%H%M%S%f").time())
+        header_start_end[4] = header_start_end[4].apply(lambda x: pd.to_datetime(x[:7], format="%H%M%S%f").time())
+    except:
+        pass
 
-        # creates start_datetime and end_datetime
-        try:
-            header_start_end["start_datetime"] = pd.to_datetime((header_start_end[1].astype(str)+header_start_end[2].astype(str)), 
-                format='%Y-%m-%d%H:%M:%S')
-            header_start_end["end_datetime"] = pd.to_datetime((header_start_end[3].astype(str)+header_start_end[4].astype(str)), 
-                format='%Y-%m-%d%H:%M:%S')
-        except ValueError:
-            header_start_end["start_datetime"] = pd.to_datetime((header_start_end[1].astype(str)+header_start_end[2].astype(str)).str[:18], 
-                format='%Y-%m-%d%H:%M:%S')
-            header_start_end["end_datetime"] = pd.to_datetime((header_start_end[3].astype(str)+header_start_end[4].astype(str)).str[:18], 
-                format='%Y-%m-%d%H:%M:%S') + timedelta(seconds=1)
+    # creates start_datetime and end_datetime
+    try:
+        header_start_end["start_datetime"] = pd.to_datetime((header_start_end[1].astype(str)+header_start_end[2].astype(str)), 
+            format='%Y-%m-%d%H:%M:%S')
+        header_start_end["end_datetime"] = pd.to_datetime((header_start_end[3].astype(str)+header_start_end[4].astype(str)), 
+            format='%Y-%m-%d%H:%M:%S')
+    except Exception:
+        pass
 
 
-        header_start_end = header_start_end.iloc[:,1:].drop_duplicates()
+    header_start_end = header_start_end.iloc[:,1:].drop_duplicates()
 
-        headers = pd.DataFrame()
+    headers = pd.DataFrame()
+    try:
         headers['start_datetime'] = header_start_end.groupby(header_start_end['start_datetime'].dt.year).min()['start_datetime']
         headers['end_datetime'] = header_start_end.groupby(header_start_end['end_datetime'].dt.year).max()['end_datetime']
-        headers['site_id'] = df.loc[df[0] == "S0",1].drop_duplicates().reset_index(drop=True)[0]
-        headers['document_url'] = file
+    except:
+        pass
 
-        headers["header_id"] = ""
-        headers["header_id"] = headers["header_id"].apply(
-                    lambda x: str(uuid.uuid4()))
-        
-        headers['year'] = headers['start_datetime'].dt.year
+    headers['site_id'] = df.loc[df[0] == "S0",1].drop_duplicates().reset_index(drop=True)[0]
+    headers['site_id'] = headers['site_id'].astype(str)
+    headers['document_url'] = file
 
-        headers["number_of_lanes"] = int(df.loc[df[0] == "L0", 2].drop_duplicates().reset_index(drop=True)[0])
-        
-        station_name = df.loc[df[0].isin(["S0"]), 3:].reset_index(drop=True).drop_duplicates().dropna(axis=1)
-        headers["station_name"] = station_name[station_name.columns].apply(lambda row: ' '.join(row.values.astype(str)), axis=1)
+    headers["header_id"] = ""
+    headers["header_id"] = headers["header_id"].apply(
+                lambda x: str(uuid.uuid4()))
+    
+    headers['year'] = headers['start_datetime'].dt.year
 
-        t21 = df.loc[df[0]=="21"].dropna(axis=1).drop_duplicates().reset_index().copy()
-        t21 = t21.iloc[:,(t21.shape[1])-9:].astype(int)
-        t21.columns = range(t21.columns.size)
-        t21 = t21.rename(columns={
-            0:'speedbin1',
-            1:'speedbin2',
-            2:'speedbin3',
-            3:'speedbin4',
-            4:'speedbin5',
-            5:'speedbin6',
-            6:'speedbin7',
-            7:'speedbin8',
-            8:'speedbin9'})
+    headers["number_of_lanes"] = int(df.loc[df[0] == "L0", 2].drop_duplicates().reset_index(drop=True)[0])
+    
+    station_name = df.loc[df[0].isin(["S0"]), 3:].reset_index(drop=True).drop_duplicates().dropna(axis=1)
+    headers["station_name"] = station_name[station_name.columns].apply(lambda row: ' '.join(row.values.astype(str)), axis=1)
 
-        headers = pd.concat([headers,t21],ignore_index=True,axis=0).bfill().ffill().drop_duplicates()
-        
-        try:
-            headers["type_21_count_interval_minutes"] = int(df.loc[df[0]=="21",1].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_30_summary_interval_minutes"] = int(df.loc[df[0]=="21",1].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_70_summary_interval_minutes"] = int(df.loc[df[0]=="21",1].drop_duplicates().reset_index(drop=True)[0])
-        except KeyError:
-            pass
-        try:
-            headers["type_30_summary_interval_minutes"] = int(df.loc[df[0]=="30",1].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_21_count_interval_minutes"] = int(df.loc[df[0]=="30",1].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_70_summary_interval_minutes"] = int(df.loc[df[0]=="30",1].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_30_vehicle_classification_scheme"] = int(df.loc[df[0] == "30", 3].drop_duplicates().reset_index(drop=True)[0])
-        except KeyError:
-            pass
-        try:
-            headers["type_30_summary_interval_minutes"] = int(df.loc[df[0]=="70",1].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_21_count_interval_minutes"] = int(df.loc[df[0]=="70",1].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_70_summary_interval_minutes"] = int(df.loc[df[0]=="70",1].drop_duplicates().reset_index(drop=True)[0])
-        except KeyError:
-            pass
+    t21 = df.loc[df[0]=="21"].dropna(axis=1).drop_duplicates().reset_index().copy()
+    t21 = t21.iloc[:,(t21.shape[1])-9:].astype(int)
+    t21.columns = range(t21.columns.size)
+    t21 = t21.rename(columns={
+        0:'speedbin1',
+        1:'speedbin2',
+        2:'speedbin3',
+        3:'speedbin4',
+        4:'speedbin5',
+        5:'speedbin6',
+        6:'speedbin7',
+        7:'speedbin8',
+        8:'speedbin9'})
 
-        try:
-            headers['dir1_id'] = int(df[df[0]=="L1"].dropna(axis=1).drop_duplicates().reset_index(drop=True)[2].min())
-            headers['dir2_id'] = int(df[df[0]=="L1"].dropna(axis=1).drop_duplicates().reset_index(drop=True)[2].max())
-        except (KeyError, ValueError):
-            headers['dir1_id'] = 0
-            headers['dir2_id'] = 4
+    headers = pd.concat([headers,t21],ignore_index=True,axis=0).bfill().ffill().drop_duplicates()
+    
+    try:
+        headers["type_21_count_interval_minutes"] = int(df.loc[df[0]=="21",1].drop_duplicates().reset_index(drop=True)[0])
+        headers["type_30_summary_interval_minutes"] = int(df.loc[df[0]=="21",1].drop_duplicates().reset_index(drop=True)[0])
+        headers["type_70_summary_interval_minutes"] = int(df.loc[df[0]=="21",1].drop_duplicates().reset_index(drop=True)[0])
+    except KeyError:
+        pass
+    try:
+        headers["type_30_summary_interval_minutes"] = int(df.loc[df[0]=="30",1].drop_duplicates().reset_index(drop=True)[0])
+        headers["type_21_count_interval_minutes"] = int(df.loc[df[0]=="30",1].drop_duplicates().reset_index(drop=True)[0])
+        headers["type_70_summary_interval_minutes"] = int(df.loc[df[0]=="30",1].drop_duplicates().reset_index(drop=True)[0])
+        headers["type_30_vehicle_classification_scheme"] = int(df.loc[df[0] == "30", 3].drop_duplicates().reset_index(drop=True)[0])
+    except KeyError:
+        pass
+    try:
+        headers["type_30_summary_interval_minutes"] = int(df.loc[df[0]=="70",1].drop_duplicates().reset_index(drop=True)[0])
+        headers["type_21_count_interval_minutes"] = int(df.loc[df[0]=="70",1].drop_duplicates().reset_index(drop=True)[0])
+        headers["type_70_summary_interval_minutes"] = int(df.loc[df[0]=="70",1].drop_duplicates().reset_index(drop=True)[0])
+    except KeyError:
+        pass
 
-        try:
-            headers["type_70_vehicle_classification_scheme"] = int(df.loc[
-                df[0] == "70", 2].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_70_maximum_gap_milliseconds"] = int(df.loc[
-                df[0] == "70", 3].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_70_maximum_differential_speed"] = int(df.loc[
-                df[0] == "70", 4].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_70_error_bin_code"] = int(df.loc[
-                df[0] == "70", 5].drop_duplicates().reset_index(drop=True)[0])
-        except KeyError:
-            pass
+    try:
+        headers['dir1_id'] = int(df[df[0]=="L1"].dropna(axis=1).drop_duplicates().reset_index(drop=True)[2].min())
+        headers['dir2_id'] = int(df[df[0]=="L1"].dropna(axis=1).drop_duplicates().reset_index(drop=True)[2].max())
+    except (KeyError, ValueError):
+        headers['dir1_id'] = 0
+        headers['dir2_id'] = 4
 
-        try:
-            headers["type_10_vehicle_classification_scheme_primary"] = int(df.loc[
-                df[0] == "10", 1].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_10_vehicle_classification_scheme_secondary"] = int(df.loc[
-                df[0] == "10", 2].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_10_maximum_gap_milliseconds"] = int(df.loc[
-                df[0] == "10", 3].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_10_maximum_differential_speed"] = int(df.loc[
-                df[0] == "10", 4].drop_duplicates().reset_index(drop=True)[0])
-        except KeyError:
-            pass
+    try:
+        headers["type_70_vehicle_classification_scheme"] = int(df.loc[
+            df[0] == "70", 2].drop_duplicates().reset_index(drop=True)[0])
+        headers["type_70_maximum_gap_milliseconds"] = int(df.loc[
+            df[0] == "70", 3].drop_duplicates().reset_index(drop=True)[0])
+        headers["type_70_maximum_differential_speed"] = int(df.loc[
+            df[0] == "70", 4].drop_duplicates().reset_index(drop=True)[0])
+        headers["type_70_error_bin_code"] = int(df.loc[
+            df[0] == "70", 5].drop_duplicates().reset_index(drop=True)[0])
+    except KeyError:
+        pass
 
-        headers = headers.reset_index(drop=True)
+    try:
+        headers["type_10_vehicle_classification_scheme_primary"] = int(df.loc[
+            df[0] == "10", 1].drop_duplicates().reset_index(drop=True)[0])
+        headers["type_10_vehicle_classification_scheme_secondary"] = int(df.loc[
+            df[0] == "10", 2].drop_duplicates().reset_index(drop=True)[0])
+        headers["type_10_maximum_gap_milliseconds"] = int(df.loc[
+            df[0] == "10", 3].drop_duplicates().reset_index(drop=True)[0])
+        headers["type_10_maximum_differential_speed"] = int(df.loc[
+            df[0] == "10", 4].drop_duplicates().reset_index(drop=True)[0])
+    except KeyError:
+        pass
 
-        m = headers.select_dtypes(np.number)
-        headers[m.columns] = m.round().astype('Int32')
+    headers = headers.reset_index(drop=True)
 
-        return headers
+    m = headers.select_dtypes(np.number)
+    headers[m.columns] = m.round().astype('Int32')
 
-    def lanes(dfh: pd.DataFrame) -> pd.DataFrame:
-        if not dfh.empty:
-            lanes_df = dfh.loc[
-                (dfh[0].isin(["L0", "L1", "L2", "L3","L4" ,"L5","L6","L7","L8","L9","L10","L11","L12"]))
-            ]
+    return headers
+
+def lanes(df: pd.DataFrame) -> pd.DataFrame:
+    if not df.empty:
+        site_name = df.loc[df[0]=="S0", 1].iat[0]
+        df = df.loc[df[0]=="L1"].dropna(axis=1).drop_duplicates().reset_index(drop=True).copy()
+        if df.shape[1] == 5:
+            df.rename(columns={
+                1 : "lane_number",
+                2 : "direction_code",
+                3 : "lane_type_code",
+                4 : "traffic_stream_number"
+            })
+        elif df.shape[1] == 11:
+            df.rename(columns={
+                1 : "lane_number",
+                2 : "direction_code",
+                3 : "lane_type_code",
+                4 : "traffic_stream_number",
+                5 : "traffic_stream_lane_position",
+                6 : "reverse_direction_lane_number",
+                7 : "vehicle_code",
+                8 : "time_code",
+                9 : "length_code",
+                10 : "speed_code"
+            })
+        elif df.shape[1] == 17:
+            df.rename(columns={
+                1 : "lane_number",
+                2 : "direction_code",
+                3 : "lane_type_code",
+                4 : "traffic_stream_number",
+                5 : "traffic_stream_lane_position",
+                6 : "reverse_direction_lane_number",
+                7 : "vehicle_code",
+                8 : "time_code",
+                9 : "length_code",
+                10 : "speed_code",
+                11 : "occupancy_time_code",
+                12 : "vehicle_following_code",
+                13 : "trailer_code",
+                14 : "axle_code",
+                15 : "mass_code",
+                16 : "tyre_type_code"
+            })
         else:
-            pass
-        return lanes_df
+            df.rename(columns={
+                1 : "lane_number",
+                2 : "direction_code",
+                3 : "lane_type_code",
+                4 : "traffic_stream_number"
+            })
+        df['site_name'] = site_name
+    else:
+        pass
+    return df
 
 def header_insert(row):
     qry = f"""
