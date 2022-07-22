@@ -39,7 +39,7 @@ def to_df(file: str) -> pd.DataFrame:
         df = df[0].str.split("\s+|,\s+|,|;|;\s+", expand=True)
         return df
     except (pd.errors.ParserError, AttributeError, ValueError):
-        df = pd.read_csv(file, header=None, sep="\s+|\n|\t|,")
+        df = pd.read_csv(file, header=None, sep="\s+|\t")
         df = df[0].str.split("\s+|,\s+|,|;|;\s+", expand=True)
         return df
     except:

@@ -81,7 +81,7 @@ class Traffic():
             df = pd.read_csv(self.file, header=None)
             df = df[0].str.split("\s+|,\s+|,|;|;\s+", expand=True)
         except (pd.errors.ParserError, AttributeError, ValueError):
-            df = pd.read_csv(self.file, header=None, sep="\s+|\n|\t|,", engine='python')
+            df = pd.read_csv(self.file, header=None, sep="\s+|\t", engine='python')
             df = df[0].str.split("\s+|,\s+|,|;|;\s+", expand=True)
         except Exception as exc:
             print(exc)
@@ -93,7 +93,7 @@ class Traffic():
                 (df[0].isin(["H0", "S0", "I0", "S1", "D0", "D1", "D3", "L0", "L1"]))
                 | (
                     (df[0].isin(["21", "70", "30", "13", "60"]))
-                    & (df.loc[df[2].isin(["21", "70", "30", "13", "60"])][3].astype(int) < 24)
+                    & (df.loc[df[2].isin(["21", "70", "30", "13", "60"])][3].astype(int) < 80)
                 )
                 | (
                     (df[0].isin(["10"]))
@@ -111,7 +111,7 @@ class Traffic():
             & (
                 (df[0].isin(["21", "22", "70", "30", "31", "13", "60"]))
                 & (df[1].isin(["0", "1", "2", "3", "4"]))
-                & ((df.loc[df[3].str.len() > 3]).all()[0])
+                & (df.loc[df[2].isin(["21", "70", "30", "13", "60"])][3].astype(int) > 80)
             )
         ]).dropna(axis=1, how="all").reset_index(drop=True).copy()
         
