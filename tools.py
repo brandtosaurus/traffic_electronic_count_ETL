@@ -223,7 +223,7 @@ def postgres_upsert(table, conn, keys, data_iter):
 def create_database_tables():
     conn=config.CONN
     cur = conn.cursor()
-    cur.execute(q.CREATE_AXLE_GROU_MASS_GX)
+    cur.execute(q.CREATE_AXLE_GROUP_MASS_TABLE_GX)
     cur.execute(q.CREATE_AXLE_GROUP_CONFIG_TABLE_CX)
     cur.execute(q.CREATE_AXLE_MASS_TABLE_AX)
     cur.execute(q.CREATE_AXLE_GROUP_MASS_TABLE_GX)
