@@ -67,10 +67,9 @@ class Traffic():
         self.site_id = self.head_df.loc[self.head_df[0]=="S0", 1].iat[0]
         self.lanes = self.get_lanes(self.head_df)
         self.header_df = self.header(self.head_df)
-        self.sum_data_df = self.get_sum_data(self.df)
-        self.sum_data_df = self.process_data_datetimes(self.sum_data_df)
-        self.sum_data_df = self.get_direction(self.sum_data_df)
-        self.indv_data_df = self.get_indv_data(self.df)
+        self.data_df = self.get_data(self.df)
+        self.data_df = self.process_datetimes(self.data_df)
+        self.data_df = self.get_direction(self.data_df)
         self.t21_table = config.TYPE_21_TBL_NAME
         self.t30_table = config.TYPE_30_TBL_NAME
         self.t70_table = config.TYPE_70_TBL_NAME
@@ -78,13 +77,10 @@ class Traffic():
 
     def to_df(self) -> pd.DataFrame:
         try:
-            df = pd.read_csv(self.file, header=None)
-            df = df[0].str.split("\s+|,\s+|,|;|;\s+", expand=True)
-        except (pd.errors.ParserError, AttributeError, ValueError):
-            df = pd.read_csv(self.file, header=None, sep="\s+|\t", engine='python')
+            df = pd.read_csv(self.file, header=None, sep="\s+", engine='python')
             df = df[0].str.split("\s+|,\s+|,|;|;\s+", expand=True)
         except Exception as exc:
-            print(exc)
+            raise Exception("to_df function did not work properly: "+exc)
         return df
 
     def get_head(self, df) -> pd.DataFrame:
@@ -105,27 +101,19 @@ class Traffic():
             traceback.print_exc()
         return df
 
-    def get_sum_data(self, df: pd.DataFrame)-> pd.DataFrame:
+    def get_data(self, df: pd.DataFrame)-> pd.DataFrame:
         df = pd.DataFrame(df.loc[
             (~df[0].isin(["H0", "H9", "S0", "I0", "S1", "D0", "D1", "D3", "L0", "L1"]))
-            & (
+            & ((
                 (df[0].isin(["21", "22", "70", "30", "31", "13", "60"]))
                 & (df[1].isin(["0", "1", "2", "3", "4"]))
-                & (df.loc[df[2].isin(["21", "70", "30", "13", "60"])][3].astype(int) > 80)
-            )
-        ]).dropna(axis=1, how="all").reset_index(drop=True).copy()
-        
-        return df
-
-    def get_indv_data(self, df: pd.DataFrame)-> pd.DataFrame:
-        df = pd.DataFrame(df.loc[
-            (~df[0].isin(["H0", "H9", "S0", "I0", "S1", "D0", "D1", "D3", "L0", "L1"]))
-            & (
+                & (df.loc[df[0].isin(["21", "70", "30", "13", "60"])][3].astype(int) > 80)
+            ) | (
                 (df[0].isin(["10"]))
                 & (~df[1].isin(["1", "8", "5", "9", "01", "08", "05", "09"]))
-                & ((df.loc[df[3].str.len() > 3]).all()[0])
-            )
-        ]).dropna(axis=1, how="all").reset_index(drop=True).copy()
+                & (df.loc[df[0].isin(["10"])][4].astype(int) > 80)
+            ))           
+            ]).dropna(axis=1, how="all").reset_index(drop=True).copy()
         
         return df
 
@@ -134,6 +122,7 @@ class Traffic():
             lanes = df.loc[
                 df[0]=="L1"
                 ].dropna(axis=1).drop_duplicates().reset_index(drop=True).copy()
+            lanes = lanes.drop([17, 18, 19, 20, 21, 22, 23, 24, 25], axis=1, errors='ignore')
             if lanes.shape[1] == 5:
                 lanes.rename(columns={
                     1 : "lane_number",
@@ -188,75 +177,104 @@ class Traffic():
             pass
         return lanes
 
-    def process_data_datetimes(self, df: pd.DataFrame) -> pd.DataFrame:
-        date_length = len(df[2].at[0])
-        duration_min = int(df[4].at[0])
+    def process_datetimes(self, df: pd.DataFrame) -> pd.DataFrame:
+        if df.loc[df[0]=="10"].empty:
+            duration_min = int(df[4].at[0])
+            date_col = 2
+            time_col = 3
+            add_day = 1
+            date_col_name = "end_date"
+            time_col_name = "end_time"
+            typ = "sum"
+        else:
+            date_col = 4
+            time_col = 5
+            duration_min = 0
+            add_day = 0
+            date_col_name = "departure_date"
+            time_col_name = "departure_time"
+            typ = "indv"
+        date_format = "%Y-%m-%d" # 2021-12-01
+        time_format = "%H:%M:%S.%f" # 00:00:00.00
+            
+        date_length = len(df[date_col].at[0])
 
-        # df[2] is date
-        # df[3] is time
+        df[time_col] = df[time_col].astype(str)
 
-        df[3] = df[3].astype(str)
-
-        df[3] = df[3].str.pad(width=6,side='right',fillchar="0")
-        df[3].loc[df[3].str[:2] == '24'] = ('0').zfill(6)
+        df[time_col] = df[time_col].str.pad(width=7,side='right',fillchar="0")
+        df[time_col].loc[df[time_col].str[:2] == '24'] = ('0').zfill(7)
 
         if date_length == 6:
-            decade = int(df[2].at[0][:2])
+            decade = int(df[date_col].at[0][:2])
             if decade < 50:
                 century = str(date.today())[:2]
             else:
                 century = int(str(date.today())[:2])-1
-
-            df[2] = str(century) + df[2]
-            df[2] = df[2].apply(lambda x: pd.to_datetime(x, format="%Y%m%d").date() + timedelta(days=1)
-                if x[3] in ['0'.zfill(6),'24'.ljust(6,'0')] else pd.to_datetime(x, format="%Y%m%d").date())
+            df[date_col] = str(century) + df[date_col]
         elif date_length == 8:
-            df[2] = df[2].apply(lambda x: pd.to_datetime(x, format="%Y%m%d").date() + timedelta(days=1)
-                if x[3] in ['0'.zfill(6),'24'.ljust(6,'0')] else pd.to_datetime(x, format="%Y%m%d").date())
+            pass
         else:
-            raise Exception("DATA Date length abnormal")
+            raise Exception("DATA Date length abnormal. length = "+str(date_length))
 
-        df[3] = df[3].apply(lambda x: pd.to_datetime(x, format="%H%M%S%f").time())
+        if typ == "indv":
+            df[date_col] = pd.to_datetime(df[date_col], format="%Y%m%d").dt.strftime(date_format)
+        else:
+            df[date_col] = df[date_col].apply(lambda x: pd.to_datetime(
+                x, format="%Y%m%d").date() + timedelta(days=add_day)
+                if x[time_col] in ['0'.zfill(7),'24'.ljust(7,'0')] 
+                else pd.to_datetime(x, format="%Y%m%d").date())
 
-        try:
-            df['end_datetime'] = pd.to_datetime((df[2].astype(str)+df[3].astype(str)), 
-                format='%Y-%m-%d%H:%M:%S')
-        except ValueError:
-            df['end_datetime'] = pd.to_datetime((df[2].astype(str)+df[3].astype(str)), 
-                format='%Y-%m-%d%H:%M:%S.%f')
+        df[time_col] = pd.to_datetime(df[time_col], format="%H%M%S%f").dt.strftime(time_format)
+        print((df[date_col].astype(str)+df[time_col].astype(str)).head())
 
-        try:
-            df['start_datetime'] = pd.to_datetime((df[2].astype(str)+df[3].astype(str)), 
-                format='%Y-%m-%d%H:%M:%S') - timedelta(minutes=duration_min)
-        except ValueError:
-            df['start_datetime'] = pd.to_datetime((df[2].astype(str)+df[3].astype(str)), 
-                format='%Y-%m-%d%H:%M:%S%f') - timedelta(minutes=duration_min)
+
+        df['end_datetime'] = pd.to_datetime((df[date_col].astype(str)+df[time_col].str[:10].astype(str)), 
+            format=date_format+time_format)
+
+        df['start_datetime'] = pd.to_datetime((df[date_col].astype(str)+df[time_col].str[:10].astype(str)), 
+            format=date_format+time_format) - timedelta(minutes=duration_min)
 
         df.rename(columns={
-            2:"end_date",
-            3:"end_time"
+            date_col: date_col_name,
+            time_col: time_col_name
         },inplace = True)
-
         return df
 
     def get_direction(self, df):
         try:
-            dir_1 = self.lanes["lane_number"].astype(int).min()
-            dir_2 = self.lanes["lane_number"].astype(int).max()
+            dir_1 = self.lanes["direction_code"].astype(int).min()
+            dir_2 = self.lanes["direction_code"].astype(int).max()
         except (TypeError,ValueError):
             dir_1 = 0
             dir_2 = 4
 
-        df['direction'] = df[5]
-        df['compass_heading'] = df[5]
-        df['direction_code'] = df[5]
-        df['direction'].loc[df[5].isin(list(self.lanes['lane_number'].astype(str).loc[self.lanes['direction_code']==dir_1]))] = 'P'
-        df['direction'].loc[df[5].isin(list(self.lanes['lane_number'].astype(str).loc[self.lanes['direction_code']==dir_2]))] = 'N'
-        df['compass_heading'].loc[df[5].isin(list(self.lanes['lane_number'].astype(str).loc[self.lanes['direction_code']==dir_1]))] = str(dir_1)
-        df['compass_heading'].loc[df[5].isin(list(self.lanes['lane_number'].astype(str).loc[self.lanes['direction_code']==dir_2]))] = str(dir_2)
-        df['direction_code'].loc[df[5].isin(list(self.lanes['lane_number'].astype(str).loc[self.lanes['direction_code']==dir_1]))] = str(dir_1)
-        df['direction_code'].loc[df[5].isin(list(self.lanes['lane_number'].astype(str).loc[self.lanes['direction_code']==dir_2]))] = str(dir_2)
-        
+        if df.loc[df[0]=="10"].empty:
+            lane_col = 5
+        else:
+            lane_col = 6
+
+        df['direction'] = df[lane_col].astype(int)
+        df['compass_heading'] = df[lane_col].astype(int)
+        df['direction_code'] = df[lane_col].astype(int)
+        df['direction'].loc[df[lane_col].astype(int).isin(
+            list(lanes['lane_number'].astype(int).loc[lanes['direction_code'].astype(int) == dir_1])
+            )] = 'P'
+        df['direction'].loc[df[lane_col].astype(int).isin(
+            list(lanes['lane_number'].astype(int).loc[lanes['direction_code'].astype(int) == dir_2])
+            )] = 'N'
+        df['compass_heading'].loc[df[lane_col].astype(int).isin(
+            list(lanes['lane_number'].astype(int).loc[lanes['direction_code'].astype(int) == dir_1])
+            )] = str(dir_1)
+        df['compass_heading'].loc[df[lane_col].astype(int).isin(
+            list(lanes['lane_number'].astype(int).loc[lanes['direction_code'].astype(int) == dir_2])
+            )] = str(dir_2)
+        df['direction_code'].loc[df[lane_col].astype(int).isin(
+            list(lanes['lane_number'].astype(int).loc[lanes['direction_code'].astype(int) == dir_2])
+            )] = str(dir_2)
+        df['direction_code'].loc[df[lane_col].astype(int).isin(
+            list(lanes['lane_number'].astype(int).loc[lanes['direction_code'].astype(int) == dir_1])
+            )] = str(dir_1)
+
         return df
 
     def header(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -401,10 +419,10 @@ class Traffic():
         return headers
 
     def type_21(self) -> pd.DataFrame:
-        if self.sum_data_df is None:
+        if self.data_df is None:
             pass
         else:
-            data = self.sum_data_df.loc[(self.sum_data_df[0] == "21")].dropna(
+            data = self.data_df.loc[(self.data_df[0] == "21")].dropna(
                 axis=1, how="all"
             ).reset_index(drop=True).copy()
 
@@ -544,10 +562,10 @@ class Traffic():
             return ddf
 
     def type_30(self) -> pd.DataFrame:
-        if self.sum_data_df is None:
+        if self.data_df is None:
             pass
         else:
-            data = self.sum_data_df.loc[(self.sum_data_df[0] == "30")].dropna(
+            data = self.data_df.loc[(self.data_df[0] == "30")].dropna(
                         axis=1, how="all"
                     ).reset_index(drop=True).copy()
             header = self.head_df.loc[(self.head_df[0] == "30")].dropna(
@@ -611,10 +629,10 @@ class Traffic():
             return df3
 
     def type_70(self) -> pd.DataFrame:
-        if self.sum_data_df is None:
+        if self.data_df is None:
             pass
         else:
-            data = self.sum_data_df.loc[(self.sum_data_df[0] == "70")].dropna(
+            data = self.data_df.loc[(self.data_df[0] == "70")].dropna(
                 axis=1, how="all"
             ).reset_index(drop=True).copy()
 
@@ -733,10 +751,10 @@ class Traffic():
             return ddf   
 
     def type_60(self) -> pd.DataFrame:
-        if self.sum_data_df is None:
+        if self.data_df is None:
             pass
         else:
-            data = self.sum_data_df.loc[(self.sum_data_df[0] == "60")].dropna(
+            data = self.data_df.loc[(self.data_df[0] == "60")].dropna(
                 axis=1, how="all"
             ).reset_index(drop=True).copy()
             dfh = self.head_df.loc[(self.head_df[0] == "60")].dropna(
@@ -800,21 +818,23 @@ class Traffic():
             return df3
 
     def type_10(self) -> pd.DataFrame:
-        if self.indv_data_df is None:
+        if self.data_df is None:
             pass
         else:
-            data = self.indv_data_df
-            # data = self.indv_data_df.loc[(self.indv_data_df[0] == "10")].dropna(
-            #     axis=1, how="all"
-            # ).reset_index(drop=True).copy()
+            # data = self.data_df
+            data = self.data_df.loc[(self.data_df[0] == "10")].dropna(
+                axis=1, how="all"
+            ).reset_index(drop=True).copy()
 
             num_of_fields = int(data.iloc[:,1].unique()[0])
             ddf = data.iloc[:,: 2 + num_of_fields]
 
-            cols = ['index']
-            for i in range(ddf.shape[1]-1):
-                cols.append(config.TYPE10_DATA_COLUMN_NAMES[i])
-            ddf = pd.DataFrame(ddf.values, columns=cols)
+            # cols = ['index']
+            # for i in range(ddf.shape[1]-1):
+            #     cols.append(config.TYPE10_DATA_COLUMN_NAMES[i])
+            # ddf = pd.DataFrame(ddf.values, columns=cols)
+            ddf.rename(columns=config.RENAME_TYPE10_DATA_COLUMNS, inplace=True, errors='ignore')
+
             ddf["data_id"] = ddf.apply(lambda x: uuid.uuid4(), axis=1)
 
             if data.shape[1] > ddf.shape[1]:
@@ -884,44 +904,6 @@ class Traffic():
             ddf["assigned_lane_number"] = ddf["assigned_lane_number"].astype(int)
             ddf["lane_number"] = ddf["physical_lane_number"].astype(int)
             ddf["physical_lane_number"] = ddf["physical_lane_number"].astype(int)
-            
-            max_lanes = self.lanes['lane_number'].max()
-
-            try:
-                dir_1 = self.lanes["lane_number"].astype(int).min()
-                dir_2 = self.lanes["lane_number"].astype(int).max()
-            except (TypeError,ValueError):
-                dir_1 = 0
-                dir_2 = 4
-
-            ddf['direction'] = ddf[5]
-            ddf['compass_heading'] = ddf[5]
-            ddf['direction_code'] = ddf[5]
-            ddf['direction'].loc[ddf[5].isin(list(self.lanes['lane_number'].astype(str).loc[self.lanes['direction_code']==dir_1]))] = 'P'
-            ddf['direction'].loc[ddf[5].isin(list(self.lanes['lane_number'].astype(str).loc[self.lanes['direction_code']==dir_2]))] = 'N'
-            ddf['compass_heading'].loc[ddf[5].isin(list(self.lanes['lane_number'].astype(str).loc[self.lanes['direction_code']==dir_1]))] = str(dir_1)
-            ddf['compass_heading'].loc[ddf[5].isin(list(self.lanes['lane_number'].astype(str).loc[self.lanes['direction_code']==dir_2]))] = str(dir_2)
-            ddf['direction_code'].loc[ddf[5].isin(list(self.lanes['lane_number'].astype(str).loc[self.lanes['direction_code']==dir_1]))] = str(dir_1)
-            ddf['direction_code'].loc[ddf[5].isin(list(self.lanes['lane_number'].astype(str).loc[self.lanes['direction_code']==dir_2]))] = str(dir_2)
-
-            if ddf["departure_date"].map(len).isin([8]).all():
-                ddf["start_datetime"] = pd.to_datetime(
-                    ddf["departure_date"] + ddf["departure_time"],
-                    format="%Y%m%d%H%M%S%f",
-                )
-            elif ddf["departure_date"].map(len).isin([6]).all():
-                ddf["start_datetime"] = pd.to_datetime(
-                    ddf["departure_date"] + ddf["departure_time"],
-                    format="%y%m%d%H%M%S%f",
-                )
-            ddf['year'] = ddf['start_datetime'].dt.year
-            ddf["site_id"] = self.site_id
-            ddf["site_id"] = ddf["site_id"].astype(str)
-
-            ddf['departure_time'] = pd.to_datetime(ddf['departure_time'], format='%H%M%S%f')
-
-            ddf = ddf.drop_duplicates()
-            ddf["start_datetime"] = ddf["start_datetime"].astype("datetime64[ns]")
 
             ddf = ddf.replace(r'^\s*$', np.NaN, regex=True)
             sub_data_df = sub_data_df.replace(r'^\s*$', np.NaN, regex=True)
@@ -929,6 +911,9 @@ class Traffic():
 
             scols = ddf.select_dtypes('object').columns
             ddf[scols] = ddf[scols].apply(pd.to_numeric, axis=1, errors='ignore')
+
+            ddf['year'] = ddf['start_datetime'].dt.year
+            ddf["site_id"] = self.site_id
 
             ddf = ddf[ddf.columns.intersection(config.TYPE10_DATA_TABLE_COL_LIST)]
 
@@ -2552,7 +2537,7 @@ def main(file: str):
     header = T.header_df
 
     if header is None:
-        pass
+        raise Exception("check get_head and header methods: header returned NoneType")
     else:
         lanes = T.lanes
         lanes = lanes[lanes.columns.intersection(lane_cols)]
@@ -2595,16 +2580,15 @@ def main(file: str):
         else:
             pass
 
-        # data = T.type_10()
-        # if data.empty:
-        #     pass
-        # else:
-        #     try:
-        #         data, sub_data = T.type_10()
-        #         header = T.header_calcs(header, type_10_data, 10)
-        #         type_10_data = main_type10(data, sub_data, file)
-        #     except:
-        #         pass
+        if head_df.loc[head_df[0] == "10"].empty:
+            pass
+        else:
+            try:
+                data, sub_data = T.type_10()
+                header = T.header_calcs(header, type_10_data, 10)
+                type_10_data = main_type10(data, sub_data, file)
+            except:
+                pass
 
         if header is not None:
             try:
@@ -2628,27 +2612,15 @@ if __name__ == "__main__":
     PATH = config.PATH
     PATH = r"C:\PQ410"
     testfile = r"C:\FTP\Syntell\0087_20220331.RSA"
-        
+    t10_file = r"C:\FTP\Syntell\SMEC RSV Files_GP PRM Sites_Dec21toFeb22_individuals\0006-20211231.RSV"
+
+    # MAIN EXECUTABLE 
     # run_multiprocess(PATH)
 
-        # time.sleep(10)
-        # run_multiprocess(PATH)
+    # RUN INDIVIDUALLY IF ANY PROBLEMS WITH MULTIPROCESSING TO FIND THE ISSUE
+    # run_individually(PATH)
 
-    run_individually(PATH)
-
-    # T = Traffic(testfile)
-    # head_df = T.head_df
-    # d = T.sum_data_df
-    # t30 = T.type_30()
-    # t10 = T.type_10()
-    # print(d.columns)
-
-    # data = d.loc[(d[0] == "30")].dropna(
-    #                 axis=1, how="all"
-    #             ).reset_index(drop=True).copy()
-    # print(data)
-    # print(t10)
-    # print(t30)
-    # print(int(d['start_datetime'].at[0].year))
+    # TEST INDIVIDUAL FILE BELOW FOR DEBUGGING
+    main(t10_file)
     
     print("COMPLETE")

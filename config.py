@@ -79,3 +79,53 @@ CONN = psycopg2.connect(
     password=DB_PASS,
     host=DB_HOST,
     port=DB_PORT)
+
+TYPE10_DATA_COLUMN_NAMES = [
+"data_type_code",
+"number_of_fields_associated_with_the_basic_vehicle_data",
+"data_source_code",
+"edit_code",
+"departure_date",
+"departure_time",
+"assigned_lane_number",
+"physical_lane_number",
+"forward_reverse_code",
+"vehicle_category",
+"vehicle_class_code_primary_scheme",
+"vehicle_class_code_secondary_scheme",
+"vehicle_speed",
+"vehicle_length",
+"site_occupancy_time_in_milliseconds",
+"chassis_height_code",
+"vehicle_following_code",
+"vehicle_tag_code",
+"trailer_count",
+"axle_count",
+"bumper_to_1st_axle_spacing",
+"tyre_type"  
+]
+
+RENAME_TYPE10_DATA_COLUMNS = {
+    0 : "data_type_code",
+    1 : "number_of_fields_associated_with_the_basic_vehicle_data",
+    2 : "data_source_code",
+    3 : "edit_code",
+    4 : "departure_date",
+    5 : "departure_time",
+    6 : "assigned_lane_number",
+    7 : "physical_lane_number",
+    8 : "forward_reverse_code",
+    9 : "vehicle_category",
+    10 : "vehicle_class_code_primary_scheme",
+    11 : "vehicle_class_code_secondary_scheme",
+    12 : "vehicle_speed",
+    13 : "vehicle_length",
+    14 : "site_occupancy_time_in_milliseconds",
+    15 : "chassis_height_code",
+    16 : "vehicle_following_code",
+    17 : "vehicle_tag_code",
+    18 : "trailer_count",
+    19 : "axle_count",
+    20 : "bumper_to_1st_axle_spacing",
+    21 : "tyre_type"
+}
