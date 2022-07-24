@@ -590,7 +590,10 @@ class Traffic():
                 ddf = data.iloc[:, 1:].dropna(axis=1, how="all").reset_index(drop=True)
 
                 duration_min = int(ddf[4][0])
-                max_lanes = self.lanes['lane_number'].astype(int).max()
+                try:
+                    max_lanes = int(self.lanes['lane_number'].astype(int).max())
+                except ValueError:
+                    max_lanes = int(self.lanes[[0,'lane_number']].drop_duplicates().count()[0])
 
                 ddf[ddf.select_dtypes(include=['object']).columns] = ddf[
                     ddf.select_dtypes(include=['object']).columns].apply(
@@ -611,7 +614,7 @@ class Traffic():
                     'class_number', 
                     'direction', 
                     'compass_heading'])
-                for lane_no in range(1, max_lanes+1):
+                for lane_no in range(1, int(max_lanes)+1):
                     for i in range(6,int(number_of_data_records)+6):
                         join_to_df3 = ddf.loc[ddf['5'].astype(int) == lane_no, ['1', 'start_datetime','end_date', 'end_time', '4', '5',str(i), 'direction', 'compass_heading']]
                         join_to_df3['class_number'] = i-5
@@ -776,7 +779,10 @@ class Traffic():
                     ddf.select_dtypes(include=['object']).columns
                     ].apply(pd.to_numeric, axis = 1, errors='ignore')
 
-                max_lanes = self.lanes['lane_number'].astype(int).max()
+                try:
+                    max_lanes = int(self.lanes['lane_number'].astype(int).max())
+                except ValueError:
+                    max_lanes = int(self.lanes[[0,'lane_number']].drop_duplicates().count()[0])
 
                 ddf.columns = ddf.columns.astype(str)
 
@@ -794,7 +800,7 @@ class Traffic():
                 'compass_heading'])
 
                 for i in range(6,int(number_of_data_records)+6):
-                    for lane_no in range(1, max_lanes+1):
+                    for lane_no in range(1, int(max_lanes)+1):
                         join_to_df3 = ddf.loc[ddf['5'].astype(int) == lane_no, [
                             '1', # edit_code
                             'start_datetime',
