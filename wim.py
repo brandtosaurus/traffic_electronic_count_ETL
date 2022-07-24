@@ -1,0 +1,1564 @@
+import queries as q
+import config
+import pandas as pd
+from psycopg2.errors import UniqueViolation, NotNullViolation, ExclusionViolation
+import pdb
+import traceback
+
+t10_cols = list(pd.read_sql_query(
+    q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_10_LIMIT1, config.ENGINE).columns)
+
+class Wim():
+    def __init__(self, data, header, header_id, site_id, pt_cols) -> None:
+        self.header_id = header_id
+        self.site_id = site_id
+        self.data_df = data
+        self.header = header
+        self.pt_cols = pt_cols
+        self.header_ids = self.get_headers_to_update()
+
+    def type_10(self) -> pd.DataFrame:
+        if self.data_df is None:
+            pass
+        else:
+            # data = self.data_df
+            data = self.data_df.loc[(self.data_df[0] == "10")].dropna(
+                axis=1, how="all"
+            ).reset_index(drop=True).copy()
+
+            num_of_fields = int(data.iloc[:,1].unique()[0])
+            ddf = data.iloc[:,: 2 + num_of_fields]
+
+            # cols = ['index']
+            # for i in range(ddf.shape[1]-1):
+            #     cols.append(config.TYPE10_DATA_COLUMN_NAMES[i])
+            # ddf = pd.DataFrame(ddf.values, columns=cols)
+            ddf.rename(columns=config.RENAME_TYPE10_DATA_COLUMNS, inplace=True, errors='ignore')
+
+            ddf["data_id"] = ddf.apply(lambda x: uuid.uuid4(), axis=1)
+
+            if data.shape[1] > ddf.shape[1]:
+                sub_data_df = pd.DataFrame(columns=['index','sub_data_type_code','offset_sensor_detection_code','mass_measurement_resolution_kg', 'number','value'])
+                for index, row in data.iterrows():
+                    col = int(row[1]) + 2
+                    while col < len(row) and row[col] != None:
+                        sub_data_type = row[col]
+                        col += 1
+                        NoOfType = int(row[col])        
+                        col +=1
+                        if sub_data_type[0].lower() in ['w','a','g']:
+                            odc = row[col]
+                            col += 1
+                            mmr = row[col]
+                            col +=1
+                            for i in range(0,NoOfType):
+                                tempdf = pd.DataFrame([[index,
+                                sub_data_type,
+                                odc,
+                                mmr,
+                                i + 1,
+                                row[col]]
+                                ], columns = ['index',
+                                'sub_data_type_code',
+                                'offset_sensor_detection_code',
+                                'mass_measurement_resolution_kg',
+                                'number',
+                                'value'
+                                ])
+                                sub_data_df = pd.concat([sub_data_df, tempdf])
+                                col += 1
+                        elif sub_data_type[0].lower() in ['s','t','c']:
+                            for i in range(0,NoOfType):
+                                tempdf = pd.DataFrame([[index, 
+                                sub_data_type,
+                                i + 1,
+                                row[col]]], columns = ['index' ,
+                                'sub_data_type_code',
+                                'number',
+                                'value'])
+                                sub_data_df = pd.concat([sub_data_df, tempdf])
+                                col += 1
+                        elif sub_data_type[0].lower() in ['v']:
+                            odc = row[col]
+                            col += 1
+                            for i in range(0,NoOfType):
+                                tempdf = pd.DataFrame([[index,
+                                sub_data_type,
+                                odc,
+                                i + 1,
+                                row[col]]
+                                ], columns = ['index',
+                                'sub_data_type_code',
+                                'offset_sensor_detection_code',
+                                'number',
+                                'value'
+                                ])
+                                sub_data_df = pd.concat([sub_data_df, tempdf])
+                                col += 1
+            else:
+                sub_data_df = pd.DataFrame(columns=['index','sub_data_type_code','offset_sensor_detection_code','mass_measurement_resolution_kg', 'number','value'])
+
+            sub_data_df = sub_data_df.merge(ddf[['index', 'data_id']], how='left', on='index')
+            
+            ddf = ddf.fillna(0)
+            ddf["assigned_lane_number"] = ddf["assigned_lane_number"].astype(int)
+            ddf["lane_number"] = ddf["physical_lane_number"].astype(int)
+            ddf["physical_lane_number"] = ddf["physical_lane_number"].astype(int)
+
+            ddf = ddf.replace(r'^\s*$', np.NaN, regex=True)
+            sub_data_df = sub_data_df.replace(r'^\s*$', np.NaN, regex=True)
+            sub_data_df = sub_data_df.drop("index", axis=1)
+
+            scols = ddf.select_dtypes('object').columns
+            ddf[scols] = ddf[scols].apply(pd.to_numeric, axis=1, errors='ignore')
+
+            ddf['year'] = ddf['start_datetime'].dt.year
+            ddf["site_id"] = self.site_id
+            ddf["header_id"] = self.header_id
+
+            ddf = ddf[ddf.columns.intersection(t10_cols)]
+
+            return ddf, sub_data_df
+
+    def get_sub_data(self, sub_data_df):
+        self.sub_data_df = sub_data_df.replace(r'^\s*$', np.NaN, regex=True)
+        self.sub_data_df = sub_data_df.drop("index", axis=1) 
+        self.wx_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 'w']
+        self.sx_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 's']
+        self.gx_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 'g']
+        self.vx_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 'v']
+        self.tx_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 't']
+        self.ax_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 'a']
+        self.cx_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 'c']
+    
+    def calcs(self, df, df2, df3):
+        try:
+            self.egrl_percent = round((((df.loc[df['edit_code']==2].count()[0])/(df.count()[0]))*100),0) 
+        except:
+            self.egrl_percent = 0
+        try:
+            self.egrl_percent_positive_direction = round(((df.loc[(df['edit_code']==2)&(df['direction']=='P')].count()[0]/df.loc[df['direction']=='P'].count()[0])*100),0) 
+        except:
+            self.egrl_percent_positive_direction = 0
+        try:
+            self.egrl_percent_negative_direction = round(((df.loc[(df['edit_code']==2)&(df['direction']=='P')].count()[0]/df.loc[df['direction']=='N'].count()[0])*100),0)  
+        except:
+            self.egrl_percent_negative_direction = 0
+        try:
+            self.egrw_percent = round((((df2.loc[df2['edit_code']==2].count()[0]+df3.loc[df3['edit_code']==2].count()[0])/df.count()[0])*100),0)   
+        except:
+            self.egrw_percent = 0
+        try:
+            self.egrw_percent_positive_direction = round((((df2.loc[(df2['edit_code']==2)&(df2['direction']=='P')].count()[0]+df3.loc[(df3['edit_code']==2)&(df3['direction']=='P')].count()[0])/df.loc[df['direction']=='P'].count()[0])*100),0)  
+        except:
+            self.egrw_percent_positive_direction = 0
+        try:
+            self.egrw_percent_negative_direction = round((((df2.loc[(df2['edit_code']==2)&(df2['direction']=='N')].count()[0]+df3.loc[(df3['edit_code']==2)&(df3['direction']=='N')].count()[0])/df.loc[df['direction']=='N'].count()[0])*100),0)   
+        except:
+            self.egrw_percent_negative_direction = 0
+        self.num_weighed = df3.groupby(pd.Grouper(key='id')).count().count()[0] or 0 
+        self.num_weighed_positive_direction = df3.loc[df3['direction']=='P'].groupby(pd.Grouper(key='id')).count().count()[0] or 0  
+        self.num_weighed_negative_direction = df3.loc[df3['direction']=='N'].groupby(pd.Grouper(key='id')).count().count()[0] or 0  
+        self.mean_equivalent_axle_mass = round((df3.groupby(pd.Grouper(key='id'))['wheel_mass'].mean()*2).mean(),2) or 0
+        self.mean_equivalent_axle_mass_positive_direction = round((df3.loc[df3['direction']=='P'].groupby(pd.Grouper(key='id'))['wheel_mass'].mean()*2).mean(),2) or 0
+        self.mean_equivalent_axle_mass_negative_direction = round((df3.loc[df3['direction']=='N'].groupby(pd.Grouper(key='id'))['wheel_mass'].mean()*2).mean(),2) or 0
+        self.mean_axle_spacing = round((df2.groupby(pd.Grouper(key='id')).mean()).mean()['axle_spacing_number'],0) or 0
+        self.mean_axle_spacing_positive_direction = round((df2.loc[df2['direction']=='P'].groupby(pd.Grouper(key='id')).mean()).mean()['axle_spacing_number'],0) or 0
+        self.mean_axle_spacing_negative_direction = round((df2.loc[df2['direction']=='N'].groupby(pd.Grouper(key='id')).mean()).mean()['axle_spacing_number'],0) or 0
+        self.e80_per_axle = ((df3['wheel_mass']*2/8200)**4.2).sum() or 0
+        self.e80_per_axle_positive_direction = ((df3.loc[df3['direction']=='P']['wheel_mass']*2/8200)**4.2).sum() or 0
+        self.e80_per_axle_negative_direction = ((df3.loc[df3['direction']=='N']['wheel_mass']*2/8200)**4.2).sum() or 0
+        self.olhv = len(df3.loc[df3['gross_mass']>df3['vehicle_mass_limit_kg']]['id'].unique()) or 0
+        self.olhv_positive_direction = len(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['id'].unique()) or 0
+        self.olhv_negative_direction = len(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['id'].unique()) or 0
+        try:
+            self.olhv_percent = round(((len(df3.loc[df3['gross_mass']>df3['vehicle_mass_limit_kg']]['id'].unique())/len(df3['id'].unique()))*100),2)
+        except ZeroDivisionError:
+            self.olhv_percent = 0
+        try:
+            self.olhv_percent_positive_direction = round(((len(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['id'].unique())/len(df3.loc[df3['direction']=='P']['id'].unique()))*100),2)
+        except ZeroDivisionError:
+            self.olhv_percent_positive_direction = 0
+        try:
+            self.olhv_percent_negative_direction = round(((len(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['id'].unique())/len(df3.loc[df3['direction']=='N']['id'].unique()))*100),2)
+        except ZeroDivisionError:
+            self.olhv_percent_negative_direction = 0
+        self.tonnage_generated = ((df3['wheel_mass']*2).sum()/1000).round().astype(int) or 0
+        self.tonnage_generated_positive_direction = ((df3.loc[df3['direction']=='P']['wheel_mass']*2).sum()/1000).round().astype(int) or 0
+        self.tonnage_generated_negative_direction = ((df3.loc[df3['direction']=='N']['wheel_mass']*2).sum()/1000).round().astype(int) or 0
+        self.olton = (df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])]['wheel_mass']*2).sum().astype(int) or 0
+        self.olton_positive_direction = (df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['wheel_mass']*2).sum().astype(int) or 0
+        self.olton_negative_direction = (df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['wheel_mass']*2).sum().astype(int) or 0
+        try:
+            self.olton_percent = round(((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])]['wheel_mass']*2).sum().round(2)/(df3['wheel_mass']*2).sum().round(2))*100,2)
+        except ZeroDivisionError:
+            self.olton_percent = 0
+        try:
+            self.olton_percent_positive_direction = round(((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['wheel_mass']*2).sum().round(2)/(df3.loc[df3['direction']=='P']['wheel_mass']*2).sum().round(2))*100,2)
+        except ZeroDivisionError:
+            self.olton_percent_positive_direction = 0
+        try:
+            self.olton_percent_negative_direction = round(((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['wheel_mass']*2).sum().round(2)/(df3.loc[df3['direction']=='N']['wheel_mass']*2).sum().round(2))*100,2)
+        except ZeroDivisionError:
+            self.olton_percent_negative_direction = 0
+        self.ole80 = round(((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])]['wheel_mass']*2/8200)**4.2).sum(),0) or 0
+        self.ole80_positive_direction = round(((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['wheel_mass']*2/8200)**4.2).sum(),0) or 0
+        self.ole80_negative_direction = round(((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['wheel_mass']*2/8200)**4.2).sum(),0) or 0
+        try:
+            self.ole80_percent = round((round(((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])]['wheel_mass']*2/8200)**4.2).sum(),0)/round(round(((df3['wheel_mass']*2/8200)**4.2).sum(),0)))*100,2)
+        except ZeroDivisionError:
+            self.ole80_percent = 0
+        try:
+            self.ole80_percent_positive_direction = ((((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['wheel_mass']*2/8200)**4.2).sum().round()/((df3.loc[df3['direction']=='P']['wheel_mass']*2/8200)**4.2).sum().round())*100).round(2)
+        except ZeroDivisionError:
+            self.ole80_percent_positive_direction = 0
+        try:
+            self.ole80_percent_negative_direction = ((((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['wheel_mass']*2/8200)**4.2).sum().round()/((df3.loc[df3['direction']=='N']['wheel_mass']*2/8200)**4.2).sum().round())*100).round(2)
+        except ZeroDivisionError:
+            self.ole80_percent_negative_direction = 0
+        self.xe80 = round(((df3['wheel_mass']*2/8200)**4.2).sum()-(((df3['wheel_mass']*2*0.05)/8200)**4.2).sum(), 2) or 0
+        self.xe80_positive_direction = round(((df3.loc[df3['direction']=='P']['wheel_mass']*2/8200)**4.2).sum()-(((df3.loc[df3['direction']=='P']['wheel_mass']*2*0.05)/8200)**4.2).sum(),2) or 0
+        self.xe80_negative_direction = round(((df3.loc[df3['direction']=='N']['wheel_mass']*2/8200)**4.2).sum()-(((df3.loc[df3['direction']=='N']['wheel_mass']*2*0.05)/8200)**4.2).sum(),2) or 0
+        try:
+            self.xe80_percent = (((((df3['wheel_mass']*2/8200)**4.2).sum()-(((df3['wheel_mass']*2*0.05)/8200)**4.2).sum())/((df3['wheel_mass']*2/8200)**4.2).sum())*100).round()
+        except ZeroDivisionError:
+            self.xe80_percent = 0
+        try:
+            self.xe80_percent_positive_direction = (((((df3.loc[df3['direction']=='P']['wheel_mass']*2/8200)**4.2).sum()-(((df3.loc[df3['direction']=='P']['wheel_mass']*2*0.05)/8200)**4.2).sum())/((df3.loc[df3['direction']=='P']['wheel_mass']*2/8200)**4.2).sum())*100).round()
+        except ZeroDivisionError:
+            self.xe80_percent_positive_direction = 0
+        try:
+            self.xe80_percent_negative_direction = (((((df3.loc[df3['direction']=='N']['wheel_mass']*2/8200)**4.2).sum()-(((df3.loc[df3['direction']=='N']['wheel_mass']*2*0.05)/8200)**4.2).sum())/((df3.loc[df3['direction']=='N']['wheel_mass']*2/8200)**4.2).sum())*100).round()
+        except ZeroDivisionError:
+            self.xe80_percent_negative_direction = 0
+        try:
+            self.e80_per_day = ((((df3['wheel_mass']*2/8200)**4.2).sum().round()/df3.groupby(pd.Grouper(key='start_datetime',freq='D')).count().count()[0])*100).round(2)
+        except ZeroDivisionError:
+            self.e80_per_day = 0
+        try:
+            self.e80_per_day_positive_direction = ((((df3.loc[df3['direction']=='P']['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[df3['direction']=='P'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().count()[0])*100).round(2)
+        except ZeroDivisionError:
+            self.e80_per_day_positive_direction = 0
+        try:
+            self.e80_per_day_negative_direction = ((((df3.loc[df3['direction']=='N']['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[df3['direction']=='N'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().count()[0])*100).round(2)
+        except ZeroDivisionError:
+            self.e80_per_day_negative_direction = 0
+        try:
+            self.e80_per_heavy_vehicle = ((((df3.loc[df3['vehicle_class_code_primary_scheme']>3]['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[df3['vehicle_class_code_primary_scheme']>3].count()[0])*100).round(2)
+        except ZeroDivisionError:
+            self.e80_per_heavy_vehicle = 0
+        try:
+            self.e80_per_heavy_vehicle_positive_direction = ((((df3.loc[(df3['vehicle_class_code_primary_scheme']>3)&(df3['direction']=='P')]['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[(df3['vehicle_class_code_primary_scheme']>3)&(df3['direction']=='P')].count()[0])*100).round(2)
+        except ZeroDivisionError:
+            self.e80_per_heavy_vehicle_positive_direction = 0
+        try:
+            self.e80_per_heavy_vehicle_negative_direction = ((((df3.loc[(df3['vehicle_class_code_primary_scheme']>3)&(df3['direction']=='N')]['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[(df3['vehicle_class_code_primary_scheme']>3)&(df3['direction']=='N')].count()[0])*100).round(2)
+        except ZeroDivisionError:
+            self.e80_per_heavy_vehicle_negative_direction = 0
+        self.worst_steering_single_axle_cnt = 0
+        self.worst_steering_single_axle_olhv_perc = 0
+        self.worst_steering_single_axle_tonperhv = 0
+        self.worst_steering_double_axle_cnt = 0
+        self.worst_steering_double_axle_olhv_perc = 0
+        self.worst_steering_double_axle_tonperhv = 0
+        self.worst_non_steering_single_axle_cnt = 0
+        self.worst_non_steering_single_axle_olhv_perc = 0
+        self.worst_non_steering_single_axle_tonperhv = 0
+        self.worst_non_steering_double_axle_cnt = 0
+        self.worst_non_steering_double_axle_olhv_perc = 0
+        self.worst_non_steering_double_axle_tonperhv = 0
+        self.worst_triple_axle_cnt = 0
+        self.worst_triple_axle_olhv_perc = 0
+        self.worst_triple_axle_tonperhv = 0
+        self.bridge_formula_cnt = round((18000 + 2.1 * (df2.loc[df2['axle_spacing_number']>1].groupby('id')['axle_spacing_cm'].sum().mean())),2) or 0
+        self.bridge_formula_olhv_perc = 0
+        self.bridge_formula_tonperhv = 0
+        self.gross_formula_cnt = 0
+        self.gross_formula_olhv_perc = 0
+        self.gross_formula_tonperhv = 0
+        self.total_avg_cnt = df.loc[df['group']=='Heavy'].count()[0]
+        self.total_avg_olhv_perc = 0
+        self.total_avg_tonperhv = round(((df3['wheel_mass']*2).sum()/1000)/df.loc[df['group']=='Heavy'].count()[0],2)
+        self.worst_steering_single_axle_cnt_positive_direciton = 0
+        self.worst_steering_single_axle_olhv_perc_positive_direciton = 0
+        self.worst_steering_single_axle_tonperhv_positive_direciton = 0
+        self.worst_steering_double_axle_cnt_positive_direciton = 0
+        self.worst_steering_double_axle_olhv_perc_positive_direciton = 0
+        self.worst_steering_double_axle_tonperhv_positive_direciton = 0
+        self.worst_non_steering_single_axle_cnt_positive_direciton = 0
+        self.worst_non_steering_single_axle_olhv_perc_positive_direciton = 0
+        self.worst_non_steering_single_axle_tonperhv_positive_direciton = 0
+        self.worst_non_steering_double_axle_cnt_positive_direciton = 0
+        self.worst_non_steering_double_axle_olhv_perc_positive_direciton = 0
+        self.worst_non_steering_double_axle_tonperhv_positive_direciton = 0
+        self.worst_triple_axle_cnt_positive_direciton = 0
+        self.worst_triple_axle_olhv_perc_positive_direciton = 0
+        self.worst_triple_axle_tonperhv_positive_direciton = 0
+        self.bridge_formula_cnt_positive_direciton = round((18000 + 2.1 * (df2.loc[(df2['axle_spacing_number']>1)&(df2['direction']=='P')].groupby('id')['axle_spacing_cm'].sum().mean())),2) or 0
+        self.bridge_formula_olhv_perc_positive_direciton = 0
+        self.bridge_formula_tonperhv_positive_direciton = 0
+        self.gross_formula_cnt_positive_direciton = 0
+        self.gross_formula_olhv_perc_positive_direciton = 0
+        self.gross_formula_tonperhv_positive_direciton = 0
+        self.total_avg_cnt_positive_direciton = df.loc[(df['group']=='Heavy')&(df['direction']=='P')].count()[0]
+        self.total_avg_olhv_perc_positive_direciton = 0
+        self.total_avg_tonperhv_positive_direciton = round(((df3.loc[df3['direction']=='P']['wheel_mass']*2).sum()/1000)/df.loc[df['group']=='Heavy'].count()[0],2)
+        self.worst_steering_single_axle_cnt_negative_direciton = 0
+        self.worst_steering_single_axle_olhv_perc_negative_direciton = 0
+        self.worst_steering_single_axle_tonperhv_negative_direciton = 0
+        self.worst_steering_double_axle_cnt_negative_direciton = 0
+        self.worst_steering_double_axle_olhv_perc_negative_direciton = 0
+        self.worst_steering_double_axle_tonperhv_negative_direciton = 0
+        self.worst_non_steering_single_axle_cnt_negative_direciton = 0
+        self.worst_non_steering_single_axle_olhv_perc_negative_direciton = 0
+        self.worst_non_steering_single_axle_tonperhv_negative_direciton = 0
+        self.worst_non_steering_double_axle_cnt_negative_direciton = 0
+        self.worst_non_steering_double_axle_olhv_perc_negative_direciton = 0
+        self.worst_non_steering_double_axle_tonperhv_negative_direciton = 0
+        self.worst_triple_axle_cnt_negative_direciton = 0
+        self.worst_triple_axle_olhv_perc_negative_direciton = 0
+        self.worst_triple_axle_tonperhv_negative_direciton = 0
+        self.bridge_formula_cnt_negative_direciton = round((18000 + 2.1 * (df2.loc[(df2['axle_spacing_number']>1)&(df2['direction']=='P')].groupby('id')['axle_spacing_cm'].sum().mean())),2) or 0
+        self.bridge_formula_olhv_perc_negative_direciton = 0
+        self.bridge_formula_tonperhv_negative_direciton = 0
+        self.gross_formula_cnt_negative_direciton = 0
+        self.gross_formula_olhv_perc_negative_direciton = 0
+        self.gross_formula_tonperhv_negative_direciton = 0
+        self.total_avg_cnt_negative_direciton = df.loc[(df['group']=='Heavy')&(df['direction']=='N')].count()[0]
+        self.total_avg_olhv_perc_negative_direciton = 0
+        self.total_avg_tonperhv_negative_direciton = round(((df3.loc[df3['direction']=='N']['wheel_mass']*2).sum()/1000)/df.loc[df['group']=='Heavy'].count()[0],2)
+        self.wst_2_axle_busses_cnt_pos_dir = 0
+        self.wst_2_axle_6_tyre_single_units_cnt_pos_dir = 0
+        self.wst_busses_with_3_or_4_axles_cnt_pos_dir = 0
+        self.wst_2_axle_6tyre_su_with_trailer_4axles_max_cnt_pos_dir = 0
+        self.wst_3_axle_su_incl_single_axle_trailer_cnt_pos_dir = 0
+        self.wst_4_or_less_axle_incl_a_single_trailer_cnt_pos_dir = 0
+        self.wst_busses_with_5_or_more_axles_cnt_pos_dir = 0
+        self.wst_3_axle_su_and_trailer_more_than_4_axles_cnt_pos_dir = 0
+        self.wst_5_axle_single_trailer_cnt_pos_dir = 0
+        self.wst_6_axle_single_trailer_cnt_pos_dir = 0
+        self.wst_5_or_less_axle_multi_trailer_cnt_pos_dir = 0
+        self.wst_6_axle_multi_trailer_cnt_pos_dir = 0
+        self.wst_7_axle_multi_trailer_cnt_pos_dir = 0
+        self.wst_8_or_more_axle_multi_trailer_cnt_pos_dir = 0
+        self.wst_2_axle_busses_olhv_perc_pos_dir = 0
+        self.wst_2_axle_6_tyre_single_units_olhv_perc_pos_dir = 0
+        self.wst_busses_with_3_or_4_axles_olhv_perc_pos_dir = 0
+        self.wst_2_axle_6tyre_su_with_trailer_4axles_max_olhv_perc_pos_dir = 0
+        self.wst_3_axle_su_incl_single_axle_trailer_olhv_perc_pos_dir = 0
+        self.wst_4_or_less_axle_incl_a_single_trailer_olhv_perc_pos_dir = 0
+        self.wst_busses_with_5_or_more_axles_olhv_perc_pos_dir = 0
+        self.wst_3_axle_su_and_trailer_more_than_4_axles_olhv_perc_pos_dir = 0
+        self.wst_5_axle_single_trailer_olhv_perc_pos_dir = 0
+        self.wst_6_axle_single_trailer_olhv_perc_pos_dir = 0
+        self.wst_5_or_less_axle_multi_trailer_olhv_perc_pos_dir = 0
+        self.wst_6_axle_multi_trailer_olhv_perc_pos_dir = 0
+        self.wst_7_axle_multi_trailer_olhv_perc_pos_dir = 0
+        self.wst_8_or_more_axle_multi_trailer_olhv_perc_pos_dir = 0
+        self.wst_2_axle_busses_tonperhv_pos_dir = 0
+        self.wst_2_axle_6_tyre_single_units_tonperhv_pos_dir = 0
+        self.wst_busses_with_3_or_4_axles_tonperhv_pos_dir = 0
+        self.wst_2_axle_6tyre_su_with_trailer_4axles_max_tonperhv_pos_dir = 0
+        self.wst_3_axle_su_incl_single_axle_trailer_tonperhv_pos_dir = 0
+        self.wst_4_or_less_axle_incl_a_single_trailer_tonperhv_pos_dir = 0
+        self.wst_busses_with_5_or_more_axles_tonperhv_pos_dir = 0
+        self.wst_3_axle_su_and_trailer_more_than_4_axles_tonperhv_pos_dir = 0
+        self.wst_5_axle_single_trailer_tonperhv_pos_dir = 0
+        self.wst_6_axle_single_trailer_tonperhv_pos_dir = 0
+        self.wst_5_or_less_axle_multi_trailer_tonperhv_pos_dir = 0
+        self.wst_6_axle_multi_trailer_tonperhv_pos_dir = 0
+        self.wst_7_axle_multi_trailer_tonperhv_pos_dir = 0
+        self.wst_8_or_more_axle_multi_trailer_tonperhv_pos_dir = 0
+        self.wst_2_axle_busses_cnt_neg_dir = 0
+        self.wst_2_axle_6_tyre_single_units_cnt_neg_dir = 0
+        self.wst_busses_with_3_or_4_axles_cnt_neg_dir = 0
+        self.wst_2_axle_6tyre_su_with_trailer_4axles_max_cnt_neg_dir = 0
+        self.wst_3_axle_su_incl_single_axle_trailer_cnt_neg_dir = 0
+        self.wst_4_or_less_axle_incl_a_single_trailer_cnt_neg_dir = 0
+        self.wst_busses_with_5_or_more_axles_cnt_neg_dir = 0
+        self.wst_3_axle_su_and_trailer_more_than_4_axles_cnt_neg_dir = 0
+        self.wst_5_axle_single_trailer_cnt_neg_dir = 0
+        self.wst_6_axle_single_trailer_cnt_neg_dir = 0
+        self.wst_5_or_less_axle_multi_trailer_cnt_neg_dir = 0
+        self.wst_6_axle_multi_trailer_cnt_neg_dir = 0
+        self.wst_7_axle_multi_trailer_cnt_neg_dir = 0
+        self.wst_8_or_more_axle_multi_trailer_cnt_neg_dir = 0
+        self.wst_2_axle_busses_olhv_perc_neg_dir = 0
+        self.wst_2_axle_6_tyre_single_units_olhv_perc_neg_dir = 0
+        self.wst_busses_with_3_or_4_axles_olhv_perc_neg_dir = 0
+        self.wst_2_axle_6tyre_su_with_trailer_4axles_max_olhv_perc_neg_dir = 0
+        self.wst_3_axle_su_incl_single_axle_trailer_olhv_perc_neg_dir = 0
+        self.wst_4_or_less_axle_incl_a_single_trailer_olhv_perc_neg_dir = 0
+        self.wst_busses_with_5_or_more_axles_olhv_perc_neg_dir = 0
+        self.wst_3_axle_su_and_trailer_more_than_4_axles_olhv_perc_neg_dir = 0
+        self.wst_5_axle_single_trailer_olhv_perc_neg_dir = 0
+        self.wst_6_axle_single_trailer_olhv_perc_neg_dir = 0
+        self.wst_5_or_less_axle_multi_trailer_olhv_perc_neg_dir = 0
+        self.wst_6_axle_multi_trailer_olhv_perc_neg_dir = 0
+        self.wst_7_axle_multi_trailer_olhv_perc_neg_dir = 0
+        self.wst_8_or_more_axle_multi_trailer_olhv_perc_neg_dir = 0
+        self.wst_2_axle_busses_tonperhv_neg_dir = 0
+        self.wst_2_axle_6_tyre_single_units_tonperhv_neg_dir = 0
+        self.wst_busses_with_3_or_4_axles_tonperhv_neg_dir = 0
+        self.wst_2_axle_6tyre_su_with_trailer_4axles_max_tonperhv_neg_dir = 0
+        self.wst_3_axle_su_incl_single_axle_trailer_tonperhv_neg_dir = 0
+        self.wst_4_or_less_axle_incl_a_single_trailer_tonperhv_neg_dir = 0
+        self.wst_busses_with_5_or_more_axles_tonperhv_neg_dir = 0
+        self.wst_3_axle_su_and_trailer_more_than_4_axles_tonperhv_neg_dir = 0
+        self.wst_5_axle_single_trailer_tonperhv_neg_dir = 0
+        self.wst_6_axle_single_trailer_tonperhv_neg_dir = 0
+        self.wst_5_or_less_axle_multi_trailer_tonperhv_neg_dir = 0
+        self.wst_6_axle_multi_trailer_tonperhv_neg_dir = 0
+        self.wst_7_axle_multi_trailer_tonperhv_neg_dir = 0
+        self.wst_8_or_more_axle_multi_trailer_tonperhv_neg_dir = 0
+        self.wst_2_axle_busses_cnt = 0
+        self.wst_2_axle_6_tyre_single_units_cnt = 0
+        self.wst_busses_with_3_or_4_axles_cnt = 0
+        self.wst_2_axle_6tyre_su_with_trailer_4axles_max_cnt = 0
+        self.wst_3_axle_su_incl_single_axle_trailer_cnt = 0
+        self.wst_4_or_less_axle_incl_a_single_trailer_cnt = 0
+        self.wst_busses_with_5_or_more_axles_cnt = 0
+        self.wst_3_axle_su_and_trailer_more_than_4_axles_cnt = 0
+        self.wst_5_axle_single_trailer_cnt = 0
+        self.wst_6_axle_single_trailer_cnt = 0
+        self.wst_5_or_less_axle_multi_trailer_cnt = 0
+        self.wst_6_axle_multi_trailer_cnt = 0
+        self.wst_7_axle_multi_trailer_cnt = 0
+        self.wst_8_or_more_axle_multi_trailer_cnt = 0
+        self.wst_2_axle_busses_olhv_perc = 0
+        self.wst_2_axle_6_tyre_single_units_olhv_perc = 0
+        self.wst_busses_with_3_or_4_axles_olhv_perc = 0
+        self.wst_2_axle_6tyre_su_with_trailer_4axles_max_olhv_perc = 0
+        self.wst_3_axle_su_incl_single_axle_trailer_olhv_perc = 0
+        self.wst_4_or_less_axle_incl_a_single_trailer_olhv_perc = 0
+        self.wst_busses_with_5_or_more_axles_olhv_perc = 0
+        self.wst_3_axle_su_and_trailer_more_than_4_axles_olhv_perc = 0
+        self.wst_5_axle_single_trailer_olhv_perc = 0
+        self.wst_6_axle_single_trailer_olhv_perc = 0
+        self.wst_5_or_less_axle_multi_trailer_olhv_perc = 0
+        self.wst_6_axle_multi_trailer_olhv_perc = 0
+        self.wst_7_axle_multi_trailer_olhv_perc = 0
+        self.wst_8_or_more_axle_multi_trailer_olhv_perc = 0
+        self.wst_2_axle_busses_tonperhv = 0
+        self.wst_2_axle_6_tyre_single_units_tonperhv = 0
+        self.wst_busses_with_3_or_4_axles_tonperhv = 0
+        self.wst_2_axle_6tyre_su_with_trailer_4axles_max_tonperhv = 0
+        self.wst_3_axle_su_incl_single_axle_trailer_tonperhv = 0
+        self.wst_4_or_less_axle_incl_a_single_trailer_tonperhv = 0
+        self.wst_busses_with_5_or_more_axles_tonperhv = 0
+        self.wst_3_axle_su_and_trailer_more_than_4_axles_tonperhv = 0
+        self.wst_5_axle_single_trailer_tonperhv = 0
+        self.wst_6_axle_single_trailer_tonperhv = 0
+        self.wst_5_or_less_axle_multi_trailer_tonperhv = 0
+        self.wst_6_axle_multi_trailer_tonperhv = 0
+        self.wst_7_axle_multi_trailer_tonperhv = 0
+        self.wst_8_or_more_axle_multi_trailer_tonperhv = 0
+
+    def header_calcs(self, header: pd.DataFrame, data: pd.DataFrame, type: int) -> pd.DataFrame:
+        try:
+            speed_limit_qry = f"select max_speed from trafc.countstation where tcname = '{self.site_id}' ;"
+            speed_limit = pd.read_sql_query(speed_limit_qry,config.ENGINE).reset_index(drop=True)
+            try:
+                speed_limit = speed_limit['max_speed'].iloc[0]
+            except IndexError:
+                speed_limit = 60
+            data = data.fillna(0, axis=0)
+            if type == 10:
+                try:
+                    header['total_light_negative_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']<=1)&(data['direction']=='N')].count()[0].round().astype(int)
+                except (ValueError, IndexError):
+                    header['total_light_negative_direction'] = 0
+                try:
+                    header['total_light_positive_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']<=1)&(data['direction']=='P')].count()[0].round().astype(int)
+                except (ValueError, IndexError):
+                    header['total_light_positive_direction'] = 0
+                header['total_light_vehicles'] = data.loc[data['vehicle_class_code_secondary_scheme']<=1].count()[0].round().astype(int)
+                try:
+                    header['total_heavy_negative_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='N')].count()[0].round().astype(int)
+                except (ValueError, IndexError):
+                    header['total_heavy_negative_direction'] = 0
+                try:
+                    header['total_heavy_positive_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='P')].count()[0].round().astype(int)
+                except (ValueError, IndexError):
+                    header['total_heavy_positive_direction'] = 0
+                header['total_heavy_vehicles'] = data.loc[data['vehicle_class_code_secondary_scheme']>1].count()[0].round().astype(int)
+                try:
+                    header['total_short_heavy_negative_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']==2)&(data['direction']=='N')].count()[0].round().astype(int)
+                except (ValueError, IndexError):
+                    header['total_short_heavy_negative_direction'] = 0
+                try:
+                    header['total_short_heavy_positive_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']==2)&(data['direction']=='P')].count()[0].round().astype(int)
+                except (ValueError, IndexError):
+                    header['total_short_heavy_positive_direction'] = 0
+                header['total_short_heavy_vehicles'] = data.loc[data['vehicle_class_code_secondary_scheme']==2].count()[0].round().astype(int)
+                try:
+                    header['total_medium_heavy_negative_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']==3)&(data['direction']=='N')].count()[0].round().astype(int)
+                except (ValueError, IndexError):
+                    header['total_medium_heavy_negative_direction'] = 0
+                try:
+                    header['total_medium_heavy_positive_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']==3)&(data['direction']=='P')].count()[0].round().astype(int)
+                except (ValueError, IndexError):
+                    header['total_medium_heavy_positive_direction'] = 0
+                header['total_medium_heavy_vehicles'] = data.loc[data['vehicle_class_code_secondary_scheme']==3].count()[0].round().astype(int)
+                try:
+                    header['total_long_heavy_negative_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']==4)&(data['direction']=='N')].count()[0].round().astype(int)
+                except (ValueError, IndexError):
+                    header['total_long_heavy_negative_direction'] = 0
+                try:
+                    header['total_long_heavy_positive_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']==4)&(data['direction']=='P')].count()[0].round().astype(int)
+                except (ValueError, IndexError):
+                    header['total_long_heavy_positive_direction'] = 0
+                header['total_long_heavy_vehicles'] = data.loc[data['vehicle_class_code_secondary_scheme']==4].count()[0].round().astype(int)
+                try:
+                    header['total_vehicles_negative_direction'] = data.loc[data['direction']=='N'].count()[0].round().astype(int)
+                except (ValueError, IndexError):
+                    header['total_vehicles_negative_direction'] = 0
+                try:
+                    header['total_vehicles_positive_direction'] = data.loc[data['direction']=='P'].count()[0].round().astype(int)
+                except (ValueError, IndexError):
+                    header['total_vehicles_positive_direction'] = 0
+                header['total_vehicles'] = data.count()[0].round().astype(int)
+                try:
+                    header['average_speed_negative_direction'] = data.loc[data['direction']=='N']['vehicle_speed'].mean().round(2)
+                except (ValueError, IndexError):
+                    header['average_speed_negative_direction'] = 0
+                try:
+                    header['average_speed_positive_direction'] = data.loc[data['direction']=='P']['vehicle_speed'].mean().round(2)
+                except (ValueError, IndexError):
+                    header['average_speed_positive_direction'] = 0
+                header['average_speed'] = data['vehicle_speed'].mean().round(2)
+                try:
+                    header['average_speed_light_vehicles_negative_direction'] = data['vehicle_speed'].loc[(data['vehicle_class_code_secondary_scheme']<=1)&(data['direction']=='N')].mean().round(2)
+                except (ValueError, IndexError):
+                    header['average_speed_light_vehicles_negative_direction'] = 0
+                try:
+                    header['average_speed_light_vehicles_positive_direction'] = data['vehicle_speed'].loc[(data['vehicle_class_code_secondary_scheme']<=1)&(data['direction']=='P')].mean().round(2)
+                except (ValueError, IndexError):
+                    header['average_speed_light_vehicles_positive_direction'] = 0
+                header['average_speed_light_vehicles'] = data['vehicle_speed'].loc[data['vehicle_class_code_secondary_scheme']<=1].mean().round(2)
+                try:
+                    header['average_speed_heavy_vehicles_negative_direction'] = data['vehicle_speed'].loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='N')].mean().round(2)
+                except (ValueError, IndexError):
+                    header['average_speed_heavy_vehicles_negative_direction'] = 0
+                try:
+                    header['average_speed_heavy_vehicles_positive_direction'] = data['vehicle_speed'].loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='P')].mean().round(2)
+                except (ValueError, IndexError):
+                    header['average_speed_heavy_vehicles_positive_direction'] = 0
+                header['average_speed_heavy_vehicles'] = data['vehicle_speed'].loc[data['vehicle_class_code_secondary_scheme']>1].mean().round(2)
+                try:
+                    header['truck_split_negative_direction'] = {str((((data.loc[(data['vehicle_class_code_secondary_scheme']==2)&(data['direction']=='N')].count()/data.loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='N')].count())[0])*100).round().astype(int)) +":"+ str((((data.loc[(data['vehicle_class_code_secondary_scheme']==3)&(data['direction']=='N')].count()/data.loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='N')].count())[0])*100).round().astype(int)) +":"+ str((((data.loc[(data['vehicle_class_code_secondary_scheme']==4)&(data['direction']=='N')].count()/data.loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='N')].count())[0])*100).round().astype(int))}
+                except (ValueError, IndexError):
+                    header['truck_split_negative_direction'] = 0
+                try:
+                    header['truck_split_positive_direction'] = {str((((data.loc[(data['vehicle_class_code_secondary_scheme']==2)&(data['direction']=='P')].count()/data.loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='P')].count())[0])*100).round().astype(int)) +":"+ str((((data.loc[(data['vehicle_class_code_secondary_scheme']==3)&(data['direction']=='P')].count()/data.loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='P')].count())[0])*100).round().astype(int)) +":"+ str((((data.loc[(data['vehicle_class_code_secondary_scheme']==4)&(data['direction']=='P')].count()/data.loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='P')].count())[0])*100).round().astype(int))}
+                except (ValueError, IndexError):
+                    header['truck_split_positive_direction'] = 0
+                header['truck_split_total'] = {str((((data.loc[data['vehicle_class_code_secondary_scheme']==2].count()/data.loc[data['vehicle_class_code_secondary_scheme']>1].count())[0])*100).round().astype(int)) +":"+ str((((data.loc[data['vehicle_class_code_secondary_scheme']==3].count()/data.loc[data['vehicle_class_code_secondary_scheme']>1].count())[0])*100).round().astype(int)) +":"+ str((((data.loc[data['vehicle_class_code_secondary_scheme']==4].count()/data.loc[data['vehicle_class_code_secondary_scheme']>1].count())[0])*100).round().astype(int))}
+                try:
+                    header['estimated_axles_per_truck_negative_direction'] = ((data.loc[(data['vehicle_class_code_secondary_scheme']==2)&(data['direction']=='N')].count()[0]*2+data.loc[(data['vehicle_class_code_secondary_scheme']==3)&(data['direction']=='N')].count()[0]*5+data.loc[(data['vehicle_class_code_secondary_scheme']==4)&(data['direction']=='N')].count()[0]*7)/(data.loc[(data['vehicle_class_code_secondary_scheme']==2)&(data['direction']=='N')].count()[0]+data.loc[(data['vehicle_class_code_secondary_scheme']==3)&(data['direction']=='N')].count()[0]+data.loc[(data['vehicle_class_code_secondary_scheme']==4)&(data['direction']=='N')].count()[0])).round(2)
+                except (ValueError, IndexError):
+                    header['estimated_axles_per_truck_negative_direction'] = 0
+                try:
+                    header['estimated_axles_per_truck_positive_direction'] = ((data.loc[(data['vehicle_class_code_secondary_scheme']==2)&(data['direction']=='P')].count()[0]*2+data.loc[(data['vehicle_class_code_secondary_scheme']==3)&(data['direction']=='P')].count()[0]*5+data.loc[(data['vehicle_class_code_secondary_scheme']==4)&(data['direction']=='P')].count()[0]*7)/(data.loc[(data['vehicle_class_code_secondary_scheme']==2)&(data['direction']=='P')].count()[0]+data.loc[(data['vehicle_class_code_secondary_scheme']==3)&(data['direction']=='P')].count()[0]+data.loc[(data['vehicle_class_code_secondary_scheme']==4)&(data['direction']=='P')].count()[0])).round(2)
+                except (ValueError, IndexError):
+                    header['estimated_axles_per_truck_positive_direction'] = 0
+                header['estimated_axles_per_truck_total'] = ((data.loc[data['vehicle_class_code_secondary_scheme']==2].count()[0]*2+data.loc[data['vehicle_class_code_secondary_scheme']==3].count()[0]*5+data.loc[data['vehicle_class_code_secondary_scheme']==4].count()[0]*7)/(data.loc[data['vehicle_class_code_secondary_scheme']==2].count()[0]+data.loc[data['vehicle_class_code_secondary_scheme']==3].count()[0]+data.loc[data['vehicle_class_code_secondary_scheme']==4].count()[0])).round(2)
+                try:
+                    header['percentage_speeding_positive_direction'] = ((data.loc[(data['vehicle_speed']>speed_limit)&(data['direction']=='P')].count()[0]/data.loc[data['direction'=='P']].count()[0])*100).round(2)
+                except (ValueError, IndexError):
+                    header['percentage_speeding_positive_direction'] = 0
+                try:
+                    header['percentage_speeding_negative_direction'] = ((data.loc[(data['vehicle_speed']>speed_limit)&(data['direction']=='N')].count()[0]/data.loc[data['direction'=='N']].count()[0])*100).round(2)
+                except (ValueError, IndexError):
+                    header['percentage_speeding_negative_direction'] = 0
+                header['percentage_speeding_total'] = ((data.loc[data['vehicle_speed']>speed_limit].count()[0]/data.count()[0])*100).round(2)
+                try:
+                    header['vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire'] = data.loc[(data['vehicle_following_code']==2)&data['direction']=='N'].count()[0]
+                except (ValueError, IndexError):
+                    header['vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire'] = 0
+                try:
+                    header['vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire'] = data.loc[(data['vehicle_following_code']==2)&data['direction']=='P'].count()[0]
+                except (ValueError, IndexError):
+                    header['vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire'] = 0
+                header['vehicles_with_rear_to_rear_headway_less_than_2sec_total'] = data.loc[data['vehicle_following_code']==2].count()[0]
+                try:
+                    header['estimated_e80_negative_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']==2)&(data['direction']=='N')].count()[0]*0.6+data.loc[(data['vehicle_class_code_secondary_scheme']==3)&(data['direction']=='N')].count()[0]*2.5+data.loc[(data['vehicle_class_code_secondary_scheme']==4)&(data['direction']=='N')].count()[0]*2.1
+                except (ValueError, IndexError):
+                    header['estimated_e80_negative_direction'] = 0
+                try:
+                    header['estimated_e80_positive_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']==2)&(data['direction']=='P')].count()[0]*0.6+data.loc[(data['vehicle_class_code_secondary_scheme']==3)&(data['direction']=='P')].count()[0]*2.5+data.loc[(data['vehicle_class_code_secondary_scheme']==4)&(data['direction']=='P')].count()[0]*2.1
+                except (ValueError, IndexError):
+                    header['estimated_e80_positive_direction'] = 0
+                header['estimated_e80_on_road'] = data.loc[data['vehicle_class_code_secondary_scheme']==2].count()[0]*0.6+data.loc[data['vehicle_class_code_secondary_scheme']==3].count()[0]*2.5+data.loc[data['vehicle_class_code_secondary_scheme']==4].count()[0]*2.1
+                try:
+                    header['adt_negative_direction'] = data.loc[data['direction']=='N'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().mean()[0].round().astype(int)
+                except (ValueError, IndexError):
+                    header['adt_negative_direction'] = 0
+                try:
+                    header['adt_positive_direction'] = data.loc[data['direction']=='P'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().mean()[0].round().astype(int)
+                except (ValueError, IndexError):
+                    header['adt_positive_direction'] = 0
+                header['adt_total'] = data.groupby(pd.Grouper(key='start_datetime',freq='D')).count().mean()[0].round().astype(int)
+                try:
+                    header['adtt_negative_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='N')].groupby(pd.Grouper(key='start_datetime',freq='D')).count().mean()[0].round().astype(int)
+                except (ValueError, IndexError):
+                    header['adtt_negative_direction'] = 0
+                try:
+                    header['adtt_positive_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='P')].groupby(pd.Grouper(key='start_datetime',freq='D')).count().mean()[0].round().astype(int)
+                except (ValueError, IndexError):
+                    header['adtt_positive_direction'] = 0
+                header['adtt_total'] = data.loc[data['vehicle_class_code_secondary_scheme']>1].groupby(pd.Grouper(key='start_datetime',freq='D')).count().mean()[0].round().astype(int)
+                try:
+                    header['highest_volume_per_hour_negative_direction'] = data.loc[data['direction']=='N'].groupby(pd.Grouper(key='start_datetime',freq='H')).count().max()[0]
+                except (ValueError, IndexError):
+                    header['highest_volume_per_hour_negative_direction'] = 0
+                try:
+                    header['highest_volume_per_hour_positive_direction'] = data.loc[data['direction']=='P'].groupby(pd.Grouper(key='start_datetime',freq='H')).count().max()[0]
+                except (ValueError, IndexError):
+                    header['highest_volume_per_hour_positive_direction'] = 0
+                header['highest_volume_per_hour_total'] = data.groupby(pd.Grouper(key='start_datetime',freq='H')).count().max()[0]
+                try:
+                    header["15th_highest_volume_per_hour_negative_direction"] = round(data.loc[data['direction']=='N'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.15)[0].round().astype(int))
+                except (ValueError, IndexError):
+                    header["15th_highest_volume_per_hour_negative_direction"] = 0
+                try:
+                    header["15th_highest_volume_per_hour_positive_direction"] = round(data.loc[data['direction']=='P'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.15)[0].round().astype(int))
+                except (ValueError, IndexError):
+                    header["15th_highest_volume_per_hour_positive_direction"] = 0
+                header["15th_highest_volume_per_hour_total"] = data.groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.15)[0].round().astype(int)
+                try:
+                    header["30th_highest_volume_per_hour_negative_direction"] = round(data.loc[data['direction']=='N'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.30)[0].round().astype(int))
+                except (ValueError, IndexError):
+                    header["30th_highest_volume_per_hour_negative_direction"] = 0
+                try:
+                    header["30th_highest_volume_per_hour_positive_direction"] = round(data.loc[data['direction']=='P'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.30)[0].round().astype(int))
+                except (ValueError, IndexError):
+                    header["30th_highest_volume_per_hour_positive_direction"] = 0
+                header["30th_highest_volume_per_hour_total"] = data.groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.30)[0].round().astype(int)
+                try:
+                    header["15th_percentile_speed_negative_direction"] = data.loc[data['direction']=='N']['vehicle_speed'].quantile(0.15).round(2)
+                except (ValueError, IndexError):
+                    header["15th_percentile_speed_negative_direction"] = 0
+                try:
+                    header["15th_percentile_speed_positive_direction"] = data.loc[data['direction']=='P']['vehicle_speed'].quantile(0.15).round(2)
+                except (ValueError, IndexError):
+                    header["15th_percentile_speed_positive_direction"] = 0
+                header["15th_percentile_speed_total"] = data['vehicle_speed'].quantile(0.15).round(2)
+                try:
+                    header["85th_percentile_speed_negative_direction"] = data.loc[data['direction']=='N']['vehicle_speed'].quantile(0.85).round(2)
+                except (ValueError, IndexError):
+                    header["85th_percentile_speed_negative_direction"] = 0
+                try:
+                    header["85th_percentile_speed_positive_direction"] = data.loc[data['direction']=='P']['vehicle_speed'].quantile(0.85).round(2)
+                except (ValueError, IndexError):
+                    header["85th_percentile_speed_positive_direction"] = 0
+                header["85th_percentile_speed_total"] = data['vehicle_speed'].quantile(0.85).round(2)
+                header['avg_weekday_traffic'] = data.groupby(pd.Grouper(key='start_datetime',freq='B')).count().mean()[0].round().astype(int)
+                header['number_of_days_counted'] = data.groupby([data['start_datetime'].dt.to_period('D')]).count().count()[0]
+                header['duration_hours'] = data.groupby([data['start_datetime'].dt.to_period('H')]).count().count()[0]
+
+                return header
+
+            elif type == 60:
+                
+                return header
+            else:
+                return header
+        except IndexError:
+            return header
+
+    def wim_header_upsert(self):
+        UPSERT_STRING = F"""INSERT INTO trafc.electronic_count_header_hswim (
+            header_id,
+            egrl_percent,
+            egrw_percent,
+            mean_equivalent_axle_mass,
+            mean_equivalent_axle_mass_positive_direction,
+            mean_equivalent_axle_mass_negative_direction,
+            mean_axle_spacing,
+            mean_axle_spacing_positive_direction,
+            mean_axle_spacing_negative_direction,
+            e80_per_axle,
+            e80_per_axle_positive_direction,
+            e80_per_axle_negative_direction,
+            olhv,
+            olhv_positive_direction,
+            olhv_negative_direction,
+            olhv_percent,
+            olhv_percent_positive_direction,
+            olhv_percent_negative_direction,
+            tonnage_generated,
+            tonnage_generated_positive_direction,
+            tonnage_generated_negative_direction,
+            olton,
+            olton_positive_direction,
+            olton_negative_direction,
+            olton_percent,
+            olton_percent_positive_direction,
+            olton_percent_negative_direction,
+            ole80,
+            ole80_positive_direction,
+            ole80_negative_direction,
+            ole80_percent,
+            ole80_percent_positive_direction,
+            ole80_percent_negative_direction,
+            xe80,
+            xe80_positive_direction,
+            xe80_negative_direction,
+            xe80_percent,
+            xe80_percent_positive_direction,
+            xe80_percent_negative_direction,
+            e80_per_day,
+            e80_per_day_positive_direction,
+            e80_per_day_negative_direction,
+            e80_per_heavy_vehicle,
+            e80_per_heavy_vehicle_positive_direction,
+            e80_per_heavy_vehicle_negative_direction,
+            worst_steering_single_axle_cnt,
+            worst_steering_single_axle_olhv_perc,
+            worst_steering_single_axle_tonperhv,
+            worst_steering_double_axle_cnt,
+            worst_steering_double_axle_olhv_perc,
+            worst_steering_double_axle_tonperhv,
+            worst_non_steering_single_axle_cnt,
+            worst_non_steering_single_axle_olhv_perc,
+            worst_non_steering_single_axle_tonperhv,
+            worst_non_steering_double_axle_cnt,
+            worst_non_steering_double_axle_olhv_perc,
+            worst_non_steering_double_axle_tonperhv,
+            worst_triple_axle_cnt,
+            worst_triple_axle_olhv_perc,
+            worst_triple_axle_tonperhv,
+            bridge_formula_cnt,
+            bridge_formula_olhv_perc,
+            bridge_formula_tonperhv,
+            gross_formula_cnt,
+            gross_formula_olhv_perc,
+            gross_formula_tonperhv,
+            total_avg_cnt,
+            total_avg_olhv_perc,
+            total_avg_tonperhv,
+            worst_steering_single_axle_cnt_positive_direciton,
+            worst_steering_single_axle_olhv_perc_positive_direciton,
+            worst_steering_single_axle_tonperhv_positive_direciton,
+            worst_steering_double_axle_cnt_positive_direciton,
+            worst_steering_double_axle_olhv_perc_positive_direciton,
+            worst_steering_double_axle_tonperhv_positive_direciton,
+            worst_non_steering_single_axle_cnt_positive_direciton,
+            worst_non_steering_single_axle_olhv_perc_positive_direciton,
+            worst_non_steering_single_axle_tonperhv_positive_direciton,
+            worst_non_steering_double_axle_cnt_positive_direciton,
+            worst_non_steering_double_axle_olhv_perc_positive_direciton,
+            worst_non_steering_double_axle_tonperhv_positive_direciton,
+            worst_triple_axle_cnt_positive_direciton,
+            worst_triple_axle_olhv_perc_positive_direciton,
+            worst_triple_axle_tonperhv_positive_direciton,
+            bridge_formula_cnt_positive_direciton,
+            bridge_formula_olhv_perc_positive_direciton,
+            bridge_formula_tonperhv_positive_direciton,
+            gross_formula_cnt_positive_direciton,
+            gross_formula_olhv_perc_positive_direciton,
+            gross_formula_tonperhv_positive_direciton,
+            total_avg_cnt_positive_direciton,
+            total_avg_olhv_perc_positive_direciton,
+            total_avg_tonperhv_positive_direciton,
+            worst_steering_single_axle_cnt_negative_direciton,
+            worst_steering_single_axle_olhv_perc_negative_direciton,
+            worst_steering_single_axle_tonperhv_negative_direciton,
+            worst_steering_double_axle_cnt_negative_direciton,
+            worst_steering_double_axle_olhv_perc_negative_direciton,
+            worst_steering_double_axle_tonperhv_negative_direciton,
+            worst_non_steering_single_axle_cnt_negative_direciton,
+            worst_non_steering_single_axle_olhv_perc_negative_direciton,
+            worst_non_steering_single_axle_tonperhv_negative_direciton,
+            worst_non_steering_double_axle_cnt_negative_direciton,
+            worst_non_steering_double_axle_olhv_perc_negative_direciton,
+            worst_non_steering_double_axle_tonperhv_negative_direciton,
+            worst_triple_axle_cnt_negative_direciton,
+            worst_triple_axle_olhv_perc_negative_direciton,
+            worst_triple_axle_tonperhv_negative_direciton,
+            bridge_formula_cnt_negative_direciton,
+            bridge_formula_olhv_perc_negative_direciton,
+            bridge_formula_tonperhv_negative_direciton,
+            gross_formula_cnt_negative_direciton,
+            gross_formula_olhv_perc_negative_direciton,
+            gross_formula_tonperhv_negative_direciton,
+            total_avg_cnt_negative_direciton,
+            total_avg_olhv_perc_negative_direciton,
+            total_avg_tonperhv_negative_direciton,
+            egrl_percent_positive_direction,
+            egrl_percent_negative_direction,
+            egrw_percent_positive_direction,
+            egrw_percent_negative_direction,
+            num_weighed,
+            num_weighed_positive_direction,
+            num_weighed_negative_direction,
+            wst_2_axle_busses_cnt_pos_dir,
+            wst_2_axle_6_tyre_single_units_cnt_pos_dir,
+            wst_busses_with_3_or_4_axles_cnt_pos_dir,
+            wst_2_axle_6tyre_su_with_trailer_4axles_max_cnt_pos_dir,
+            wst_3_axle_su_incl_single_axle_trailer_cnt_pos_dir,
+            wst_4_or_less_axle_incl_a_single_trailer_cnt_pos_dir,
+            wst_busses_with_5_or_more_axles_cnt_pos_dir,
+            wst_3_axle_su_and_trailer_more_than_4_axles_cnt_pos_dir,
+            wst_5_axle_single_trailer_cnt_pos_dir,
+            wst_6_axle_single_trailer_cnt_pos_dir,
+            wst_5_or_less_axle_multi_trailer_cnt_pos_dir,
+            wst_6_axle_multi_trailer_cnt_pos_dir,
+            wst_7_axle_multi_trailer_cnt_pos_dir,
+            wst_8_or_more_axle_multi_trailer_cnt_pos_dir,
+            wst_2_axle_busses_olhv_perc_pos_dir,
+            wst_2_axle_6_tyre_single_units_olhv_perc_pos_dir,
+            wst_busses_with_3_or_4_axles_olhv_perc_pos_dir,
+            wst_2_axle_6tyre_su_with_trailer_4axles_max_olhv_perc_pos_dir,
+            wst_3_axle_su_incl_single_axle_trailer_olhv_perc_pos_dir,
+            wst_4_or_less_axle_incl_a_single_trailer_olhv_perc_pos_dir,
+            wst_busses_with_5_or_more_axles_olhv_perc_pos_dir,
+            wst_3_axle_su_and_trailer_more_than_4_axles_olhv_perc_pos_dir,
+            wst_5_axle_single_trailer_olhv_perc_pos_dir,
+            wst_6_axle_single_trailer_olhv_perc_pos_dir,
+            wst_5_or_less_axle_multi_trailer_olhv_perc_pos_dir,
+            wst_6_axle_multi_trailer_olhv_perc_pos_dir,
+            wst_7_axle_multi_trailer_olhv_perc_pos_dir,
+            wst_8_or_more_axle_multi_trailer_olhv_perc_pos_dir,
+            wst_2_axle_busses_tonperhv_pos_dir,
+            wst_2_axle_6_tyre_single_units_tonperhv_pos_dir,
+            wst_busses_with_3_or_4_axles_tonperhv_pos_dir,
+            wst_2_axle_6tyre_su_with_trailer_4axles_max_tonperhv_pos_dir,
+            wst_3_axle_su_incl_single_axle_trailer_tonperhv_pos_dir,
+            wst_4_or_less_axle_incl_a_single_trailer_tonperhv_pos_dir,
+            wst_busses_with_5_or_more_axles_tonperhv_pos_dir,
+            wst_3_axle_su_and_trailer_more_than_4_axles_tonperhv_pos_dir,
+            wst_5_axle_single_trailer_tonperhv_pos_dir,
+            wst_6_axle_single_trailer_tonperhv_pos_dir,
+            wst_5_or_less_axle_multi_trailer_tonperhv_pos_dir,
+            wst_6_axle_multi_trailer_tonperhv_pos_dir,
+            wst_7_axle_multi_trailer_tonperhv_pos_dir,
+            wst_8_or_more_axle_multi_trailer_tonperhv_pos_dir,
+            wst_2_axle_busses_cnt_neg_dir,
+            wst_2_axle_6_tyre_single_units_cnt_neg_dir,
+            wst_busses_with_3_or_4_axles_cnt_neg_dir,
+            wst_2_axle_6tyre_su_with_trailer_4axles_max_cnt_neg_dir,
+            wst_3_axle_su_incl_single_axle_trailer_cnt_neg_dir,
+            wst_4_or_less_axle_incl_a_single_trailer_cnt_neg_dir,
+            wst_busses_with_5_or_more_axles_cnt_neg_dir,
+            wst_3_axle_su_and_trailer_more_than_4_axles_cnt_neg_dir,
+            wst_5_axle_single_trailer_cnt_neg_dir,
+            wst_6_axle_single_trailer_cnt_neg_dir,
+            wst_5_or_less_axle_multi_trailer_cnt_neg_dir,
+            wst_6_axle_multi_trailer_cnt_neg_dir,
+            wst_7_axle_multi_trailer_cnt_neg_dir,
+            wst_8_or_more_axle_multi_trailer_cnt_neg_dir,
+            wst_2_axle_busses_olhv_perc_neg_dir,
+            wst_2_axle_6_tyre_single_units_olhv_perc_neg_dir,
+            wst_busses_with_3_or_4_axles_olhv_perc_neg_dir,
+            wst_2_axle_6tyre_su_with_trailer_4axles_max_olhv_perc_neg_dir,
+            wst_3_axle_su_incl_single_axle_trailer_olhv_perc_neg_dir,
+            wst_4_or_less_axle_incl_a_single_trailer_olhv_perc_neg_dir,
+            wst_busses_with_5_or_more_axles_olhv_perc_neg_dir,
+            wst_3_axle_su_and_trailer_more_than_4_axles_olhv_perc_neg_dir,
+            wst_5_axle_single_trailer_olhv_perc_neg_dir,
+            wst_6_axle_single_trailer_olhv_perc_neg_dir,
+            wst_5_or_less_axle_multi_trailer_olhv_perc_neg_dir,
+            wst_6_axle_multi_trailer_olhv_perc_neg_dir,
+            wst_7_axle_multi_trailer_olhv_perc_neg_dir,
+            wst_8_or_more_axle_multi_trailer_olhv_perc_neg_dir,
+            wst_2_axle_busses_tonperhv_neg_dir,
+            wst_2_axle_6_tyre_single_units_tonperhv_neg_dir,
+            wst_busses_with_3_or_4_axles_tonperhv_neg_dir,
+            wst_2_axle_6tyre_su_with_trailer_4axles_max_tonperhv_neg_dir,
+            wst_3_axle_su_incl_single_axle_trailer_tonperhv_neg_dir,
+            wst_4_or_less_axle_incl_a_single_trailer_tonperhv_neg_dir,
+            wst_busses_with_5_or_more_axles_tonperhv_neg_dir,
+            wst_3_axle_su_and_trailer_more_than_4_axles_tonperhv_neg_dir,
+            wst_5_axle_single_trailer_tonperhv_neg_dir,
+            wst_6_axle_single_trailer_tonperhv_neg_dir,
+            wst_5_or_less_axle_multi_trailer_tonperhv_neg_dir,
+            wst_6_axle_multi_trailer_tonperhv_neg_dir,
+            wst_7_axle_multi_trailer_tonperhv_neg_dir,
+            wst_8_or_more_axle_multi_trailer_tonperhv_neg_dir,
+            wst_2_axle_busses_cnt,
+            wst_2_axle_6_tyre_single_units_cnt,
+            wst_busses_with_3_or_4_axles_cnt,
+            wst_2_axle_6tyre_su_with_trailer_4axles_max_cnt,
+            wst_3_axle_su_incl_single_axle_trailer_cnt,
+            wst_4_or_less_axle_incl_a_single_trailer_cnt,
+            wst_busses_with_5_or_more_axles_cnt,
+            wst_3_axle_su_and_trailer_more_than_4_axles_cnt,
+            wst_5_axle_single_trailer_cnt,
+            wst_6_axle_single_trailer_cnt,
+            wst_5_or_less_axle_multi_trailer_cnt,
+            wst_6_axle_multi_trailer_cnt,
+            wst_7_axle_multi_trailer_cnt,
+            wst_8_or_more_axle_multi_trailer_cnt,
+            wst_2_axle_busses_olhv_perc,
+            wst_2_axle_6_tyre_single_units_olhv_perc,
+            wst_busses_with_3_or_4_axles_olhv_perc,
+            wst_2_axle_6tyre_su_with_trailer_4axles_max_olhv_perc,
+            wst_3_axle_su_incl_single_axle_trailer_olhv_perc,
+            wst_4_or_less_axle_incl_a_single_trailer_olhv_perc,
+            wst_busses_with_5_or_more_axles_olhv_perc,
+            wst_3_axle_su_and_trailer_more_than_4_axles_olhv_perc,
+            wst_5_axle_single_trailer_olhv_perc,
+            wst_6_axle_single_trailer_olhv_perc,
+            wst_5_or_less_axle_multi_trailer_olhv_perc,
+            wst_6_axle_multi_trailer_olhv_perc,
+            wst_7_axle_multi_trailer_olhv_perc,
+            wst_8_or_more_axle_multi_trailer_olhv_perc,
+            wst_2_axle_busses_tonperhv,
+            wst_2_axle_6_tyre_single_units_tonperhv,
+            wst_busses_with_3_or_4_axles_tonperhv,
+            wst_2_axle_6tyre_su_with_trailer_4axles_max_tonperhv,
+            wst_3_axle_su_incl_single_axle_trailer_tonperhv,
+            wst_4_or_less_axle_incl_a_single_trailer_tonperhv,
+            wst_busses_with_5_or_more_axles_tonperhv,
+            wst_3_axle_su_and_trailer_more_than_4_axles_tonperhv,
+            wst_5_axle_single_trailer_tonperhv,
+            wst_6_axle_single_trailer_tonperhv,
+            wst_5_or_less_axle_multi_trailer_tonperhv,
+            wst_6_axle_multi_trailer_tonperhv,
+            wst_7_axle_multi_trailer_tonperhv,
+            wst_8_or_more_axle_multi_trailer_tonperhv)
+        VALUES(
+            '{self.header_id}',
+            {self.egrl_percent},
+            {self.egrw_percent},
+            {self.mean_equivalent_axle_mass},
+            {self.mean_equivalent_axle_mass_positive_direction},
+            {self.mean_equivalent_axle_mass_negative_direction},
+            {self.mean_axle_spacing},
+            {self.mean_axle_spacing_positive_direction},
+            {self.mean_axle_spacing_negative_direction},
+            {self.e80_per_axle},
+            {self.e80_per_axle_positive_direction},
+            {self.e80_per_axle_negative_direction},
+            {self.olhv},
+            {self.olhv_positive_direction},
+            {self.olhv_negative_direction},
+            {self.olhv_percent},
+            {self.olhv_percent_positive_direction},
+            {self.olhv_percent_negative_direction},
+            {self.tonnage_generated},
+            {self.tonnage_generated_positive_direction},
+            {self.tonnage_generated_negative_direction},
+            {self.olton},
+            {self.olton_positive_direction},
+            {self.olton_negative_direction},
+            {self.olton_percent},
+            {self.olton_percent_positive_direction},
+            {self.olton_percent_negative_direction},
+            {self.ole80},
+            {self.ole80_positive_direction},
+            {self.ole80_negative_direction},
+            {self.ole80_percent},
+            {self.ole80_percent_positive_direction},
+            {self.ole80_percent_negative_direction},
+            {self.xe80},
+            {self.xe80_positive_direction},
+            {self.xe80_negative_direction},
+            {self.xe80_percent},
+            {self.xe80_percent_positive_direction},
+            {self.xe80_percent_negative_direction},
+            {self.e80_per_day},
+            {self.e80_per_day_positive_direction},
+            {self.e80_per_day_negative_direction},
+            {self.e80_per_heavy_vehicle},
+            {self.e80_per_heavy_vehicle_positive_direction},
+            {self.e80_per_heavy_vehicle_negative_direction},
+            {self.worst_steering_single_axle_cnt},
+            {self.worst_steering_single_axle_olhv_perc},
+            {self.worst_steering_single_axle_tonperhv},
+            {self.worst_steering_double_axle_cnt},
+            {self.worst_steering_double_axle_olhv_perc},
+            {self.worst_steering_double_axle_tonperhv},
+            {self.worst_non_steering_single_axle_cnt},
+            {self.worst_non_steering_single_axle_olhv_perc},
+            {self.worst_non_steering_single_axle_tonperhv},
+            {self.worst_non_steering_double_axle_cnt},
+            {self.worst_non_steering_double_axle_olhv_perc},
+            {self.worst_non_steering_double_axle_tonperhv},
+            {self.worst_triple_axle_cnt},
+            {self.worst_triple_axle_olhv_perc},
+            {self.worst_triple_axle_tonperhv},
+            {self.bridge_formula_cnt},
+            {self.bridge_formula_olhv_perc},
+            {self.bridge_formula_tonperhv},
+            {self.gross_formula_cnt},
+            {self.gross_formula_olhv_perc},
+            {self.gross_formula_tonperhv},
+            {self.total_avg_cnt},
+            {self.total_avg_olhv_perc},
+            {self.total_avg_tonperhv},
+            {self.worst_steering_single_axle_cnt_positive_direciton},
+            {self.worst_steering_single_axle_olhv_perc_positive_direciton},
+            {self.worst_steering_single_axle_tonperhv_positive_direciton},
+            {self.worst_steering_double_axle_cnt_positive_direciton},
+            {self.worst_steering_double_axle_olhv_perc_positive_direciton},
+            {self.worst_steering_double_axle_tonperhv_positive_direciton},
+            {self.worst_non_steering_single_axle_cnt_positive_direciton},
+            {self.worst_non_steering_single_axle_olhv_perc_positive_direciton},
+            {self.worst_non_steering_single_axle_tonperhv_positive_direciton},
+            {self.worst_non_steering_double_axle_cnt_positive_direciton},
+            {self.worst_non_steering_double_axle_olhv_perc_positive_direciton},
+            {self.worst_non_steering_double_axle_tonperhv_positive_direciton},
+            {self.worst_triple_axle_cnt_positive_direciton},
+            {self.worst_triple_axle_olhv_perc_positive_direciton},
+            {self.worst_triple_axle_tonperhv_positive_direciton},
+            {self.bridge_formula_cnt_positive_direciton},
+            {self.bridge_formula_olhv_perc_positive_direciton},
+            {self.bridge_formula_tonperhv_positive_direciton},
+            {self.gross_formula_cnt_positive_direciton},
+            {self.gross_formula_olhv_perc_positive_direciton},
+            {self.gross_formula_tonperhv_positive_direciton},
+            {self.total_avg_cnt_positive_direciton},
+            {self.total_avg_olhv_perc_positive_direciton},
+            {self.total_avg_tonperhv_positive_direciton},
+            {self.worst_steering_single_axle_cnt_negative_direciton},
+            {self.worst_steering_single_axle_olhv_perc_negative_direciton},
+            {self.worst_steering_single_axle_tonperhv_negative_direciton},
+            {self.worst_steering_double_axle_cnt_negative_direciton},
+            {self.worst_steering_double_axle_olhv_perc_negative_direciton},
+            {self.worst_steering_double_axle_tonperhv_negative_direciton},
+            {self.worst_non_steering_single_axle_cnt_negative_direciton},
+            {self.worst_non_steering_single_axle_olhv_perc_negative_direciton},
+            {self.worst_non_steering_single_axle_tonperhv_negative_direciton},
+            {self.worst_non_steering_double_axle_cnt_negative_direciton},
+            {self.worst_non_steering_double_axle_olhv_perc_negative_direciton},
+            {self.worst_non_steering_double_axle_tonperhv_negative_direciton},
+            {self.worst_triple_axle_cnt_negative_direciton},
+            {self.worst_triple_axle_olhv_perc_negative_direciton},
+            {self.worst_triple_axle_tonperhv_negative_direciton},
+            {self.bridge_formula_cnt_negative_direciton},
+            {self.bridge_formula_olhv_perc_negative_direciton},
+            {self.bridge_formula_tonperhv_negative_direciton},
+            {self.gross_formula_cnt_negative_direciton},
+            {self.gross_formula_olhv_perc_negative_direciton},
+            {self.gross_formula_tonperhv_negative_direciton},
+            {self.total_avg_cnt_negative_direciton},
+            {self.total_avg_olhv_perc_negative_direciton},
+            {self.total_avg_tonperhv_negative_direciton},
+            {self.egrl_percent_positive_direction},
+            {self.egrl_percent_negative_direction},
+            {self.egrw_percent_positive_direction},
+            {self.egrw_percent_negative_direction},
+            {self.num_weighed},
+            {self.num_weighed_positive_direction},
+            {self.num_weighed_negative_direction},
+            {self.wst_2_axle_busses_cnt_pos_dir},
+            {self.wst_2_axle_6_tyre_single_units_cnt_pos_dir},
+            {self.wst_busses_with_3_or_4_axles_cnt_pos_dir},
+            {self.wst_2_axle_6tyre_su_with_trailer_4axles_max_cnt_pos_dir},
+            {self.wst_3_axle_su_incl_single_axle_trailer_cnt_pos_dir},
+            {self.wst_4_or_less_axle_incl_a_single_trailer_cnt_pos_dir},
+            {self.wst_busses_with_5_or_more_axles_cnt_pos_dir},
+            {self.wst_3_axle_su_and_trailer_more_than_4_axles_cnt_pos_dir},
+            {self.wst_5_axle_single_trailer_cnt_pos_dir},
+            {self.wst_6_axle_single_trailer_cnt_pos_dir},
+            {self.wst_5_or_less_axle_multi_trailer_cnt_pos_dir},
+            {self.wst_6_axle_multi_trailer_cnt_pos_dir},
+            {self.wst_7_axle_multi_trailer_cnt_pos_dir},
+            {self.wst_8_or_more_axle_multi_trailer_cnt_pos_dir},
+            {self.wst_2_axle_busses_olhv_perc_pos_dir},
+            {self.wst_2_axle_6_tyre_single_units_olhv_perc_pos_dir},
+            {self.wst_busses_with_3_or_4_axles_olhv_perc_pos_dir},
+            {self.wst_2_axle_6tyre_su_with_trailer_4axles_max_olhv_perc_pos_dir},
+            {self.wst_3_axle_su_incl_single_axle_trailer_olhv_perc_pos_dir},
+            {self.wst_4_or_less_axle_incl_a_single_trailer_olhv_perc_pos_dir},
+            {self.wst_busses_with_5_or_more_axles_olhv_perc_pos_dir},
+            {self.wst_3_axle_su_and_trailer_more_than_4_axles_olhv_perc_pos_dir},
+            {self.wst_5_axle_single_trailer_olhv_perc_pos_dir},
+            {self.wst_6_axle_single_trailer_olhv_perc_pos_dir},
+            {self.wst_5_or_less_axle_multi_trailer_olhv_perc_pos_dir},
+            {self.wst_6_axle_multi_trailer_olhv_perc_pos_dir},
+            {self.wst_7_axle_multi_trailer_olhv_perc_pos_dir},
+            {self.wst_8_or_more_axle_multi_trailer_olhv_perc_pos_dir},
+            {self.wst_2_axle_busses_tonperhv_pos_dir},
+            {self.wst_2_axle_6_tyre_single_units_tonperhv_pos_dir},
+            {self.wst_busses_with_3_or_4_axles_tonperhv_pos_dir},
+            {self.wst_2_axle_6tyre_su_with_trailer_4axles_max_tonperhv_pos_dir},
+            {self.wst_3_axle_su_incl_single_axle_trailer_tonperhv_pos_dir},
+            {self.wst_4_or_less_axle_incl_a_single_trailer_tonperhv_pos_dir},
+            {self.wst_busses_with_5_or_more_axles_tonperhv_pos_dir},
+            {self.wst_3_axle_su_and_trailer_more_than_4_axles_tonperhv_pos_dir},
+            {self.wst_5_axle_single_trailer_tonperhv_pos_dir},
+            {self.wst_6_axle_single_trailer_tonperhv_pos_dir},
+            {self.wst_5_or_less_axle_multi_trailer_tonperhv_pos_dir},
+            {self.wst_6_axle_multi_trailer_tonperhv_pos_dir},
+            {self.wst_7_axle_multi_trailer_tonperhv_pos_dir},
+            {self.wst_8_or_more_axle_multi_trailer_tonperhv_pos_dir},
+            {self.wst_2_axle_busses_cnt_neg_dir},
+            {self.wst_2_axle_6_tyre_single_units_cnt_neg_dir},
+            {self.wst_busses_with_3_or_4_axles_cnt_neg_dir},
+            {self.wst_2_axle_6tyre_su_with_trailer_4axles_max_cnt_neg_dir},
+            {self.wst_3_axle_su_incl_single_axle_trailer_cnt_neg_dir},
+            {self.wst_4_or_less_axle_incl_a_single_trailer_cnt_neg_dir},
+            {self.wst_busses_with_5_or_more_axles_cnt_neg_dir},
+            {self.wst_3_axle_su_and_trailer_more_than_4_axles_cnt_neg_dir},
+            {self.wst_5_axle_single_trailer_cnt_neg_dir},
+            {self.wst_6_axle_single_trailer_cnt_neg_dir},
+            {self.wst_5_or_less_axle_multi_trailer_cnt_neg_dir},
+            {self.wst_6_axle_multi_trailer_cnt_neg_dir},
+            {self.wst_7_axle_multi_trailer_cnt_neg_dir},
+            {self.wst_8_or_more_axle_multi_trailer_cnt_neg_dir},
+            {self.wst_2_axle_busses_olhv_perc_neg_dir},
+            {self.wst_2_axle_6_tyre_single_units_olhv_perc_neg_dir},
+            {self.wst_busses_with_3_or_4_axles_olhv_perc_neg_dir},
+            {self.wst_2_axle_6tyre_su_with_trailer_4axles_max_olhv_perc_neg_dir},
+            {self.wst_3_axle_su_incl_single_axle_trailer_olhv_perc_neg_dir},
+            {self.wst_4_or_less_axle_incl_a_single_trailer_olhv_perc_neg_dir},
+            {self.wst_busses_with_5_or_more_axles_olhv_perc_neg_dir},
+            {self.wst_3_axle_su_and_trailer_more_than_4_axles_olhv_perc_neg_dir},
+            {self.wst_5_axle_single_trailer_olhv_perc_neg_dir},
+            {self.wst_6_axle_single_trailer_olhv_perc_neg_dir},
+            {self.wst_5_or_less_axle_multi_trailer_olhv_perc_neg_dir},
+            {self.wst_6_axle_multi_trailer_olhv_perc_neg_dir},
+            {self.wst_7_axle_multi_trailer_olhv_perc_neg_dir},
+            {self.wst_8_or_more_axle_multi_trailer_olhv_perc_neg_dir},
+            {self.wst_2_axle_busses_tonperhv_neg_dir},
+            {self.wst_2_axle_6_tyre_single_units_tonperhv_neg_dir},
+            {self.wst_busses_with_3_or_4_axles_tonperhv_neg_dir},
+            {self.wst_2_axle_6tyre_su_with_trailer_4axles_max_tonperhv_neg_dir},
+            {self.wst_3_axle_su_incl_single_axle_trailer_tonperhv_neg_dir},
+            {self.wst_4_or_less_axle_incl_a_single_trailer_tonperhv_neg_dir},
+            {self.wst_busses_with_5_or_more_axles_tonperhv_neg_dir},
+            {self.wst_3_axle_su_and_trailer_more_than_4_axles_tonperhv_neg_dir},
+            {self.wst_5_axle_single_trailer_tonperhv_neg_dir},
+            {self.wst_6_axle_single_trailer_tonperhv_neg_dir},
+            {self.wst_5_or_less_axle_multi_trailer_tonperhv_neg_dir},
+            {self.wst_6_axle_multi_trailer_tonperhv_neg_dir},
+            {self.wst_7_axle_multi_trailer_tonperhv_neg_dir},
+            {self.wst_8_or_more_axle_multi_trailer_tonperhv_neg_dir},
+            {self.wst_2_axle_busses_cnt},
+            {self.wst_2_axle_6_tyre_single_units_cnt},
+            {self.wst_busses_with_3_or_4_axles_cnt},
+            {self.wst_2_axle_6tyre_su_with_trailer_4axles_max_cnt},
+            {self.wst_3_axle_su_incl_single_axle_trailer_cnt},
+            {self.wst_4_or_less_axle_incl_a_single_trailer_cnt},
+            {self.wst_busses_with_5_or_more_axles_cnt},
+            {self.wst_3_axle_su_and_trailer_more_than_4_axles_cnt},
+            {self.wst_5_axle_single_trailer_cnt},
+            {self.wst_6_axle_single_trailer_cnt},
+            {self.wst_5_or_less_axle_multi_trailer_cnt},
+            {self.wst_6_axle_multi_trailer_cnt},
+            {self.wst_7_axle_multi_trailer_cnt},
+            {self.wst_8_or_more_axle_multi_trailer_cnt},
+            {self.wst_2_axle_busses_olhv_perc},
+            {self.wst_2_axle_6_tyre_single_units_olhv_perc},
+            {self.wst_busses_with_3_or_4_axles_olhv_perc},
+            {self.wst_2_axle_6tyre_su_with_trailer_4axles_max_olhv_perc},
+            {self.wst_3_axle_su_incl_single_axle_trailer_olhv_perc},
+            {self.wst_4_or_less_axle_incl_a_single_trailer_olhv_perc},
+            {self.wst_busses_with_5_or_more_axles_olhv_perc},
+            {self.wst_3_axle_su_and_trailer_more_than_4_axles_olhv_perc},
+            {self.wst_5_axle_single_trailer_olhv_perc},
+            {self.wst_6_axle_single_trailer_olhv_perc},
+            {self.wst_5_or_less_axle_multi_trailer_olhv_perc},
+            {self.wst_6_axle_multi_trailer_olhv_perc},
+            {self.wst_7_axle_multi_trailer_olhv_perc},
+            {self.wst_8_or_more_axle_multi_trailer_olhv_perc},
+            {self.wst_2_axle_busses_tonperhv},
+            {self.wst_2_axle_6_tyre_single_units_tonperhv},
+            {self.wst_busses_with_3_or_4_axles_tonperhv},
+            {self.wst_2_axle_6tyre_su_with_trailer_4axles_max_tonperhv},
+            {self.wst_3_axle_su_incl_single_axle_trailer_tonperhv},
+            {self.wst_4_or_less_axle_incl_a_single_trailer_tonperhv},
+            {self.wst_busses_with_5_or_more_axles_tonperhv},
+            {self.wst_3_axle_su_and_trailer_more_than_4_axles_tonperhv},
+            {self.wst_5_axle_single_trailer_tonperhv},
+            {self.wst_6_axle_single_trailer_tonperhv},
+            {self.wst_5_or_less_axle_multi_trailer_tonperhv},
+            {self.wst_6_axle_multi_trailer_tonperhv},
+            {self.wst_7_axle_multi_trailer_tonperhv},
+            {self.wst_8_or_more_axle_multi_trailer_tonperhv})
+            ON CONFLICT ON CONSTRAINT electronic_count_header_hswim_pkey DO UPDATE SET 
+            egrl_percent = COALESCE(EXCLUDED.egrl_percent,egrl_percent),
+            egrw_percent = COALESCE(EXCLUDED.egrw_percent,egrw_percent),
+            mean_equivalent_axle_mass = COALESCE(EXCLUDED.mean_equivalent_axle_mass,mean_equivalent_axle_mass),
+            mean_equivalent_axle_mass_positive_direction = COALESCE(EXCLUDED.mean_equivalent_axle_mass_positive_direction,mean_equivalent_axle_mass_positive_direction),
+            mean_equivalent_axle_mass_negative_direction = COALESCE(EXCLUDED.mean_equivalent_axle_mass_negative_direction,mean_equivalent_axle_mass_negative_direction),
+            mean_axle_spacing = COALESCE(EXCLUDED.mean_axle_spacing,mean_axle_spacing),
+            mean_axle_spacing_positive_direction = COALESCE(EXCLUDED.mean_axle_spacing_positive_direction,mean_axle_spacing_positive_direction),
+            mean_axle_spacing_negative_direction = COALESCE(EXCLUDED.mean_axle_spacing_negative_direction,mean_axle_spacing_negative_direction),
+            e80_per_axle = COALESCE(EXCLUDED.e80_per_axle,e80_per_axle),
+            e80_per_axle_positive_direction = COALESCE(EXCLUDED.e80_per_axle_positive_direction,e80_per_axle_positive_direction),
+            e80_per_axle_negative_direction = COALESCE(EXCLUDED.e80_per_axle_negative_direction,e80_per_axle_negative_direction),
+            olhv = COALESCE(EXCLUDED.olhv,olhv),
+            olhv_positive_direction = COALESCE(EXCLUDED.olhv_positive_direction,olhv_positive_direction),
+            olhv_negative_direction = COALESCE(EXCLUDED.olhv_negative_direction,olhv_negative_direction),
+            olhv_percent = COALESCE(EXCLUDED.olhv_percent,olhv_percent),
+            olhv_percent_positive_direction = COALESCE(EXCLUDED.olhv_percent_positive_direction,olhv_percent_positive_direction),
+            olhv_percent_negative_direction = COALESCE(EXCLUDED.olhv_percent_negative_direction,olhv_percent_negative_direction),
+            tonnage_generated = COALESCE(EXCLUDED.tonnage_generated,tonnage_generated),
+            tonnage_generated_positive_direction = COALESCE(EXCLUDED.tonnage_generated_positive_direction,tonnage_generated_positive_direction),
+            tonnage_generated_negative_direction = COALESCE(EXCLUDED.tonnage_generated_negative_direction,tonnage_generated_negative_direction),
+            olton = COALESCE(EXCLUDED.olton,olton),
+            olton_positive_direction = COALESCE(EXCLUDED.olton_positive_direction,olton_positive_direction),
+            olton_negative_direction = COALESCE(EXCLUDED.olton_negative_direction,olton_negative_direction),
+            olton_percent = COALESCE(EXCLUDED.olton_percent,olton_percent),
+            olton_percent_positive_direction = COALESCE(EXCLUDED.olton_percent_positive_direction,olton_percent_positive_direction),
+            olton_percent_negative_direction = COALESCE(EXCLUDED.olton_percent_negative_direction,olton_percent_negative_direction),
+            ole8 = COALESCE(EXCLUDED.ole8,ole8),
+            ole80_positive_direction = COALESCE(EXCLUDED.ole80_positive_direction,ole80_positive_direction),
+            ole80_negative_direction = COALESCE(EXCLUDED.ole80_negative_direction,ole80_negative_direction),
+            ole80_percent = COALESCE(EXCLUDED.ole80_percent,ole80_percent),
+            ole80_percent_positive_direction = COALESCE(EXCLUDED.ole80_percent_positive_direction,ole80_percent_positive_direction),
+            ole80_percent_negative_direction = COALESCE(EXCLUDED.ole80_percent_negative_direction,ole80_percent_negative_direction),
+            xe8 = COALESCE(EXCLUDED.xe8,xe8),
+            xe80_positive_direction = COALESCE(EXCLUDED.xe80_positive_direction,xe80_positive_direction),
+            xe80_negative_direction = COALESCE(EXCLUDED.xe80_negative_direction,xe80_negative_direction),
+            xe80_percent = COALESCE(EXCLUDED.xe80_percent,xe80_percent),
+            xe80_percent_positive_direction = COALESCE(EXCLUDED.xe80_percent_positive_direction,xe80_percent_positive_direction),
+            xe80_percent_negative_direction = COALESCE(EXCLUDED.xe80_percent_negative_direction,xe80_percent_negative_direction),
+            e80_per_day = COALESCE(EXCLUDED.e80_per_day,e80_per_day),
+            e80_per_day_positive_direction = COALESCE(EXCLUDED.e80_per_day_positive_direction,e80_per_day_positive_direction),
+            e80_per_day_negative_direction = COALESCE(EXCLUDED.e80_per_day_negative_direction,e80_per_day_negative_direction),
+            e80_per_heavy_vehicle = COALESCE(EXCLUDED.e80_per_heavy_vehicle,e80_per_heavy_vehicle),
+            e80_per_heavy_vehicle_positive_direction = COALESCE(EXCLUDED.e80_per_heavy_vehicle_positive_direction,e80_per_heavy_vehicle_positive_direction),
+            e80_per_heavy_vehicle_negative_direction = COALESCE(EXCLUDED.e80_per_heavy_vehicle_negative_direction,e80_per_heavy_vehicle_negative_direction),
+            worst_steering_single_axle_cnt = COALESCE(EXCLUDED.worst_steering_single_axle_cnt,worst_steering_single_axle_cnt),
+            worst_steering_single_axle_olhv_perc = COALESCE(EXCLUDED.worst_steering_single_axle_olhv_perc,worst_steering_single_axle_olhv_perc),
+            worst_steering_single_axle_tonperhv = COALESCE(EXCLUDED.worst_steering_single_axle_tonperhv,worst_steering_single_axle_tonperhv),
+            worst_steering_double_axle_cnt = COALESCE(EXCLUDED.worst_steering_double_axle_cnt,worst_steering_double_axle_cnt),
+            worst_steering_double_axle_olhv_perc = COALESCE(EXCLUDED.worst_steering_double_axle_olhv_perc,worst_steering_double_axle_olhv_perc),
+            worst_steering_double_axle_tonperhv = COALESCE(EXCLUDED.worst_steering_double_axle_tonperhv,worst_steering_double_axle_tonperhv),
+            worst_non_steering_single_axle_cnt = COALESCE(EXCLUDED.worst_non_steering_single_axle_cnt,worst_non_steering_single_axle_cnt),
+            worst_non_steering_single_axle_olhv_perc = COALESCE(EXCLUDED.worst_non_steering_single_axle_olhv_perc,worst_non_steering_single_axle_olhv_perc),
+            worst_non_steering_single_axle_tonperhv = COALESCE(EXCLUDED.worst_non_steering_single_axle_tonperhv,worst_non_steering_single_axle_tonperhv),
+            worst_non_steering_double_axle_cnt = COALESCE(EXCLUDED.worst_non_steering_double_axle_cnt,worst_non_steering_double_axle_cnt),
+            worst_non_steering_double_axle_olhv_perc = COALESCE(EXCLUDED.worst_non_steering_double_axle_olhv_perc,worst_non_steering_double_axle_olhv_perc),
+            worst_non_steering_double_axle_tonperhv = COALESCE(EXCLUDED.worst_non_steering_double_axle_tonperhv,worst_non_steering_double_axle_tonperhv),
+            worst_triple_axle_cnt = COALESCE(EXCLUDED.worst_triple_axle_cnt,worst_triple_axle_cnt),
+            worst_triple_axle_olhv_perc = COALESCE(EXCLUDED.worst_triple_axle_olhv_perc,worst_triple_axle_olhv_perc),
+            worst_triple_axle_tonperhv = COALESCE(EXCLUDED.worst_triple_axle_tonperhv,worst_triple_axle_tonperhv),
+            bridge_formula_cnt = COALESCE(EXCLUDED.bridge_formula_cnt,bridge_formula_cnt),
+            bridge_formula_olhv_perc = COALESCE(EXCLUDED.bridge_formula_olhv_perc,bridge_formula_olhv_perc),
+            bridge_formula_tonperhv = COALESCE(EXCLUDED.bridge_formula_tonperhv,bridge_formula_tonperhv),
+            gross_formula_cnt = COALESCE(EXCLUDED.gross_formula_cnt,gross_formula_cnt),
+            gross_formula_olhv_perc = COALESCE(EXCLUDED.gross_formula_olhv_perc,gross_formula_olhv_perc),
+            gross_formula_tonperhv = COALESCE(EXCLUDED.gross_formula_tonperhv,gross_formula_tonperhv),
+            total_avg_cnt = COALESCE(EXCLUDED.total_avg_cnt,total_avg_cnt),
+            total_avg_olhv_perc = COALESCE(EXCLUDED.total_avg_olhv_perc,total_avg_olhv_perc),
+            total_avg_tonperhv = COALESCE(EXCLUDED.total_avg_tonperhv,total_avg_tonperhv),
+            worst_steering_single_axle_cnt_positive_direciton = COALESCE(EXCLUDED.worst_steering_single_axle_cnt_positive_direciton,worst_steering_single_axle_cnt_positive_direciton),
+            worst_steering_single_axle_olhv_perc_positive_direciton = COALESCE(EXCLUDED.worst_steering_single_axle_olhv_perc_positive_direciton,worst_steering_single_axle_olhv_perc_positive_direciton),
+            worst_steering_single_axle_tonperhv_positive_direciton = COALESCE(EXCLUDED.worst_steering_single_axle_tonperhv_positive_direciton,worst_steering_single_axle_tonperhv_positive_direciton),
+            worst_steering_double_axle_cnt_positive_direciton = COALESCE(EXCLUDED.worst_steering_double_axle_cnt_positive_direciton,worst_steering_double_axle_cnt_positive_direciton),
+            worst_steering_double_axle_olhv_perc_positive_direciton = COALESCE(EXCLUDED.worst_steering_double_axle_olhv_perc_positive_direciton,worst_steering_double_axle_olhv_perc_positive_direciton),
+            worst_steering_double_axle_tonperhv_positive_direciton = COALESCE(EXCLUDED.worst_steering_double_axle_tonperhv_positive_direciton,worst_steering_double_axle_tonperhv_positive_direciton),
+            worst_non_steering_single_axle_cnt_positive_direciton = COALESCE(EXCLUDED.worst_non_steering_single_axle_cnt_positive_direciton,worst_non_steering_single_axle_cnt_positive_direciton),
+            worst_non_steering_single_axle_olhv_perc_positive_direciton = COALESCE(EXCLUDED.worst_non_steering_single_axle_olhv_perc_positive_direciton,worst_non_steering_single_axle_olhv_perc_positive_direciton),
+            worst_non_steering_single_axle_tonperhv_positive_direciton = COALESCE(EXCLUDED.worst_non_steering_single_axle_tonperhv_positive_direciton,worst_non_steering_single_axle_tonperhv_positive_direciton),
+            worst_non_steering_double_axle_cnt_positive_direciton = COALESCE(EXCLUDED.worst_non_steering_double_axle_cnt_positive_direciton,worst_non_steering_double_axle_cnt_positive_direciton),
+            worst_non_steering_double_axle_olhv_perc_positive_direciton = COALESCE(EXCLUDED.worst_non_steering_double_axle_olhv_perc_positive_direciton,worst_non_steering_double_axle_olhv_perc_positive_direciton),
+            worst_non_steering_double_axle_tonperhv_positive_direciton = COALESCE(EXCLUDED.worst_non_steering_double_axle_tonperhv_positive_direciton,worst_non_steering_double_axle_tonperhv_positive_direciton),
+            worst_triple_axle_cnt_positive_direciton = COALESCE(EXCLUDED.worst_triple_axle_cnt_positive_direciton,worst_triple_axle_cnt_positive_direciton),
+            worst_triple_axle_olhv_perc_positive_direciton = COALESCE(EXCLUDED.worst_triple_axle_olhv_perc_positive_direciton,worst_triple_axle_olhv_perc_positive_direciton),
+            worst_triple_axle_tonperhv_positive_direciton = COALESCE(EXCLUDED.worst_triple_axle_tonperhv_positive_direciton,worst_triple_axle_tonperhv_positive_direciton),
+            bridge_formula_cnt_positive_direciton = COALESCE(EXCLUDED.bridge_formula_cnt_positive_direciton,bridge_formula_cnt_positive_direciton),
+            bridge_formula_olhv_perc_positive_direciton = COALESCE(EXCLUDED.bridge_formula_olhv_perc_positive_direciton,bridge_formula_olhv_perc_positive_direciton),
+            bridge_formula_tonperhv_positive_direciton = COALESCE(EXCLUDED.bridge_formula_tonperhv_positive_direciton,bridge_formula_tonperhv_positive_direciton),
+            gross_formula_cnt_positive_direciton = COALESCE(EXCLUDED.gross_formula_cnt_positive_direciton,gross_formula_cnt_positive_direciton),
+            gross_formula_olhv_perc_positive_direciton = COALESCE(EXCLUDED.gross_formula_olhv_perc_positive_direciton,gross_formula_olhv_perc_positive_direciton),
+            gross_formula_tonperhv_positive_direciton = COALESCE(EXCLUDED.gross_formula_tonperhv_positive_direciton,gross_formula_tonperhv_positive_direciton),
+            total_avg_cnt_positive_direciton = COALESCE(EXCLUDED.total_avg_cnt_positive_direciton,total_avg_cnt_positive_direciton),
+            total_avg_olhv_perc_positive_direciton = COALESCE(EXCLUDED.total_avg_olhv_perc_positive_direciton,total_avg_olhv_perc_positive_direciton),
+            total_avg_tonperhv_positive_direciton = COALESCE(EXCLUDED.total_avg_tonperhv_positive_direciton,total_avg_tonperhv_positive_direciton),
+            worst_steering_single_axle_cnt_negative_direciton = COALESCE(EXCLUDED.worst_steering_single_axle_cnt_negative_direciton,worst_steering_single_axle_cnt_negative_direciton),
+            worst_steering_single_axle_olhv_perc_negative_direciton = COALESCE(EXCLUDED.worst_steering_single_axle_olhv_perc_negative_direciton,worst_steering_single_axle_olhv_perc_negative_direciton),
+            worst_steering_single_axle_tonperhv_negative_direciton = COALESCE(EXCLUDED.worst_steering_single_axle_tonperhv_negative_direciton,worst_steering_single_axle_tonperhv_negative_direciton),
+            worst_steering_double_axle_cnt_negative_direciton = COALESCE(EXCLUDED.worst_steering_double_axle_cnt_negative_direciton,worst_steering_double_axle_cnt_negative_direciton),
+            worst_steering_double_axle_olhv_perc_negative_direciton = COALESCE(EXCLUDED.worst_steering_double_axle_olhv_perc_negative_direciton,worst_steering_double_axle_olhv_perc_negative_direciton),
+            worst_steering_double_axle_tonperhv_negative_direciton = COALESCE(EXCLUDED.worst_steering_double_axle_tonperhv_negative_direciton,worst_steering_double_axle_tonperhv_negative_direciton),
+            worst_non_steering_single_axle_cnt_negative_direciton = COALESCE(EXCLUDED.worst_non_steering_single_axle_cnt_negative_direciton,worst_non_steering_single_axle_cnt_negative_direciton),
+            worst_non_steering_single_axle_olhv_perc_negative_direciton = COALESCE(EXCLUDED.worst_non_steering_single_axle_olhv_perc_negative_direciton,worst_non_steering_single_axle_olhv_perc_negative_direciton),
+            worst_non_steering_single_axle_tonperhv_negative_direciton = COALESCE(EXCLUDED.worst_non_steering_single_axle_tonperhv_negative_direciton,worst_non_steering_single_axle_tonperhv_negative_direciton),
+            worst_non_steering_double_axle_cnt_negative_direciton = COALESCE(EXCLUDED.worst_non_steering_double_axle_cnt_negative_direciton,worst_non_steering_double_axle_cnt_negative_direciton),
+            worst_non_steering_double_axle_olhv_perc_negative_direciton = COALESCE(EXCLUDED.worst_non_steering_double_axle_olhv_perc_negative_direciton,worst_non_steering_double_axle_olhv_perc_negative_direciton),
+            worst_non_steering_double_axle_tonperhv_negative_direciton = COALESCE(EXCLUDED.worst_non_steering_double_axle_tonperhv_negative_direciton,worst_non_steering_double_axle_tonperhv_negative_direciton),
+            worst_triple_axle_cnt_negative_direciton = COALESCE(EXCLUDED.worst_triple_axle_cnt_negative_direciton,worst_triple_axle_cnt_negative_direciton),
+            worst_triple_axle_olhv_perc_negative_direciton = COALESCE(EXCLUDED.worst_triple_axle_olhv_perc_negative_direciton,worst_triple_axle_olhv_perc_negative_direciton),
+            worst_triple_axle_tonperhv_negative_direciton = COALESCE(EXCLUDED.worst_triple_axle_tonperhv_negative_direciton,worst_triple_axle_tonperhv_negative_direciton),
+            bridge_formula_cnt_negative_direciton = COALESCE(EXCLUDED.bridge_formula_cnt_negative_direciton,bridge_formula_cnt_negative_direciton),
+            bridge_formula_olhv_perc_negative_direciton = COALESCE(EXCLUDED.bridge_formula_olhv_perc_negative_direciton,bridge_formula_olhv_perc_negative_direciton),
+            bridge_formula_tonperhv_negative_direciton = COALESCE(EXCLUDED.bridge_formula_tonperhv_negative_direciton,bridge_formula_tonperhv_negative_direciton),
+            gross_formula_cnt_negative_direciton = COALESCE(EXCLUDED.gross_formula_cnt_negative_direciton,gross_formula_cnt_negative_direciton),
+            gross_formula_olhv_perc_negative_direciton = COALESCE(EXCLUDED.gross_formula_olhv_perc_negative_direciton,gross_formula_olhv_perc_negative_direciton),
+            gross_formula_tonperhv_negative_direciton = COALESCE(EXCLUDED.gross_formula_tonperhv_negative_direciton,gross_formula_tonperhv_negative_direciton),
+            total_avg_cnt_negative_direciton = COALESCE(EXCLUDED.total_avg_cnt_negative_direciton,total_avg_cnt_negative_direciton),
+            total_avg_olhv_perc_negative_direciton = COALESCE(EXCLUDED.total_avg_olhv_perc_negative_direciton,total_avg_olhv_perc_negative_direciton),
+            total_avg_tonperhv_negative_direciton = COALESCE(EXCLUDED.total_avg_tonperhv_negative_direciton,total_avg_tonperhv_negative_direciton),
+            egrl_percent_positive_direction = COALESCE(EXCLUDED.egrl_percent_positive_direction,egrl_percent_positive_direction),
+            egrl_percent_negative_direction = COALESCE(EXCLUDED.egrl_percent_negative_direction,egrl_percent_negative_direction),
+            egrw_percent_positive_direction = COALESCE(EXCLUDED.egrw_percent_positive_direction,egrw_percent_positive_direction),
+            egrw_percent_negative_direction = COALESCE(EXCLUDED.egrw_percent_negative_direction,egrw_percent_negative_direction),
+            num_weighed = COALESCE(EXCLUDED.num_weighed,num_weighed),
+            num_weighed_positive_direction = COALESCE(EXCLUDED.num_weighed_positive_direction,num_weighed_positive_direction),
+            num_weighed_negative_direction = COALESCE(EXCLUDED.num_weighed_negative_direction,num_weighed_negative_direction),
+            wst_2_axle_busses_cnt_pos_dir = COALESCE(EXCLUDED.wst_2_axle_busses_cnt_pos_dir,wst_2_axle_busses_cnt_pos_dir),
+            wst_2_axle_6_tyre_single_units_cnt_pos_dir = COALESCE(EXCLUDED.wst_2_axle_6_tyre_single_units_cnt_pos_dir,wst_2_axle_6_tyre_single_units_cnt_pos_dir),
+            wst_busses_with_3_or_4_axles_cnt_pos_dir = COALESCE(EXCLUDED.wst_busses_with_3_or_4_axles_cnt_pos_dir,wst_busses_with_3_or_4_axles_cnt_pos_dir),
+            wst_2_axle_6tyre_su_with_trailer_4axles_max_cnt_pos_dir = COALESCE(EXCLUDED.wst_2_axle_6tyre_su_with_trailer_4axles_max_cnt_pos_dir,wst_2_axle_6tyre_su_with_trailer_4axles_max_cnt_pos_dir),
+            wst_3_axle_su_incl_single_axle_trailer_cnt_pos_dir = COALESCE(EXCLUDED.wst_3_axle_su_incl_single_axle_trailer_cnt_pos_dir,wst_3_axle_su_incl_single_axle_trailer_cnt_pos_dir),
+            wst_4_or_less_axle_incl_a_single_trailer_cnt_pos_dir = COALESCE(EXCLUDED.wst_4_or_less_axle_incl_a_single_trailer_cnt_pos_dir,wst_4_or_less_axle_incl_a_single_trailer_cnt_pos_dir),
+            wst_busses_with_5_or_more_axles_cnt_pos_dir = COALESCE(EXCLUDED.wst_busses_with_5_or_more_axles_cnt_pos_dir,wst_busses_with_5_or_more_axles_cnt_pos_dir),
+            wst_3_axle_su_and_trailer_more_than_4_axles_cnt_pos_dir = COALESCE(EXCLUDED.wst_3_axle_su_and_trailer_more_than_4_axles_cnt_pos_dir,wst_3_axle_su_and_trailer_more_than_4_axles_cnt_pos_dir),
+            wst_5_axle_single_trailer_cnt_pos_dir = COALESCE(EXCLUDED.wst_5_axle_single_trailer_cnt_pos_dir,wst_5_axle_single_trailer_cnt_pos_dir),
+            wst_6_axle_single_trailer_cnt_pos_dir = COALESCE(EXCLUDED.wst_6_axle_single_trailer_cnt_pos_dir,wst_6_axle_single_trailer_cnt_pos_dir),
+            wst_5_or_less_axle_multi_trailer_cnt_pos_dir = COALESCE(EXCLUDED.wst_5_or_less_axle_multi_trailer_cnt_pos_dir,wst_5_or_less_axle_multi_trailer_cnt_pos_dir),
+            wst_6_axle_multi_trailer_cnt_pos_dir = COALESCE(EXCLUDED.wst_6_axle_multi_trailer_cnt_pos_dir,wst_6_axle_multi_trailer_cnt_pos_dir),
+            wst_7_axle_multi_trailer_cnt_pos_dir = COALESCE(EXCLUDED.wst_7_axle_multi_trailer_cnt_pos_dir,wst_7_axle_multi_trailer_cnt_pos_dir),
+            wst_8_or_more_axle_multi_trailer_cnt_pos_dir = COALESCE(EXCLUDED.wst_8_or_more_axle_multi_trailer_cnt_pos_dir,wst_8_or_more_axle_multi_trailer_cnt_pos_dir),
+            wst_2_axle_busses_olhv_perc_pos_dir = COALESCE(EXCLUDED.wst_2_axle_busses_olhv_perc_pos_dir,wst_2_axle_busses_olhv_perc_pos_dir),
+            wst_2_axle_6_tyre_single_units_olhv_perc_pos_dir = COALESCE(EXCLUDED.wst_2_axle_6_tyre_single_units_olhv_perc_pos_dir,wst_2_axle_6_tyre_single_units_olhv_perc_pos_dir),
+            wst_busses_with_3_or_4_axles_olhv_perc_pos_dir = COALESCE(EXCLUDED.wst_busses_with_3_or_4_axles_olhv_perc_pos_dir,wst_busses_with_3_or_4_axles_olhv_perc_pos_dir),
+            wst_2_axle_6tyre_su_with_trailer_4axles_max_olhv_perc_pos_dir = COALESCE(EXCLUDED.wst_2_axle_6tyre_su_with_trailer_4axles_max_olhv_perc_pos_dir,wst_2_axle_6tyre_su_with_trailer_4axles_max_olhv_perc_pos_dir),
+            wst_3_axle_su_incl_single_axle_trailer_olhv_perc_pos_dir = COALESCE(EXCLUDED.wst_3_axle_su_incl_single_axle_trailer_olhv_perc_pos_dir,wst_3_axle_su_incl_single_axle_trailer_olhv_perc_pos_dir),
+            wst_4_or_less_axle_incl_a_single_trailer_olhv_perc_pos_dir = COALESCE(EXCLUDED.wst_4_or_less_axle_incl_a_single_trailer_olhv_perc_pos_dir,wst_4_or_less_axle_incl_a_single_trailer_olhv_perc_pos_dir),
+            wst_busses_with_5_or_more_axles_olhv_perc_pos_dir = COALESCE(EXCLUDED.wst_busses_with_5_or_more_axles_olhv_perc_pos_dir,wst_busses_with_5_or_more_axles_olhv_perc_pos_dir),
+            wst_3_axle_su_and_trailer_more_than_4_axles_olhv_perc_pos_dir = COALESCE(EXCLUDED.wst_3_axle_su_and_trailer_more_than_4_axles_olhv_perc_pos_dir,wst_3_axle_su_and_trailer_more_than_4_axles_olhv_perc_pos_dir),
+            wst_5_axle_single_trailer_olhv_perc_pos_dir = COALESCE(EXCLUDED.wst_5_axle_single_trailer_olhv_perc_pos_dir,wst_5_axle_single_trailer_olhv_perc_pos_dir),
+            wst_6_axle_single_trailer_olhv_perc_pos_dir = COALESCE(EXCLUDED.wst_6_axle_single_trailer_olhv_perc_pos_dir,wst_6_axle_single_trailer_olhv_perc_pos_dir),
+            wst_5_or_less_axle_multi_trailer_olhv_perc_pos_dir = COALESCE(EXCLUDED.wst_5_or_less_axle_multi_trailer_olhv_perc_pos_dir,wst_5_or_less_axle_multi_trailer_olhv_perc_pos_dir),
+            wst_6_axle_multi_trailer_olhv_perc_pos_dir = COALESCE(EXCLUDED.wst_6_axle_multi_trailer_olhv_perc_pos_dir,wst_6_axle_multi_trailer_olhv_perc_pos_dir),
+            wst_7_axle_multi_trailer_olhv_perc_pos_dir = COALESCE(EXCLUDED.wst_7_axle_multi_trailer_olhv_perc_pos_dir,wst_7_axle_multi_trailer_olhv_perc_pos_dir),
+            wst_8_or_more_axle_multi_trailer_olhv_perc_pos_dir = COALESCE(EXCLUDED.wst_8_or_more_axle_multi_trailer_olhv_perc_pos_dir,wst_8_or_more_axle_multi_trailer_olhv_perc_pos_dir),
+            wst_2_axle_busses_tonperhv_pos_dir = COALESCE(EXCLUDED.wst_2_axle_busses_tonperhv_pos_dir,wst_2_axle_busses_tonperhv_pos_dir),
+            wst_2_axle_6_tyre_single_units_tonperhv_pos_dir = COALESCE(EXCLUDED.wst_2_axle_6_tyre_single_units_tonperhv_pos_dir,wst_2_axle_6_tyre_single_units_tonperhv_pos_dir),
+            wst_busses_with_3_or_4_axles_tonperhv_pos_dir = COALESCE(EXCLUDED.wst_busses_with_3_or_4_axles_tonperhv_pos_dir,wst_busses_with_3_or_4_axles_tonperhv_pos_dir),
+            wst_2_axle_6tyre_su_with_trailer_4axles_max_tonperhv_pos_dir = COALESCE(EXCLUDED.wst_2_axle_6tyre_su_with_trailer_4axles_max_tonperhv_pos_dir,wst_2_axle_6tyre_su_with_trailer_4axles_max_tonperhv_pos_dir),
+            wst_3_axle_su_incl_single_axle_trailer_tonperhv_pos_dir = COALESCE(EXCLUDED.wst_3_axle_su_incl_single_axle_trailer_tonperhv_pos_dir,wst_3_axle_su_incl_single_axle_trailer_tonperhv_pos_dir),
+            wst_4_or_less_axle_incl_a_single_trailer_tonperhv_pos_dir = COALESCE(EXCLUDED.wst_4_or_less_axle_incl_a_single_trailer_tonperhv_pos_dir,wst_4_or_less_axle_incl_a_single_trailer_tonperhv_pos_dir),
+            wst_busses_with_5_or_more_axles_tonperhv_pos_dir = COALESCE(EXCLUDED.wst_busses_with_5_or_more_axles_tonperhv_pos_dir,wst_busses_with_5_or_more_axles_tonperhv_pos_dir),
+            wst_3_axle_su_and_trailer_more_than_4_axles_tonperhv_pos_dir = COALESCE(EXCLUDED.wst_3_axle_su_and_trailer_more_than_4_axles_tonperhv_pos_dir,wst_3_axle_su_and_trailer_more_than_4_axles_tonperhv_pos_dir),
+            wst_5_axle_single_trailer_tonperhv_pos_dir = COALESCE(EXCLUDED.wst_5_axle_single_trailer_tonperhv_pos_dir,wst_5_axle_single_trailer_tonperhv_pos_dir),
+            wst_6_axle_single_trailer_tonperhv_pos_dir = COALESCE(EXCLUDED.wst_6_axle_single_trailer_tonperhv_pos_dir,wst_6_axle_single_trailer_tonperhv_pos_dir),
+            wst_5_or_less_axle_multi_trailer_tonperhv_pos_dir = COALESCE(EXCLUDED.wst_5_or_less_axle_multi_trailer_tonperhv_pos_dir,wst_5_or_less_axle_multi_trailer_tonperhv_pos_dir),
+            wst_6_axle_multi_trailer_tonperhv_pos_dir = COALESCE(EXCLUDED.wst_6_axle_multi_trailer_tonperhv_pos_dir,wst_6_axle_multi_trailer_tonperhv_pos_dir),
+            wst_7_axle_multi_trailer_tonperhv_pos_dir = COALESCE(EXCLUDED.wst_7_axle_multi_trailer_tonperhv_pos_dir,wst_7_axle_multi_trailer_tonperhv_pos_dir),
+            wst_8_or_more_axle_multi_trailer_tonperhv_pos_dir = COALESCE(EXCLUDED.wst_8_or_more_axle_multi_trailer_tonperhv_pos_dir,wst_8_or_more_axle_multi_trailer_tonperhv_pos_dir),
+            wst_2_axle_busses_cnt_neg_dir = COALESCE(EXCLUDED.wst_2_axle_busses_cnt_neg_dir,wst_2_axle_busses_cnt_neg_dir),
+            wst_2_axle_6_tyre_single_units_cnt_neg_dir = COALESCE(EXCLUDED.wst_2_axle_6_tyre_single_units_cnt_neg_dir,wst_2_axle_6_tyre_single_units_cnt_neg_dir),
+            wst_busses_with_3_or_4_axles_cnt_neg_dir = COALESCE(EXCLUDED.wst_busses_with_3_or_4_axles_cnt_neg_dir,wst_busses_with_3_or_4_axles_cnt_neg_dir),
+            wst_2_axle_6tyre_su_with_trailer_4axles_max_cnt_neg_dir = COALESCE(EXCLUDED.wst_2_axle_6tyre_su_with_trailer_4axles_max_cnt_neg_dir,wst_2_axle_6tyre_su_with_trailer_4axles_max_cnt_neg_dir),
+            wst_3_axle_su_incl_single_axle_trailer_cnt_neg_dir = COALESCE(EXCLUDED.wst_3_axle_su_incl_single_axle_trailer_cnt_neg_dir,wst_3_axle_su_incl_single_axle_trailer_cnt_neg_dir),
+            wst_4_or_less_axle_incl_a_single_trailer_cnt_neg_dir = COALESCE(EXCLUDED.wst_4_or_less_axle_incl_a_single_trailer_cnt_neg_dir,wst_4_or_less_axle_incl_a_single_trailer_cnt_neg_dir),
+            wst_busses_with_5_or_more_axles_cnt_neg_dir = COALESCE(EXCLUDED.wst_busses_with_5_or_more_axles_cnt_neg_dir,wst_busses_with_5_or_more_axles_cnt_neg_dir),
+            wst_3_axle_su_and_trailer_more_than_4_axles_cnt_neg_dir = COALESCE(EXCLUDED.wst_3_axle_su_and_trailer_more_than_4_axles_cnt_neg_dir,wst_3_axle_su_and_trailer_more_than_4_axles_cnt_neg_dir),
+            wst_5_axle_single_trailer_cnt_neg_dir = COALESCE(EXCLUDED.wst_5_axle_single_trailer_cnt_neg_dir,wst_5_axle_single_trailer_cnt_neg_dir),
+            wst_6_axle_single_trailer_cnt_neg_dir = COALESCE(EXCLUDED.wst_6_axle_single_trailer_cnt_neg_dir,wst_6_axle_single_trailer_cnt_neg_dir),
+            wst_5_or_less_axle_multi_trailer_cnt_neg_dir = COALESCE(EXCLUDED.wst_5_or_less_axle_multi_trailer_cnt_neg_dir,wst_5_or_less_axle_multi_trailer_cnt_neg_dir),
+            wst_6_axle_multi_trailer_cnt_neg_dir = COALESCE(EXCLUDED.wst_6_axle_multi_trailer_cnt_neg_dir,wst_6_axle_multi_trailer_cnt_neg_dir),
+            wst_7_axle_multi_trailer_cnt_neg_dir = COALESCE(EXCLUDED.wst_7_axle_multi_trailer_cnt_neg_dir,wst_7_axle_multi_trailer_cnt_neg_dir),
+            wst_8_or_more_axle_multi_trailer_cnt_neg_dir = COALESCE(EXCLUDED.wst_8_or_more_axle_multi_trailer_cnt_neg_dir,wst_8_or_more_axle_multi_trailer_cnt_neg_dir),
+            wst_2_axle_busses_olhv_perc_neg_dir = COALESCE(EXCLUDED.wst_2_axle_busses_olhv_perc_neg_dir,wst_2_axle_busses_olhv_perc_neg_dir),
+            wst_2_axle_6_tyre_single_units_olhv_perc_neg_dir = COALESCE(EXCLUDED.wst_2_axle_6_tyre_single_units_olhv_perc_neg_dir,wst_2_axle_6_tyre_single_units_olhv_perc_neg_dir),
+            wst_busses_with_3_or_4_axles_olhv_perc_neg_dir = COALESCE(EXCLUDED.wst_busses_with_3_or_4_axles_olhv_perc_neg_dir,wst_busses_with_3_or_4_axles_olhv_perc_neg_dir),
+            wst_2_axle_6tyre_su_with_trailer_4axles_max_olhv_perc_neg_dir = COALESCE(EXCLUDED.wst_2_axle_6tyre_su_with_trailer_4axles_max_olhv_perc_neg_dir,wst_2_axle_6tyre_su_with_trailer_4axles_max_olhv_perc_neg_dir),
+            wst_3_axle_su_incl_single_axle_trailer_olhv_perc_neg_dir = COALESCE(EXCLUDED.wst_3_axle_su_incl_single_axle_trailer_olhv_perc_neg_dir,wst_3_axle_su_incl_single_axle_trailer_olhv_perc_neg_dir),
+            wst_4_or_less_axle_incl_a_single_trailer_olhv_perc_neg_dir = COALESCE(EXCLUDED.wst_4_or_less_axle_incl_a_single_trailer_olhv_perc_neg_dir,wst_4_or_less_axle_incl_a_single_trailer_olhv_perc_neg_dir),
+            wst_busses_with_5_or_more_axles_olhv_perc_neg_dir = COALESCE(EXCLUDED.wst_busses_with_5_or_more_axles_olhv_perc_neg_dir,wst_busses_with_5_or_more_axles_olhv_perc_neg_dir),
+            wst_3_axle_su_and_trailer_more_than_4_axles_olhv_perc_neg_dir = COALESCE(EXCLUDED.wst_3_axle_su_and_trailer_more_than_4_axles_olhv_perc_neg_dir,wst_3_axle_su_and_trailer_more_than_4_axles_olhv_perc_neg_dir),
+            wst_5_axle_single_trailer_olhv_perc_neg_dir = COALESCE(EXCLUDED.wst_5_axle_single_trailer_olhv_perc_neg_dir,wst_5_axle_single_trailer_olhv_perc_neg_dir),
+            wst_6_axle_single_trailer_olhv_perc_neg_dir = COALESCE(EXCLUDED.wst_6_axle_single_trailer_olhv_perc_neg_dir,wst_6_axle_single_trailer_olhv_perc_neg_dir),
+            wst_5_or_less_axle_multi_trailer_olhv_perc_neg_dir = COALESCE(EXCLUDED.wst_5_or_less_axle_multi_trailer_olhv_perc_neg_dir,wst_5_or_less_axle_multi_trailer_olhv_perc_neg_dir),
+            wst_6_axle_multi_trailer_olhv_perc_neg_dir = COALESCE(EXCLUDED.wst_6_axle_multi_trailer_olhv_perc_neg_dir,wst_6_axle_multi_trailer_olhv_perc_neg_dir),
+            wst_7_axle_multi_trailer_olhv_perc_neg_dir = COALESCE(EXCLUDED.wst_7_axle_multi_trailer_olhv_perc_neg_dir,wst_7_axle_multi_trailer_olhv_perc_neg_dir),
+            wst_8_or_more_axle_multi_trailer_olhv_perc_neg_dir = COALESCE(EXCLUDED.wst_8_or_more_axle_multi_trailer_olhv_perc_neg_dir,wst_8_or_more_axle_multi_trailer_olhv_perc_neg_dir),
+            wst_2_axle_busses_tonperhv_neg_dir = COALESCE(EXCLUDED.wst_2_axle_busses_tonperhv_neg_dir,wst_2_axle_busses_tonperhv_neg_dir),
+            wst_2_axle_6_tyre_single_units_tonperhv_neg_dir = COALESCE(EXCLUDED.wst_2_axle_6_tyre_single_units_tonperhv_neg_dir,wst_2_axle_6_tyre_single_units_tonperhv_neg_dir),
+            wst_busses_with_3_or_4_axles_tonperhv_neg_dir = COALESCE(EXCLUDED.wst_busses_with_3_or_4_axles_tonperhv_neg_dir,wst_busses_with_3_or_4_axles_tonperhv_neg_dir),
+            wst_2_axle_6tyre_su_with_trailer_4axles_max_tonperhv_neg_dir = COALESCE(EXCLUDED.wst_2_axle_6tyre_su_with_trailer_4axles_max_tonperhv_neg_dir,wst_2_axle_6tyre_su_with_trailer_4axles_max_tonperhv_neg_dir),
+            wst_3_axle_su_incl_single_axle_trailer_tonperhv_neg_dir = COALESCE(EXCLUDED.wst_3_axle_su_incl_single_axle_trailer_tonperhv_neg_dir,wst_3_axle_su_incl_single_axle_trailer_tonperhv_neg_dir),
+            wst_4_or_less_axle_incl_a_single_trailer_tonperhv_neg_dir = COALESCE(EXCLUDED.wst_4_or_less_axle_incl_a_single_trailer_tonperhv_neg_dir,wst_4_or_less_axle_incl_a_single_trailer_tonperhv_neg_dir),
+            wst_busses_with_5_or_more_axles_tonperhv_neg_dir = COALESCE(EXCLUDED.wst_busses_with_5_or_more_axles_tonperhv_neg_dir,wst_busses_with_5_or_more_axles_tonperhv_neg_dir),
+            wst_3_axle_su_and_trailer_more_than_4_axles_tonperhv_neg_dir = COALESCE(EXCLUDED.wst_3_axle_su_and_trailer_more_than_4_axles_tonperhv_neg_dir,wst_3_axle_su_and_trailer_more_than_4_axles_tonperhv_neg_dir),
+            wst_5_axle_single_trailer_tonperhv_neg_dir = COALESCE(EXCLUDED.wst_5_axle_single_trailer_tonperhv_neg_dir,wst_5_axle_single_trailer_tonperhv_neg_dir),
+            wst_6_axle_single_trailer_tonperhv_neg_dir = COALESCE(EXCLUDED.wst_6_axle_single_trailer_tonperhv_neg_dir,wst_6_axle_single_trailer_tonperhv_neg_dir),
+            wst_5_or_less_axle_multi_trailer_tonperhv_neg_dir = COALESCE(EXCLUDED.wst_5_or_less_axle_multi_trailer_tonperhv_neg_dir,wst_5_or_less_axle_multi_trailer_tonperhv_neg_dir),
+            wst_6_axle_multi_trailer_tonperhv_neg_dir = COALESCE(EXCLUDED.wst_6_axle_multi_trailer_tonperhv_neg_dir,wst_6_axle_multi_trailer_tonperhv_neg_dir),
+            wst_7_axle_multi_trailer_tonperhv_neg_dir = COALESCE(EXCLUDED.wst_7_axle_multi_trailer_tonperhv_neg_dir,wst_7_axle_multi_trailer_tonperhv_neg_dir),
+            wst_8_or_more_axle_multi_trailer_tonperhv_neg_dir = COALESCE(EXCLUDED.wst_8_or_more_axle_multi_trailer_tonperhv_neg_dir,wst_8_or_more_axle_multi_trailer_tonperhv_neg_dir),
+            wst_2_axle_busses_cnt = COALESCE(EXCLUDED.wst_2_axle_busses_cnt,wst_2_axle_busses_cnt),
+            wst_2_axle_6_tyre_single_units_cnt = COALESCE(EXCLUDED.wst_2_axle_6_tyre_single_units_cnt,wst_2_axle_6_tyre_single_units_cnt),
+            wst_busses_with_3_or_4_axles_cnt = COALESCE(EXCLUDED.wst_busses_with_3_or_4_axles_cnt,wst_busses_with_3_or_4_axles_cnt),
+            wst_2_axle_6tyre_su_with_trailer_4axles_max_cnt = COALESCE(EXCLUDED.wst_2_axle_6tyre_su_with_trailer_4axles_max_cnt,wst_2_axle_6tyre_su_with_trailer_4axles_max_cnt),
+            wst_3_axle_su_incl_single_axle_trailer_cnt = COALESCE(EXCLUDED.wst_3_axle_su_incl_single_axle_trailer_cnt,wst_3_axle_su_incl_single_axle_trailer_cnt),
+            wst_4_or_less_axle_incl_a_single_trailer_cnt = COALESCE(EXCLUDED.wst_4_or_less_axle_incl_a_single_trailer_cnt,wst_4_or_less_axle_incl_a_single_trailer_cnt),
+            wst_busses_with_5_or_more_axles_cnt = COALESCE(EXCLUDED.wst_busses_with_5_or_more_axles_cnt,wst_busses_with_5_or_more_axles_cnt),
+            wst_3_axle_su_and_trailer_more_than_4_axles_cnt = COALESCE(EXCLUDED.wst_3_axle_su_and_trailer_more_than_4_axles_cnt,wst_3_axle_su_and_trailer_more_than_4_axles_cnt),
+            wst_5_axle_single_trailer_cnt = COALESCE(EXCLUDED.wst_5_axle_single_trailer_cnt,wst_5_axle_single_trailer_cnt),
+            wst_6_axle_single_trailer_cnt = COALESCE(EXCLUDED.wst_6_axle_single_trailer_cnt,wst_6_axle_single_trailer_cnt),
+            wst_5_or_less_axle_multi_trailer_cnt = COALESCE(EXCLUDED.wst_5_or_less_axle_multi_trailer_cnt,wst_5_or_less_axle_multi_trailer_cnt),
+            wst_6_axle_multi_trailer_cnt = COALESCE(EXCLUDED.wst_6_axle_multi_trailer_cnt,wst_6_axle_multi_trailer_cnt),
+            wst_7_axle_multi_trailer_cnt = COALESCE(EXCLUDED.wst_7_axle_multi_trailer_cnt,wst_7_axle_multi_trailer_cnt),
+            wst_8_or_more_axle_multi_trailer_cnt = COALESCE(EXCLUDED.wst_8_or_more_axle_multi_trailer_cnt,wst_8_or_more_axle_multi_trailer_cnt),
+            wst_2_axle_busses_olhv_perc = COALESCE(EXCLUDED.wst_2_axle_busses_olhv_perc,wst_2_axle_busses_olhv_perc),
+            wst_2_axle_6_tyre_single_units_olhv_perc = COALESCE(EXCLUDED.wst_2_axle_6_tyre_single_units_olhv_perc,wst_2_axle_6_tyre_single_units_olhv_perc),
+            wst_busses_with_3_or_4_axles_olhv_perc = COALESCE(EXCLUDED.wst_busses_with_3_or_4_axles_olhv_perc,wst_busses_with_3_or_4_axles_olhv_perc),
+            wst_2_axle_6tyre_su_with_trailer_4axles_max_olhv_perc = COALESCE(EXCLUDED.wst_2_axle_6tyre_su_with_trailer_4axles_max_olhv_perc,wst_2_axle_6tyre_su_with_trailer_4axles_max_olhv_perc),
+            wst_3_axle_su_incl_single_axle_trailer_olhv_perc = COALESCE(EXCLUDED.wst_3_axle_su_incl_single_axle_trailer_olhv_perc,wst_3_axle_su_incl_single_axle_trailer_olhv_perc),
+            wst_4_or_less_axle_incl_a_single_trailer_olhv_perc = COALESCE(EXCLUDED.wst_4_or_less_axle_incl_a_single_trailer_olhv_perc,wst_4_or_less_axle_incl_a_single_trailer_olhv_perc),
+            wst_busses_with_5_or_more_axles_olhv_perc = COALESCE(EXCLUDED.wst_busses_with_5_or_more_axles_olhv_perc,wst_busses_with_5_or_more_axles_olhv_perc),
+            wst_3_axle_su_and_trailer_more_than_4_axles_olhv_perc = COALESCE(EXCLUDED.wst_3_axle_su_and_trailer_more_than_4_axles_olhv_perc,wst_3_axle_su_and_trailer_more_than_4_axles_olhv_perc),
+            wst_5_axle_single_trailer_olhv_perc = COALESCE(EXCLUDED.wst_5_axle_single_trailer_olhv_perc,wst_5_axle_single_trailer_olhv_perc),
+            wst_6_axle_single_trailer_olhv_perc = COALESCE(EXCLUDED.wst_6_axle_single_trailer_olhv_perc,wst_6_axle_single_trailer_olhv_perc),
+            wst_5_or_less_axle_multi_trailer_olhv_perc = COALESCE(EXCLUDED.wst_5_or_less_axle_multi_trailer_olhv_perc,wst_5_or_less_axle_multi_trailer_olhv_perc),
+            wst_6_axle_multi_trailer_olhv_perc = COALESCE(EXCLUDED.wst_6_axle_multi_trailer_olhv_perc,wst_6_axle_multi_trailer_olhv_perc),
+            wst_7_axle_multi_trailer_olhv_perc = COALESCE(EXCLUDED.wst_7_axle_multi_trailer_olhv_perc,wst_7_axle_multi_trailer_olhv_perc),
+            wst_8_or_more_axle_multi_trailer_olhv_perc = COALESCE(EXCLUDED.wst_8_or_more_axle_multi_trailer_olhv_perc,wst_8_or_more_axle_multi_trailer_olhv_perc),
+            wst_2_axle_busses_tonperhv = COALESCE(EXCLUDED.wst_2_axle_busses_tonperhv,wst_2_axle_busses_tonperhv),
+            wst_2_axle_6_tyre_single_units_tonperhv = COALESCE(EXCLUDED.wst_2_axle_6_tyre_single_units_tonperhv,wst_2_axle_6_tyre_single_units_tonperhv),
+            wst_busses_with_3_or_4_axles_tonperhv = COALESCE(EXCLUDED.wst_busses_with_3_or_4_axles_tonperhv,wst_busses_with_3_or_4_axles_tonperhv),
+            wst_2_axle_6tyre_su_with_trailer_4axles_max_tonperhv = COALESCE(EXCLUDED.wst_2_axle_6tyre_su_with_trailer_4axles_max_tonperhv,wst_2_axle_6tyre_su_with_trailer_4axles_max_tonperhv),
+            wst_3_axle_su_incl_single_axle_trailer_tonperhv = COALESCE(EXCLUDED.wst_3_axle_su_incl_single_axle_trailer_tonperhv,wst_3_axle_su_incl_single_axle_trailer_tonperhv),
+            wst_4_or_less_axle_incl_a_single_trailer_tonperhv = COALESCE(EXCLUDED.wst_4_or_less_axle_incl_a_single_trailer_tonperhv,wst_4_or_less_axle_incl_a_single_trailer_tonperhv),
+            wst_busses_with_5_or_more_axles_tonperhv = COALESCE(EXCLUDED.wst_busses_with_5_or_more_axles_tonperhv,wst_busses_with_5_or_more_axles_tonperhv),
+            wst_3_axle_su_and_trailer_more_than_4_axles_tonperhv = COALESCE(EXCLUDED.wst_3_axle_su_and_trailer_more_than_4_axles_tonperhv,wst_3_axle_su_and_trailer_more_than_4_axles_tonperhv),
+            wst_5_axle_single_trailer_tonperhv = COALESCE(EXCLUDED.wst_5_axle_single_trailer_tonperhv,wst_5_axle_single_trailer_tonperhv),
+            wst_6_axle_single_trailer_tonperhv = COALESCE(EXCLUDED.wst_6_axle_single_trailer_tonperhv,wst_6_axle_single_trailer_tonperhv),
+            wst_5_or_less_axle_multi_trailer_tonperhv = COALESCE(EXCLUDED.wst_5_or_less_axle_multi_trailer_tonperhv,wst_5_or_less_axle_multi_trailer_tonperhv),
+            wst_6_axle_multi_trailer_tonperhv = COALESCE(EXCLUDED.wst_6_axle_multi_trailer_tonperhv,wst_6_axle_multi_trailer_tonperhv),
+            wst_7_axle_multi_trailer_tonperhv = COALESCE(EXCLUDED.wst_7_axle_multi_trailer_tonperhv,wst_7_axle_multi_trailer_tonperhv),
+            wst_8_or_more_axle_multi_trailer_tonperhv = COALESCE(EXCLUDED.wst_8_or_more_axle_multi_trailer_tonperhv,wst_8_or_more_axle_multi_trailer_tonperhv)
+            ;
+        """
+        return UPSERT_STRING
+
+    def get_headers_to_update(self):
+        print('fetching headers to update')
+        header_ids = pd.read_sql_query(q.GET_HSWIM_HEADER_IDS, config.ENGINE)
+        return header_ids
+
+    def wim_header_upsert_func1(self, header_id):
+        SELECT_TYPE10_QRY = f"""SELECT * FROM trafc.electronic_count_data_type_10 t10
+            left join traf_lu.vehicle_classes_scheme08 c on c.id = t10.vehicle_class_code_primary_scheme
+            where t10.header_id = '{header_id}'
+            """
+        AXLE_SPACING_SELECT_QRY = f"""SELECT 
+            t10.id,
+            t10.header_id, 
+            t10.start_datetime,
+            t10.edit_code,
+            t10.vehicle_class_code_primary_scheme, 
+            t10.vehicle_class_code_secondary_scheme,
+            t10.direction,
+            t10.axle_count,
+            axs.axle_spacing_number,
+            axs.axle_spacing_cm
+            FROM trafc.electronic_count_data_type_10 t10
+            inner join trafc.traffic_e_type10_axle_spacing axs ON axs.type10_id = t10.data_id
+            where t10.header_id = '{header_id}'
+            """
+        WHEEL_MASS_SELECT_QRY = f"""SELECT 
+            t10.id,
+            t10.header_id, 
+            t10.start_datetime,
+            t10.edit_code,
+            t10.vehicle_class_code_primary_scheme, 
+            t10.vehicle_class_code_secondary_scheme,
+            t10.direction,
+            t10.axle_count,
+            wm.wheel_mass_number,
+            wm.wheel_mass,
+            vm.kg as vehicle_mass_limit_kg,
+            sum(wm.wheel_mass*2) over(partition by t10.id) as gross_mass
+            FROM trafc.electronic_count_data_type_10 t10
+            inner join trafc.traffic_e_type10_wheel_mass wm ON wm.type10_id = t10.data_id
+            inner join traf_lu.gross_vehicle_mass_limits vm on vm.number_of_axles = t10.axle_count
+            where t10.header_id = '{header_id}'
+            """
+        return SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, WHEEL_MASS_SELECT_QRY
+    
+    def wim_header_upsert_func2(self, SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, WHEEL_MASS_SELECT_QRY):
+        df = pd.read_sql_query(SELECT_TYPE10_QRY,config.ENGINE)
+        df = df.fillna(0)
+        df2 = pd.read_sql_query(AXLE_SPACING_SELECT_QRY,config.ENGINE)
+        df2 = df2.fillna(0)
+        df3 = pd.read_sql_query(WHEEL_MASS_SELECT_QRY,config.ENGINE)
+        df3 = df3.fillna(0)
+        return df, df2, df3
+
+    def main(self):
+        if self.data_df is not None and self.header_id is not None:
+
+            data, sub_data = self.type_10()
+            data = data[data.columns.intersection(t10_cols)]
+            tools.push_to_db(data, config.TYPE_10_TBL_NAME)
+
+            self.get_sub_data(sub_data)
+
+            if self.wx_data.empty:
+                pass
+            else:
+                self.wx_data.rename(columns = {"value":"wheel_mass", "number":"wheel_mass_number", "id":"type10_id"}, inplace=True)
+                push_to_db(self.wx_data, config.WX_TABLE)
+                
+            if self.ax_data.empty:
+                pass
+            else:
+                push_to_db(self.ax_data, config.AX_TABLE)
+                
+            if self.gx_data.empty:
+                pass
+            else:
+                push_to_db(self.gx_data, config.GX_TABLE)
+                
+            if self.sx_data.empty:
+                pass
+            else:
+                self.sx_data.rename(columns = {"value":"axle_spacing_cm", "number":"axle_spacing_number", "id":"type10_id"}, inplace=True)
+                self.sx_data = self.sx_data.drop(["offset_sensor_detection_code","mass_measurement_resolution_kg"], axis=1)
+                push_to_db(self.sx_data, config.SX_TABLE)
+                
+            if self.tx_data.empty:
+                pass
+            else:
+                self.tx_data.rename(columns = {"value":"tyre_code", "number":"tyre_number", "id":"type10_id"}, inplace=True)
+                self.tx_data = self.tx_data.drop(["offset_sensor_detection_code","mass_measurement_resolution_kg"], axis=1)
+                push_to_db(self.tx_data, config.TX_TABLE)
+                
+            if self.cx_data.empty:
+                pass
+            else:
+                push_to_db(self.cx_data, config.CX_TABLE)
+                
+            if self.vx_data.empty:
+                pass
+            else:
+                self.vx_data.rename(columns = {"value":"group_axle_count", "offset_sensor_detection_code":"vehicle_registration_number" ,"number":"group_axle_number", "id":"type10_id"}, inplace=True)
+                self.vx_data = self.vx_data.drop(["mass_measurement_resolution_kg"], axis=1)
+                push_to_db(self.vx_data, config.VX_TABLE)
+
+        else:
+            for header_id in list(self.header_ids['header_id'].astype(str)):
+                SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, WHEEL_MASS_SELECT_QRY = self.wim_header_upsert_func1(header_id)
+                df, df2, df3 = self.wim_header_upsert_func2(SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, WHEEL_MASS_SELECT_QRY)
+                if df2 is None or df3 is None:
+                    pass
+                else:
+                    print(f'working on {header_id}')
+                    self.calcs(df,df2,df3)
+                    insert_string = self.wim_header_upsert()
+                    with config.ENGINE.connect() as conn:
+                        print(f'upserting: {header_id}')
+                        conn.execute(insert_string)
+                        print('COMPLETE')
+
+def push_to_db(df: pd.DataFrame, table_name: str):
+    try:
+        df = df.loc[:,~df.columns.duplicated()]
+        df.to_sql(
+            table_name,
+            con=config.ENGINE,
+            schema=config.TRAFFIC_SCHEMA,
+            if_exists="append",
+            index=False,
+            method=tools.psql_insert_copy,
+        )
+    except (UniqueViolation, NotNullViolation, ExclusionViolation):
+        print("Data already in : " + table_name)
+        pass
+
+
+if __name__ == "__main__":
+    upsert = Wim()

@@ -4,5 +4,17 @@
   "python.linting.enabled": true,
   "[python]": {
     "editor.defaultFormatter": "ms-python.pylint"
-  }
+  },
+  "sqltools.connections": [
+    {
+      "previewLimit": 50,
+      "server": "linearline.dedicated.co.za",
+      "port": 5432,
+      "driver": "PostgreSQL",
+      "name": "linearline - Gauteng",
+      "database": "gauteng",
+      "username": "postgres",
+      "password": "Lin3@r1in3!431"
+    }
+  ]
 }
