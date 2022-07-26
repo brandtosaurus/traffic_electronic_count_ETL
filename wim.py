@@ -1,258 +1,325 @@
 import queries as q
 import config
+import main
 import pandas as pd
-from psycopg2.errors import UniqueViolation, NotNullViolation, ExclusionViolation
+import numpy as np
+import uuid
 import pdb
 import traceback
 
-t10_cols = list(pd.read_sql_query(
-    q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_10_LIMIT1, config.ENGINE).columns)
 
 class Wim():
-    def __init__(self, data, header, header_id, site_id, pt_cols) -> None:
+    def __init__(self, data, head_df, header_id, site_id, pt_cols) -> None:
         self.header_id = header_id
         self.site_id = site_id
         self.data_df = data
-        self.header = header
+        self.head_df = head_df
         self.pt_cols = pt_cols
+        self.primary_vehicle_class = int(
+            self.head_df.loc[self.head_df[0] == "10", 1].values[0])
+        self.secondary_vehicle_class = int(
+            self.head_df.loc[self.head_df[0] == "10", 2].values[0])
         self.header_ids = self.get_headers_to_update()
+        self.t10_cols = list(pd.read_sql_query(
+            q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_10_LIMIT1, config.ENGINE).columns)
+        self.wim_header_cols = list(pd.read_sql_query(
+            q.SEELECT_HSWIM_HEADER_COLS, config.ENGINE).columns)
+        self.vm_limits = pd.read_sql_query(
+            f"SELECT * FROM {config.TRAFFIC_LOOKUP_SCHEMA}.gross_vehicle_mass_limits;", config.ENGINE)
 
     def type_10(self) -> pd.DataFrame:
         if self.data_df is None:
             pass
         else:
-            # data = self.data_df
-            data = self.data_df.loc[(self.data_df[0] == "10")].dropna(
-                axis=1, how="all"
-            ).reset_index(drop=True).copy()
-
-            num_of_fields = int(data.iloc[:,1].unique()[0])
-            ddf = data.iloc[:,: 2 + num_of_fields]
-
-            # cols = ['index']
-            # for i in range(ddf.shape[1]-1):
-            #     cols.append(config.TYPE10_DATA_COLUMN_NAMES[i])
-            # ddf = pd.DataFrame(ddf.values, columns=cols)
-            ddf.rename(columns=config.RENAME_TYPE10_DATA_COLUMNS, inplace=True, errors='ignore')
-
-            ddf["data_id"] = ddf.apply(lambda x: uuid.uuid4(), axis=1)
-
-            if data.shape[1] > ddf.shape[1]:
-                sub_data_df = pd.DataFrame(columns=['index','sub_data_type_code','offset_sensor_detection_code','mass_measurement_resolution_kg', 'number','value'])
-                for index, row in data.iterrows():
-                    col = int(row[1]) + 2
-                    while col < len(row) and row[col] != None:
-                        sub_data_type = row[col]
-                        col += 1
-                        NoOfType = int(row[col])        
-                        col +=1
-                        if sub_data_type[0].lower() in ['w','a','g']:
-                            odc = row[col]
-                            col += 1
-                            mmr = row[col]
-                            col +=1
-                            for i in range(0,NoOfType):
-                                tempdf = pd.DataFrame([[index,
-                                sub_data_type,
-                                odc,
-                                mmr,
-                                i + 1,
-                                row[col]]
-                                ], columns = ['index',
-                                'sub_data_type_code',
-                                'offset_sensor_detection_code',
-                                'mass_measurement_resolution_kg',
-                                'number',
-                                'value'
-                                ])
-                                sub_data_df = pd.concat([sub_data_df, tempdf])
-                                col += 1
-                        elif sub_data_type[0].lower() in ['s','t','c']:
-                            for i in range(0,NoOfType):
-                                tempdf = pd.DataFrame([[index, 
-                                sub_data_type,
-                                i + 1,
-                                row[col]]], columns = ['index' ,
-                                'sub_data_type_code',
-                                'number',
-                                'value'])
-                                sub_data_df = pd.concat([sub_data_df, tempdf])
-                                col += 1
-                        elif sub_data_type[0].lower() in ['v']:
-                            odc = row[col]
-                            col += 1
-                            for i in range(0,NoOfType):
-                                tempdf = pd.DataFrame([[index,
-                                sub_data_type,
-                                odc,
-                                i + 1,
-                                row[col]]
-                                ], columns = ['index',
-                                'sub_data_type_code',
-                                'offset_sensor_detection_code',
-                                'number',
-                                'value'
-                                ])
-                                sub_data_df = pd.concat([sub_data_df, tempdf])
-                                col += 1
+            if self.data_df.empty:
+                return None
+            elif self.data is None:
+                return None
             else:
-                sub_data_df = pd.DataFrame(columns=['index','sub_data_type_code','offset_sensor_detection_code','mass_measurement_resolution_kg', 'number','value'])
+                data = self.data_df.loc[(self.data_df[0] == "10")].dropna(
+                    axis=1, how="all"
+                ).reset_index(drop=True).copy()
 
-            sub_data_df = sub_data_df.merge(ddf[['index', 'data_id']], how='left', on='index')
-            
-            ddf = ddf.fillna(0)
-            ddf["assigned_lane_number"] = ddf["assigned_lane_number"].astype(int)
-            ddf["lane_number"] = ddf["physical_lane_number"].astype(int)
-            ddf["physical_lane_number"] = ddf["physical_lane_number"].astype(int)
+                num_of_fields = int(data.iloc[:, 1].unique()[0])
+                ddf = data.iloc[:, : 2 + num_of_fields]
+                ddf.rename(columns=config.RENAME_TYPE10_DATA_COLUMNS,
+                           inplace=True, errors='ignore')
+                ddf["data_id"] = ddf.apply(lambda x: uuid.uuid4(), axis=1)
 
-            ddf = ddf.replace(r'^\s*$', np.NaN, regex=True)
-            sub_data_df = sub_data_df.replace(r'^\s*$', np.NaN, regex=True)
-            sub_data_df = sub_data_df.drop("index", axis=1)
+                if data.shape[1] > ddf.shape[1]:
+                    sub_data_df = pd.DataFrame(columns=[
+                        'sub_data_type_code',
+                        'offset_sensor_detection_code',
+                        'mass_measurement_resolution_kg',
+                        'number',
+                        'value'])
+                    for index, row in data.iterrows():
+                        col = int(row[1]) + 2
+                        while col < len(row) - 5 and row[col] is not None:
+                            sub_data_type = row[col]
+                            col += 1
+                            no_of_type = int(row[col])
+                            col += 1
+                            if sub_data_type[0].lower() in ['w', 'a', 'g']:
+                                odc = row[col]
+                                col += 1
+                                mmr = row[col]
+                                col += 1
+                                for i in range(0, no_of_type):
+                                    tempdf = pd.DataFrame([[
+                                        sub_data_type,
+                                        odc,
+                                        mmr,
+                                        i + 1,
+                                        row[col]]
+                                    ], columns=[
+                                        'sub_data_type_code',
+                                        'offset_sensor_detection_code',
+                                        'mass_measurement_resolution_kg',
+                                        'number',
+                                        'value'
+                                    ])
+                                    sub_data_df = pd.concat(
+                                        [sub_data_df, tempdf])
+                                    col += 1
+                            elif sub_data_type[0].lower() in ['s', 't', 'c']:
+                                for i in range(0, no_of_type):
+                                    tempdf = pd.DataFrame([[
+                                        sub_data_type,
+                                        i + 1,
+                                        row[col]]
+                                    ], columns=[
+                                        'sub_data_type_code',
+                                        'number',
+                                        'value'])
+                                    sub_data_df = pd.concat(
+                                        [sub_data_df, tempdf])
+                                    col += 1
+                            elif sub_data_type[0].lower() in ['v']:
+                                odc = row[col]
+                                col += 1
+                                for i in range(0, no_of_type):
+                                    tempdf = pd.DataFrame([[
+                                        sub_data_type,
+                                        odc,
+                                        i + 1,
+                                        row[col]]
+                                    ], columns=[
+                                        'sub_data_type_code',
+                                        'offset_sensor_detection_code',
+                                        'number',
+                                        'value'
+                                    ])
+                                    sub_data_df = pd.concat(
+                                        [sub_data_df, tempdf])
+                                    col += 1
+                else:
+                    sub_data_df = pd.DataFrame(columns=[
+                        'sub_data_type_code',
+                        'offset_sensor_detection_code',
+                        'mass_measurement_resolution_kg',
+                        'number',
+                        'value'])
 
-            scols = ddf.select_dtypes('object').columns
-            ddf[scols] = ddf[scols].apply(pd.to_numeric, axis=1, errors='ignore')
+                sub_data_df = sub_data_df.merge(
+                    ddf['data_id'], how='left', left_index=True, right_index=True)
 
-            ddf['year'] = ddf['start_datetime'].dt.year
-            ddf["site_id"] = self.site_id
-            ddf["header_id"] = self.header_id
+                ddf = ddf.fillna(0)
+                ddf["assigned_lane_number"] = ddf["assigned_lane_number"].astype(
+                    int)
+                ddf["lane_number"] = ddf["physical_lane_number"].astype(int)
+                ddf["physical_lane_number"] = ddf["physical_lane_number"].astype(
+                    int)
 
-            ddf = ddf[ddf.columns.intersection(t10_cols)]
+                ddf = ddf.replace(r'^\s*$', np.NaN, regex=True)
+                sub_data_df = sub_data_df.replace(r'^\s*$', np.NaN, regex=True)
+                sub_data_df = sub_data_df.drop(
+                    "index", axis=1, errors='ignore')
 
-            return ddf, sub_data_df
+                scols = ddf.select_dtypes('object').columns
+                ddf[scols] = ddf[scols].apply(
+                    pd.to_numeric, axis=1, errors='ignore')
 
-    def get_sub_data(self, sub_data_df):
-        self.sub_data_df = sub_data_df.replace(r'^\s*$', np.NaN, regex=True)
-        self.sub_data_df = sub_data_df.drop("index", axis=1) 
-        self.wx_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 'w']
-        self.sx_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 's']
-        self.gx_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 'g']
-        self.vx_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 'v']
-        self.tx_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 't']
-        self.ax_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 'a']
-        self.cx_data = sub_data_df.loc[sub_data_df['sub_data_type_code'].str.lower().str[0] == 'c']
-    
-    def calcs(self, df, df2, df3):
+                ddf['year'] = ddf['start_datetime'].dt.year
+                ddf["site_id"] = self.site_id
+                ddf["header_id"] = self.header_id
+
+                ddf = ddf[ddf.columns.intersection(self.t10_cols)]
+
+                return ddf, sub_data_df
+
+    def wim_header_calcs(self, df: pd.DataFrame, df2: pd.DataFrame, df3: pd.DataFrame):
         try:
-            self.egrl_percent = round((((df.loc[df['edit_code']==2].count()[0])/(df.count()[0]))*100),0) 
+            self.egrl_percent = round(
+                (((df.loc[df['edit_code'] == 2].count()[0])/(df.count()[0]))*100), 0)
         except:
             self.egrl_percent = 0
         try:
-            self.egrl_percent_positive_direction = round(((df.loc[(df['edit_code']==2)&(df['direction']=='P')].count()[0]/df.loc[df['direction']=='P'].count()[0])*100),0) 
+            self.egrl_percent_positive_direction = round(((df.loc[(df['edit_code'] == 2) & (
+                df['direction'] == 'P')].count()[0]/df.loc[df['direction'] == 'P'].count()[0])*100), 0)
         except:
             self.egrl_percent_positive_direction = 0
         try:
-            self.egrl_percent_negative_direction = round(((df.loc[(df['edit_code']==2)&(df['direction']=='P')].count()[0]/df.loc[df['direction']=='N'].count()[0])*100),0)  
+            self.egrl_percent_negative_direction = round(((df.loc[(df['edit_code'] == 2) & (
+                df['direction'] == 'P')].count()[0]/df.loc[df['direction'] == 'N'].count()[0])*100), 0)
         except:
             self.egrl_percent_negative_direction = 0
         try:
-            self.egrw_percent = round((((df2.loc[df2['edit_code']==2].count()[0]+df3.loc[df3['edit_code']==2].count()[0])/df.count()[0])*100),0)   
+            self.egrw_percent = round((((df2.loc[df2['edit_code'] == 2].count(
+            )[0]+df3.loc[df3['edit_code'] == 2].count()[0])/df.count()[0])*100), 0)
         except:
             self.egrw_percent = 0
         try:
-            self.egrw_percent_positive_direction = round((((df2.loc[(df2['edit_code']==2)&(df2['direction']=='P')].count()[0]+df3.loc[(df3['edit_code']==2)&(df3['direction']=='P')].count()[0])/df.loc[df['direction']=='P'].count()[0])*100),0)  
+            self.egrw_percent_positive_direction = round((((df2.loc[(df2['edit_code'] == 2) & (df2['direction'] == 'P')].count(
+            )[0]+df3.loc[(df3['edit_code'] == 2) & (df3['direction'] == 'P')].count()[0])/df.loc[df['direction'] == 'P'].count()[0])*100), 0)
         except:
             self.egrw_percent_positive_direction = 0
         try:
-            self.egrw_percent_negative_direction = round((((df2.loc[(df2['edit_code']==2)&(df2['direction']=='N')].count()[0]+df3.loc[(df3['edit_code']==2)&(df3['direction']=='N')].count()[0])/df.loc[df['direction']=='N'].count()[0])*100),0)   
+            self.egrw_percent_negative_direction = round((((df2.loc[(df2['edit_code'] == 2) & (df2['direction'] == 'N')].count(
+            )[0]+df3.loc[(df3['edit_code'] == 2) & (df3['direction'] == 'N')].count()[0])/df.loc[df['direction'] == 'N'].count()[0])*100), 0)
         except:
             self.egrw_percent_negative_direction = 0
-        self.num_weighed = df3.groupby(pd.Grouper(key='id')).count().count()[0] or 0 
-        self.num_weighed_positive_direction = df3.loc[df3['direction']=='P'].groupby(pd.Grouper(key='id')).count().count()[0] or 0  
-        self.num_weighed_negative_direction = df3.loc[df3['direction']=='N'].groupby(pd.Grouper(key='id')).count().count()[0] or 0  
-        self.mean_equivalent_axle_mass = round((df3.groupby(pd.Grouper(key='id'))['wheel_mass'].mean()*2).mean(),2) or 0
-        self.mean_equivalent_axle_mass_positive_direction = round((df3.loc[df3['direction']=='P'].groupby(pd.Grouper(key='id'))['wheel_mass'].mean()*2).mean(),2) or 0
-        self.mean_equivalent_axle_mass_negative_direction = round((df3.loc[df3['direction']=='N'].groupby(pd.Grouper(key='id'))['wheel_mass'].mean()*2).mean(),2) or 0
-        self.mean_axle_spacing = round((df2.groupby(pd.Grouper(key='id')).mean()).mean()['axle_spacing_number'],0) or 0
-        self.mean_axle_spacing_positive_direction = round((df2.loc[df2['direction']=='P'].groupby(pd.Grouper(key='id')).mean()).mean()['axle_spacing_number'],0) or 0
-        self.mean_axle_spacing_negative_direction = round((df2.loc[df2['direction']=='N'].groupby(pd.Grouper(key='id')).mean()).mean()['axle_spacing_number'],0) or 0
+        self.num_weighed = df3.groupby(
+            pd.Grouper(key='id')).count().count()[0] or 0
+        self.num_weighed_positive_direction = df3.loc[df3['direction'] == 'P'].groupby(
+            pd.Grouper(key='id')).count().count()[0] or 0
+        self.num_weighed_negative_direction = df3.loc[df3['direction'] == 'N'].groupby(
+            pd.Grouper(key='id')).count().count()[0] or 0
+        self.mean_equivalent_axle_mass = round(
+            (df3.groupby(pd.Grouper(key='id'))['wheel_mass'].mean()*2).mean(), 2) or 0
+        self.mean_equivalent_axle_mass_positive_direction = round(
+            (df3.loc[df3['direction'] == 'P'].groupby(pd.Grouper(key='id'))['wheel_mass'].mean()*2).mean(), 2) or 0
+        self.mean_equivalent_axle_mass_negative_direction = round(
+            (df3.loc[df3['direction'] == 'N'].groupby(pd.Grouper(key='id'))['wheel_mass'].mean()*2).mean(), 2) or 0
+        self.mean_axle_spacing = round((df2.groupby(pd.Grouper(key='id')).mean()).mean()[
+                                       'axle_spacing_number'], 0) or 0
+        self.mean_axle_spacing_positive_direction = round((df2.loc[df2['direction'] == 'P'].groupby(
+            pd.Grouper(key='id')).mean()).mean()['axle_spacing_number'], 0) or 0
+        self.mean_axle_spacing_negative_direction = round((df2.loc[df2['direction'] == 'N'].groupby(
+            pd.Grouper(key='id')).mean()).mean()['axle_spacing_number'], 0) or 0
         self.e80_per_axle = ((df3['wheel_mass']*2/8200)**4.2).sum() or 0
-        self.e80_per_axle_positive_direction = ((df3.loc[df3['direction']=='P']['wheel_mass']*2/8200)**4.2).sum() or 0
-        self.e80_per_axle_negative_direction = ((df3.loc[df3['direction']=='N']['wheel_mass']*2/8200)**4.2).sum() or 0
-        self.olhv = len(df3.loc[df3['gross_mass']>df3['vehicle_mass_limit_kg']]['id'].unique()) or 0
-        self.olhv_positive_direction = len(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['id'].unique()) or 0
-        self.olhv_negative_direction = len(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['id'].unique()) or 0
+        self.e80_per_axle_positive_direction = (
+            (df3.loc[df3['direction'] == 'P']['wheel_mass']*2/8200)**4.2).sum() or 0
+        self.e80_per_axle_negative_direction = (
+            (df3.loc[df3['direction'] == 'N']['wheel_mass']*2/8200)**4.2).sum() or 0
+        self.olhv = len(
+            df3.loc[df3['gross_mass'] > df3['vehicle_mass_limit_kg']]['id'].unique()) or 0
+        self.olhv_positive_direction = len(df3.loc[(df3['gross_mass'] > df3['vehicle_mass_limit_kg']) & (
+            df3['direction'] == 'P')]['id'].unique()) or 0
+        self.olhv_negative_direction = len(df3.loc[(df3['gross_mass'] > df3['vehicle_mass_limit_kg']) & (
+            df3['direction'] == 'N')]['id'].unique()) or 0
         try:
-            self.olhv_percent = round(((len(df3.loc[df3['gross_mass']>df3['vehicle_mass_limit_kg']]['id'].unique())/len(df3['id'].unique()))*100),2)
+            self.olhv_percent = round(
+                ((len(df3.loc[df3['gross_mass'] > df3['vehicle_mass_limit_kg']]['id'].unique())/len(df3['id'].unique()))*100), 2)
         except ZeroDivisionError:
             self.olhv_percent = 0
         try:
-            self.olhv_percent_positive_direction = round(((len(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['id'].unique())/len(df3.loc[df3['direction']=='P']['id'].unique()))*100),2)
+            self.olhv_percent_positive_direction = round(((len(df3.loc[(df3['gross_mass'] > df3['vehicle_mass_limit_kg']) & (
+                df3['direction'] == 'P')]['id'].unique())/len(df3.loc[df3['direction'] == 'P']['id'].unique()))*100), 2)
         except ZeroDivisionError:
             self.olhv_percent_positive_direction = 0
         try:
-            self.olhv_percent_negative_direction = round(((len(df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['id'].unique())/len(df3.loc[df3['direction']=='N']['id'].unique()))*100),2)
+            self.olhv_percent_negative_direction = round(((len(df3.loc[(df3['gross_mass'] > df3['vehicle_mass_limit_kg']) & (
+                df3['direction'] == 'N')]['id'].unique())/len(df3.loc[df3['direction'] == 'N']['id'].unique()))*100), 2)
         except ZeroDivisionError:
             self.olhv_percent_negative_direction = 0
-        self.tonnage_generated = ((df3['wheel_mass']*2).sum()/1000).round().astype(int) or 0
-        self.tonnage_generated_positive_direction = ((df3.loc[df3['direction']=='P']['wheel_mass']*2).sum()/1000).round().astype(int) or 0
-        self.tonnage_generated_negative_direction = ((df3.loc[df3['direction']=='N']['wheel_mass']*2).sum()/1000).round().astype(int) or 0
-        self.olton = (df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])]['wheel_mass']*2).sum().astype(int) or 0
-        self.olton_positive_direction = (df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['wheel_mass']*2).sum().astype(int) or 0
-        self.olton_negative_direction = (df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['wheel_mass']*2).sum().astype(int) or 0
+        self.tonnage_generated = (
+            (df3['wheel_mass']*2).sum()/1000).round().astype(int) or 0
+        self.tonnage_generated_positive_direction = (
+            (df3.loc[df3['direction'] == 'P']['wheel_mass']*2).sum()/1000).round().astype(int) or 0
+        self.tonnage_generated_negative_direction = (
+            (df3.loc[df3['direction'] == 'N']['wheel_mass']*2).sum()/1000).round().astype(int) or 0
+        self.olton = (df3.loc[(df3['gross_mass'] > df3['vehicle_mass_limit_kg'])]
+                      ['wheel_mass']*2).sum().astype(int) or 0
+        self.olton_positive_direction = (df3.loc[(df3['gross_mass'] > df3['vehicle_mass_limit_kg']) & (
+            df3['direction'] == 'P')]['wheel_mass']*2).sum().astype(int) or 0
+        self.olton_negative_direction = (df3.loc[(df3['gross_mass'] > df3['vehicle_mass_limit_kg']) & (
+            df3['direction'] == 'N')]['wheel_mass']*2).sum().astype(int) or 0
         try:
-            self.olton_percent = round(((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])]['wheel_mass']*2).sum().round(2)/(df3['wheel_mass']*2).sum().round(2))*100,2)
+            self.olton_percent = round(((df3.loc[(df3['gross_mass'] > df3['vehicle_mass_limit_kg'])]
+                                       ['wheel_mass']*2).sum().round(2)/(df3['wheel_mass']*2).sum().round(2))*100, 2)
         except ZeroDivisionError:
             self.olton_percent = 0
         try:
-            self.olton_percent_positive_direction = round(((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['wheel_mass']*2).sum().round(2)/(df3.loc[df3['direction']=='P']['wheel_mass']*2).sum().round(2))*100,2)
+            self.olton_percent_positive_direction = round(((df3.loc[(df3['gross_mass'] > df3['vehicle_mass_limit_kg']) & (
+                df3['direction'] == 'P')]['wheel_mass']*2).sum().round(2)/(df3.loc[df3['direction'] == 'P']['wheel_mass']*2).sum().round(2))*100, 2)
         except ZeroDivisionError:
             self.olton_percent_positive_direction = 0
         try:
-            self.olton_percent_negative_direction = round(((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['wheel_mass']*2).sum().round(2)/(df3.loc[df3['direction']=='N']['wheel_mass']*2).sum().round(2))*100,2)
+            self.olton_percent_negative_direction = round(((df3.loc[(df3['gross_mass'] > df3['vehicle_mass_limit_kg']) & (
+                df3['direction'] == 'N')]['wheel_mass']*2).sum().round(2)/(df3.loc[df3['direction'] == 'N']['wheel_mass']*2).sum().round(2))*100, 2)
         except ZeroDivisionError:
             self.olton_percent_negative_direction = 0
-        self.ole80 = round(((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])]['wheel_mass']*2/8200)**4.2).sum(),0) or 0
-        self.ole80_positive_direction = round(((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['wheel_mass']*2/8200)**4.2).sum(),0) or 0
-        self.ole80_negative_direction = round(((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['wheel_mass']*2/8200)**4.2).sum(),0) or 0
+        self.ole80 = round(
+            ((df3.loc[(df3['gross_mass'] > df3['vehicle_mass_limit_kg'])]['wheel_mass']*2/8200)**4.2).sum(), 0) or 0
+        self.ole80_positive_direction = round(((df3.loc[(df3['gross_mass'] > df3['vehicle_mass_limit_kg']) & (
+            df3['direction'] == 'P')]['wheel_mass']*2/8200)**4.2).sum(), 0) or 0
+        self.ole80_negative_direction = round(((df3.loc[(df3['gross_mass'] > df3['vehicle_mass_limit_kg']) & (
+            df3['direction'] == 'N')]['wheel_mass']*2/8200)**4.2).sum(), 0) or 0
         try:
-            self.ole80_percent = round((round(((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])]['wheel_mass']*2/8200)**4.2).sum(),0)/round(round(((df3['wheel_mass']*2/8200)**4.2).sum(),0)))*100,2)
+            self.ole80_percent = round((round(((df3.loc[(df3['gross_mass'] > df3['vehicle_mass_limit_kg'])]['wheel_mass']*2/8200)**4.2).sum(
+            ), 0)/round(round(((df3['wheel_mass']*2/8200)**4.2).sum(), 0)))*100, 2)
         except ZeroDivisionError:
             self.ole80_percent = 0
         try:
-            self.ole80_percent_positive_direction = ((((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='P')]['wheel_mass']*2/8200)**4.2).sum().round()/((df3.loc[df3['direction']=='P']['wheel_mass']*2/8200)**4.2).sum().round())*100).round(2)
+            self.ole80_percent_positive_direction = ((((df3.loc[(df3['gross_mass'] > df3['vehicle_mass_limit_kg']) & (
+                df3['direction'] == 'P')]['wheel_mass']*2/8200)**4.2).sum().round()/((df3.loc[df3['direction'] == 'P']['wheel_mass']*2/8200)**4.2).sum().round())*100).round(2)
         except ZeroDivisionError:
             self.ole80_percent_positive_direction = 0
         try:
-            self.ole80_percent_negative_direction = ((((df3.loc[(df3['gross_mass']>df3['vehicle_mass_limit_kg'])&(df3['direction']=='N')]['wheel_mass']*2/8200)**4.2).sum().round()/((df3.loc[df3['direction']=='N']['wheel_mass']*2/8200)**4.2).sum().round())*100).round(2)
+            self.ole80_percent_negative_direction = ((((df3.loc[(df3['gross_mass'] > df3['vehicle_mass_limit_kg']) & (
+                df3['direction'] == 'N')]['wheel_mass']*2/8200)**4.2).sum().round()/((df3.loc[df3['direction'] == 'N']['wheel_mass']*2/8200)**4.2).sum().round())*100).round(2)
         except ZeroDivisionError:
             self.ole80_percent_negative_direction = 0
-        self.xe80 = round(((df3['wheel_mass']*2/8200)**4.2).sum()-(((df3['wheel_mass']*2*0.05)/8200)**4.2).sum(), 2) or 0
-        self.xe80_positive_direction = round(((df3.loc[df3['direction']=='P']['wheel_mass']*2/8200)**4.2).sum()-(((df3.loc[df3['direction']=='P']['wheel_mass']*2*0.05)/8200)**4.2).sum(),2) or 0
-        self.xe80_negative_direction = round(((df3.loc[df3['direction']=='N']['wheel_mass']*2/8200)**4.2).sum()-(((df3.loc[df3['direction']=='N']['wheel_mass']*2*0.05)/8200)**4.2).sum(),2) or 0
+        self.xe80 = round(((df3['wheel_mass']*2/8200)**4.2).sum() -
+                          (((df3['wheel_mass']*2*0.05)/8200)**4.2).sum(), 2) or 0
+        self.xe80_positive_direction = round(((df3.loc[df3['direction'] == 'P']['wheel_mass']*2/8200)**4.2).sum()-(
+            ((df3.loc[df3['direction'] == 'P']['wheel_mass']*2*0.05)/8200)**4.2).sum(), 2) or 0
+        self.xe80_negative_direction = round(((df3.loc[df3['direction'] == 'N']['wheel_mass']*2/8200)**4.2).sum()-(
+            ((df3.loc[df3['direction'] == 'N']['wheel_mass']*2*0.05)/8200)**4.2).sum(), 2) or 0
         try:
-            self.xe80_percent = (((((df3['wheel_mass']*2/8200)**4.2).sum()-(((df3['wheel_mass']*2*0.05)/8200)**4.2).sum())/((df3['wheel_mass']*2/8200)**4.2).sum())*100).round()
+            self.xe80_percent = (((((df3['wheel_mass']*2/8200)**4.2).sum()-(
+                ((df3['wheel_mass']*2*0.05)/8200)**4.2).sum())/((df3['wheel_mass']*2/8200)**4.2).sum())*100).round()
         except ZeroDivisionError:
             self.xe80_percent = 0
         try:
-            self.xe80_percent_positive_direction = (((((df3.loc[df3['direction']=='P']['wheel_mass']*2/8200)**4.2).sum()-(((df3.loc[df3['direction']=='P']['wheel_mass']*2*0.05)/8200)**4.2).sum())/((df3.loc[df3['direction']=='P']['wheel_mass']*2/8200)**4.2).sum())*100).round()
+            self.xe80_percent_positive_direction = (((((df3.loc[df3['direction'] == 'P']['wheel_mass']*2/8200)**4.2).sum()-(
+                ((df3.loc[df3['direction'] == 'P']['wheel_mass']*2*0.05)/8200)**4.2).sum())/((df3.loc[df3['direction'] == 'P']['wheel_mass']*2/8200)**4.2).sum())*100).round()
         except ZeroDivisionError:
             self.xe80_percent_positive_direction = 0
         try:
-            self.xe80_percent_negative_direction = (((((df3.loc[df3['direction']=='N']['wheel_mass']*2/8200)**4.2).sum()-(((df3.loc[df3['direction']=='N']['wheel_mass']*2*0.05)/8200)**4.2).sum())/((df3.loc[df3['direction']=='N']['wheel_mass']*2/8200)**4.2).sum())*100).round()
+            self.xe80_percent_negative_direction = (((((df3.loc[df3['direction'] == 'N']['wheel_mass']*2/8200)**4.2).sum()-(
+                ((df3.loc[df3['direction'] == 'N']['wheel_mass']*2*0.05)/8200)**4.2).sum())/((df3.loc[df3['direction'] == 'N']['wheel_mass']*2/8200)**4.2).sum())*100).round()
         except ZeroDivisionError:
             self.xe80_percent_negative_direction = 0
         try:
-            self.e80_per_day = ((((df3['wheel_mass']*2/8200)**4.2).sum().round()/df3.groupby(pd.Grouper(key='start_datetime',freq='D')).count().count()[0])*100).round(2)
+            self.e80_per_day = ((((df3['wheel_mass']*2/8200)**4.2).sum().round()/df3.groupby(
+                pd.Grouper(key='start_datetime', freq='D')).count().count()[0])*100).round(2)
         except ZeroDivisionError:
             self.e80_per_day = 0
         try:
-            self.e80_per_day_positive_direction = ((((df3.loc[df3['direction']=='P']['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[df3['direction']=='P'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().count()[0])*100).round(2)
+            self.e80_per_day_positive_direction = ((((df3.loc[df3['direction'] == 'P']['wheel_mass']*2/8200)**4.2).sum().round(
+            )/df3.loc[df3['direction'] == 'P'].groupby(pd.Grouper(key='start_datetime', freq='D')).count().count()[0])*100).round(2)
         except ZeroDivisionError:
             self.e80_per_day_positive_direction = 0
         try:
-            self.e80_per_day_negative_direction = ((((df3.loc[df3['direction']=='N']['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[df3['direction']=='N'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().count()[0])*100).round(2)
+            self.e80_per_day_negative_direction = ((((df3.loc[df3['direction'] == 'N']['wheel_mass']*2/8200)**4.2).sum().round(
+            )/df3.loc[df3['direction'] == 'N'].groupby(pd.Grouper(key='start_datetime', freq='D')).count().count()[0])*100).round(2)
         except ZeroDivisionError:
             self.e80_per_day_negative_direction = 0
         try:
-            self.e80_per_heavy_vehicle = ((((df3.loc[df3['vehicle_class_code_primary_scheme']>3]['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[df3['vehicle_class_code_primary_scheme']>3].count()[0])*100).round(2)
+            self.e80_per_heavy_vehicle = ((((df3.loc[df3['vehicle_class_code_primary_scheme'] > 3]['wheel_mass']*2/8200)**4.2).sum(
+            ).round()/df3.loc[df3['vehicle_class_code_primary_scheme'] > 3].count()[0])*100).round(2)
         except ZeroDivisionError:
             self.e80_per_heavy_vehicle = 0
         try:
-            self.e80_per_heavy_vehicle_positive_direction = ((((df3.loc[(df3['vehicle_class_code_primary_scheme']>3)&(df3['direction']=='P')]['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[(df3['vehicle_class_code_primary_scheme']>3)&(df3['direction']=='P')].count()[0])*100).round(2)
+            self.e80_per_heavy_vehicle_positive_direction = ((((df3.loc[(df3['vehicle_class_code_primary_scheme'] > 3) & (
+                df3['direction'] == 'P')]['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[(df3['vehicle_class_code_primary_scheme'] > 3) & (df3['direction'] == 'P')].count()[0])*100).round(2)
         except ZeroDivisionError:
             self.e80_per_heavy_vehicle_positive_direction = 0
         try:
-            self.e80_per_heavy_vehicle_negative_direction = ((((df3.loc[(df3['vehicle_class_code_primary_scheme']>3)&(df3['direction']=='N')]['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[(df3['vehicle_class_code_primary_scheme']>3)&(df3['direction']=='N')].count()[0])*100).round(2)
+            self.e80_per_heavy_vehicle_negative_direction = ((((df3.loc[(df3['vehicle_class_code_primary_scheme'] > 3) & (
+                df3['direction'] == 'N')]['wheel_mass']*2/8200)**4.2).sum().round()/df3.loc[(df3['vehicle_class_code_primary_scheme'] > 3) & (df3['direction'] == 'N')].count()[0])*100).round(2)
         except ZeroDivisionError:
             self.e80_per_heavy_vehicle_negative_direction = 0
         self.worst_steering_single_axle_cnt = 0
@@ -270,15 +337,17 @@ class Wim():
         self.worst_triple_axle_cnt = 0
         self.worst_triple_axle_olhv_perc = 0
         self.worst_triple_axle_tonperhv = 0
-        self.bridge_formula_cnt = round((18000 + 2.1 * (df2.loc[df2['axle_spacing_number']>1].groupby('id')['axle_spacing_cm'].sum().mean())),2) or 0
+        self.bridge_formula_cnt = round(
+            (18000 + 2.1 * (df2.loc[df2['axle_spacing_number'] > 1].groupby('id')['axle_spacing_cm'].sum().mean())), 2) or 0
         self.bridge_formula_olhv_perc = 0
         self.bridge_formula_tonperhv = 0
         self.gross_formula_cnt = 0
         self.gross_formula_olhv_perc = 0
         self.gross_formula_tonperhv = 0
-        self.total_avg_cnt = df.loc[df['group']=='Heavy'].count()[0]
+        self.total_avg_cnt = df.loc[df['group'] == 'Heavy'].count()[0]
         self.total_avg_olhv_perc = 0
-        self.total_avg_tonperhv = round(((df3['wheel_mass']*2).sum()/1000)/df.loc[df['group']=='Heavy'].count()[0],2)
+        self.total_avg_tonperhv = round(
+            ((df3['wheel_mass']*2).sum()/1000)/df.loc[df['group'] == 'Heavy'].count()[0], 2)
         self.worst_steering_single_axle_cnt_positive_direciton = 0
         self.worst_steering_single_axle_olhv_perc_positive_direciton = 0
         self.worst_steering_single_axle_tonperhv_positive_direciton = 0
@@ -294,15 +363,18 @@ class Wim():
         self.worst_triple_axle_cnt_positive_direciton = 0
         self.worst_triple_axle_olhv_perc_positive_direciton = 0
         self.worst_triple_axle_tonperhv_positive_direciton = 0
-        self.bridge_formula_cnt_positive_direciton = round((18000 + 2.1 * (df2.loc[(df2['axle_spacing_number']>1)&(df2['direction']=='P')].groupby('id')['axle_spacing_cm'].sum().mean())),2) or 0
+        self.bridge_formula_cnt_positive_direciton = round((18000 + 2.1 * (df2.loc[(df2['axle_spacing_number'] > 1) & (
+            df2['direction'] == 'P')].groupby('id')['axle_spacing_cm'].sum().mean())), 2) or 0
         self.bridge_formula_olhv_perc_positive_direciton = 0
         self.bridge_formula_tonperhv_positive_direciton = 0
         self.gross_formula_cnt_positive_direciton = 0
         self.gross_formula_olhv_perc_positive_direciton = 0
         self.gross_formula_tonperhv_positive_direciton = 0
-        self.total_avg_cnt_positive_direciton = df.loc[(df['group']=='Heavy')&(df['direction']=='P')].count()[0]
+        self.total_avg_cnt_positive_direciton = df.loc[(
+            df['group'] == 'Heavy') & (df['direction'] == 'P')].count()[0]
         self.total_avg_olhv_perc_positive_direciton = 0
-        self.total_avg_tonperhv_positive_direciton = round(((df3.loc[df3['direction']=='P']['wheel_mass']*2).sum()/1000)/df.loc[df['group']=='Heavy'].count()[0],2)
+        self.total_avg_tonperhv_positive_direciton = round(
+            ((df3.loc[df3['direction'] == 'P']['wheel_mass']*2).sum()/1000)/df.loc[df['group'] == 'Heavy'].count()[0], 2)
         self.worst_steering_single_axle_cnt_negative_direciton = 0
         self.worst_steering_single_axle_olhv_perc_negative_direciton = 0
         self.worst_steering_single_axle_tonperhv_negative_direciton = 0
@@ -318,15 +390,18 @@ class Wim():
         self.worst_triple_axle_cnt_negative_direciton = 0
         self.worst_triple_axle_olhv_perc_negative_direciton = 0
         self.worst_triple_axle_tonperhv_negative_direciton = 0
-        self.bridge_formula_cnt_negative_direciton = round((18000 + 2.1 * (df2.loc[(df2['axle_spacing_number']>1)&(df2['direction']=='P')].groupby('id')['axle_spacing_cm'].sum().mean())),2) or 0
+        self.bridge_formula_cnt_negative_direciton = round((18000 + 2.1 * (df2.loc[(df2['axle_spacing_number'] > 1) & (
+            df2['direction'] == 'P')].groupby('id')['axle_spacing_cm'].sum().mean())), 2) or 0
         self.bridge_formula_olhv_perc_negative_direciton = 0
         self.bridge_formula_tonperhv_negative_direciton = 0
         self.gross_formula_cnt_negative_direciton = 0
         self.gross_formula_olhv_perc_negative_direciton = 0
         self.gross_formula_tonperhv_negative_direciton = 0
-        self.total_avg_cnt_negative_direciton = df.loc[(df['group']=='Heavy')&(df['direction']=='N')].count()[0]
+        self.total_avg_cnt_negative_direciton = df.loc[(
+            df['group'] == 'Heavy') & (df['direction'] == 'N')].count()[0]
         self.total_avg_olhv_perc_negative_direciton = 0
-        self.total_avg_tonperhv_negative_direciton = round(((df3.loc[df3['direction']=='N']['wheel_mass']*2).sum()/1000)/df.loc[df['group']=='Heavy'].count()[0],2)
+        self.total_avg_tonperhv_negative_direciton = round(
+            ((df3.loc[df3['direction'] == 'N']['wheel_mass']*2).sum()/1000)/df.loc[df['group'] == 'Heavy'].count()[0], 2)
         self.wst_2_axle_busses_cnt_pos_dir = 0
         self.wst_2_axle_6_tyre_single_units_cnt_pos_dir = 0
         self.wst_busses_with_3_or_4_axles_cnt_pos_dir = 0
@@ -453,221 +528,308 @@ class Wim():
         self.wst_6_axle_multi_trailer_tonperhv = 0
         self.wst_7_axle_multi_trailer_tonperhv = 0
         self.wst_8_or_more_axle_multi_trailer_tonperhv = 0
+        self.wst_short_heavy_veh = 0
+        self.wst_short_heavy_veh_cnt = 0
+        self.wst_short_heavy_veh_olhv_perc = 0
+        self.wst_short_heavy_veh_tonperhv = 0
+        self.wst_short_heavy_veh_tonperhv_neg_dir = 0
+        self.wst_short_heavy_veh_tonperhv_neg_dir_perc = 0
+        self.wst_short_heavy_veh_tonperhv_pos_dir = 0
+        self.wst_short_heavy_veh_tonperhv_pos_dir_perc = 0
+        self.wst_med_heavy_veh = 0
+        self.wst_med_heavy_veh_cnt = 0
+        self.wst_med_heavy_veh_olhv_perc = 0
+        self.wst_med_heavy_veh_tonperhv = 0
+        self.wst_med_heavy_veh_tonperhv_neg_dir = 0
+        self.wst_med_heavy_veh_tonperhv_neg_dir_perc = 0
+        self.wst_med_heavy_veh_tonperhv_pos_dir = 0
+        self.wst_med_heavy_veh_tonperhv_pos_dir_perc = 0
+        self.wst_long_heavy_veh = 0
+        self.wst_long_heavy_veh_cnt = 0
+        self.wst_long_heavy_veh_olhv_perc = 0
+        self.wst_long_heavy_veh_tonperhv = 0
+        self.wst_long_heavy_veh_tonperhv_neg_dir = 0
+        self.wst_long_heavy_veh_tonperhv_neg_dir_perc = 0
+        self.wst_long_heavy_veh_tonperhv_pos_dir = 0
+        self.wst_long_heavy_veh_tonperhv_pos_dir_perc = 0
 
-    def header_calcs(self, header: pd.DataFrame, data: pd.DataFrame, type: int) -> pd.DataFrame:
+    def summary_header_calcs(self, header: pd.DataFrame, data: pd.DataFrame, type: int) -> pd.DataFrame:
         try:
             speed_limit_qry = f"select max_speed from trafc.countstation where tcname = '{self.site_id}' ;"
-            speed_limit = pd.read_sql_query(speed_limit_qry,config.ENGINE).reset_index(drop=True)
+            speed_limit = pd.read_sql_query(
+                speed_limit_qry, config.ENGINE).reset_index(drop=True)
             try:
                 speed_limit = speed_limit['max_speed'].iloc[0]
             except IndexError:
                 speed_limit = 60
-            data = data.fillna(0, axis=0)
-            if type == 10:
-                try:
-                    header['total_light_negative_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']<=1)&(data['direction']=='N')].count()[0].round().astype(int)
-                except (ValueError, IndexError):
-                    header['total_light_negative_direction'] = 0
-                try:
-                    header['total_light_positive_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']<=1)&(data['direction']=='P')].count()[0].round().astype(int)
-                except (ValueError, IndexError):
-                    header['total_light_positive_direction'] = 0
-                header['total_light_vehicles'] = data.loc[data['vehicle_class_code_secondary_scheme']<=1].count()[0].round().astype(int)
-                try:
-                    header['total_heavy_negative_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='N')].count()[0].round().astype(int)
-                except (ValueError, IndexError):
-                    header['total_heavy_negative_direction'] = 0
-                try:
-                    header['total_heavy_positive_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='P')].count()[0].round().astype(int)
-                except (ValueError, IndexError):
-                    header['total_heavy_positive_direction'] = 0
-                header['total_heavy_vehicles'] = data.loc[data['vehicle_class_code_secondary_scheme']>1].count()[0].round().astype(int)
-                try:
-                    header['total_short_heavy_negative_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']==2)&(data['direction']=='N')].count()[0].round().astype(int)
-                except (ValueError, IndexError):
-                    header['total_short_heavy_negative_direction'] = 0
-                try:
-                    header['total_short_heavy_positive_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']==2)&(data['direction']=='P')].count()[0].round().astype(int)
-                except (ValueError, IndexError):
-                    header['total_short_heavy_positive_direction'] = 0
-                header['total_short_heavy_vehicles'] = data.loc[data['vehicle_class_code_secondary_scheme']==2].count()[0].round().astype(int)
-                try:
-                    header['total_medium_heavy_negative_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']==3)&(data['direction']=='N')].count()[0].round().astype(int)
-                except (ValueError, IndexError):
-                    header['total_medium_heavy_negative_direction'] = 0
-                try:
-                    header['total_medium_heavy_positive_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']==3)&(data['direction']=='P')].count()[0].round().astype(int)
-                except (ValueError, IndexError):
-                    header['total_medium_heavy_positive_direction'] = 0
-                header['total_medium_heavy_vehicles'] = data.loc[data['vehicle_class_code_secondary_scheme']==3].count()[0].round().astype(int)
-                try:
-                    header['total_long_heavy_negative_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']==4)&(data['direction']=='N')].count()[0].round().astype(int)
-                except (ValueError, IndexError):
-                    header['total_long_heavy_negative_direction'] = 0
-                try:
-                    header['total_long_heavy_positive_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']==4)&(data['direction']=='P')].count()[0].round().astype(int)
-                except (ValueError, IndexError):
-                    header['total_long_heavy_positive_direction'] = 0
-                header['total_long_heavy_vehicles'] = data.loc[data['vehicle_class_code_secondary_scheme']==4].count()[0].round().astype(int)
-                try:
-                    header['total_vehicles_negative_direction'] = data.loc[data['direction']=='N'].count()[0].round().astype(int)
-                except (ValueError, IndexError):
-                    header['total_vehicles_negative_direction'] = 0
-                try:
-                    header['total_vehicles_positive_direction'] = data.loc[data['direction']=='P'].count()[0].round().astype(int)
-                except (ValueError, IndexError):
-                    header['total_vehicles_positive_direction'] = 0
-                header['total_vehicles'] = data.count()[0].round().astype(int)
-                try:
-                    header['average_speed_negative_direction'] = data.loc[data['direction']=='N']['vehicle_speed'].mean().round(2)
-                except (ValueError, IndexError):
-                    header['average_speed_negative_direction'] = 0
-                try:
-                    header['average_speed_positive_direction'] = data.loc[data['direction']=='P']['vehicle_speed'].mean().round(2)
-                except (ValueError, IndexError):
-                    header['average_speed_positive_direction'] = 0
-                header['average_speed'] = data['vehicle_speed'].mean().round(2)
-                try:
-                    header['average_speed_light_vehicles_negative_direction'] = data['vehicle_speed'].loc[(data['vehicle_class_code_secondary_scheme']<=1)&(data['direction']=='N')].mean().round(2)
-                except (ValueError, IndexError):
-                    header['average_speed_light_vehicles_negative_direction'] = 0
-                try:
-                    header['average_speed_light_vehicles_positive_direction'] = data['vehicle_speed'].loc[(data['vehicle_class_code_secondary_scheme']<=1)&(data['direction']=='P')].mean().round(2)
-                except (ValueError, IndexError):
-                    header['average_speed_light_vehicles_positive_direction'] = 0
-                header['average_speed_light_vehicles'] = data['vehicle_speed'].loc[data['vehicle_class_code_secondary_scheme']<=1].mean().round(2)
-                try:
-                    header['average_speed_heavy_vehicles_negative_direction'] = data['vehicle_speed'].loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='N')].mean().round(2)
-                except (ValueError, IndexError):
-                    header['average_speed_heavy_vehicles_negative_direction'] = 0
-                try:
-                    header['average_speed_heavy_vehicles_positive_direction'] = data['vehicle_speed'].loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='P')].mean().round(2)
-                except (ValueError, IndexError):
-                    header['average_speed_heavy_vehicles_positive_direction'] = 0
-                header['average_speed_heavy_vehicles'] = data['vehicle_speed'].loc[data['vehicle_class_code_secondary_scheme']>1].mean().round(2)
-                try:
-                    header['truck_split_negative_direction'] = {str((((data.loc[(data['vehicle_class_code_secondary_scheme']==2)&(data['direction']=='N')].count()/data.loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='N')].count())[0])*100).round().astype(int)) +":"+ str((((data.loc[(data['vehicle_class_code_secondary_scheme']==3)&(data['direction']=='N')].count()/data.loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='N')].count())[0])*100).round().astype(int)) +":"+ str((((data.loc[(data['vehicle_class_code_secondary_scheme']==4)&(data['direction']=='N')].count()/data.loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='N')].count())[0])*100).round().astype(int))}
-                except (ValueError, IndexError):
-                    header['truck_split_negative_direction'] = 0
-                try:
-                    header['truck_split_positive_direction'] = {str((((data.loc[(data['vehicle_class_code_secondary_scheme']==2)&(data['direction']=='P')].count()/data.loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='P')].count())[0])*100).round().astype(int)) +":"+ str((((data.loc[(data['vehicle_class_code_secondary_scheme']==3)&(data['direction']=='P')].count()/data.loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='P')].count())[0])*100).round().astype(int)) +":"+ str((((data.loc[(data['vehicle_class_code_secondary_scheme']==4)&(data['direction']=='P')].count()/data.loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='P')].count())[0])*100).round().astype(int))}
-                except (ValueError, IndexError):
-                    header['truck_split_positive_direction'] = 0
-                header['truck_split_total'] = {str((((data.loc[data['vehicle_class_code_secondary_scheme']==2].count()/data.loc[data['vehicle_class_code_secondary_scheme']>1].count())[0])*100).round().astype(int)) +":"+ str((((data.loc[data['vehicle_class_code_secondary_scheme']==3].count()/data.loc[data['vehicle_class_code_secondary_scheme']>1].count())[0])*100).round().astype(int)) +":"+ str((((data.loc[data['vehicle_class_code_secondary_scheme']==4].count()/data.loc[data['vehicle_class_code_secondary_scheme']>1].count())[0])*100).round().astype(int))}
-                try:
-                    header['estimated_axles_per_truck_negative_direction'] = ((data.loc[(data['vehicle_class_code_secondary_scheme']==2)&(data['direction']=='N')].count()[0]*2+data.loc[(data['vehicle_class_code_secondary_scheme']==3)&(data['direction']=='N')].count()[0]*5+data.loc[(data['vehicle_class_code_secondary_scheme']==4)&(data['direction']=='N')].count()[0]*7)/(data.loc[(data['vehicle_class_code_secondary_scheme']==2)&(data['direction']=='N')].count()[0]+data.loc[(data['vehicle_class_code_secondary_scheme']==3)&(data['direction']=='N')].count()[0]+data.loc[(data['vehicle_class_code_secondary_scheme']==4)&(data['direction']=='N')].count()[0])).round(2)
-                except (ValueError, IndexError):
-                    header['estimated_axles_per_truck_negative_direction'] = 0
-                try:
-                    header['estimated_axles_per_truck_positive_direction'] = ((data.loc[(data['vehicle_class_code_secondary_scheme']==2)&(data['direction']=='P')].count()[0]*2+data.loc[(data['vehicle_class_code_secondary_scheme']==3)&(data['direction']=='P')].count()[0]*5+data.loc[(data['vehicle_class_code_secondary_scheme']==4)&(data['direction']=='P')].count()[0]*7)/(data.loc[(data['vehicle_class_code_secondary_scheme']==2)&(data['direction']=='P')].count()[0]+data.loc[(data['vehicle_class_code_secondary_scheme']==3)&(data['direction']=='P')].count()[0]+data.loc[(data['vehicle_class_code_secondary_scheme']==4)&(data['direction']=='P')].count()[0])).round(2)
-                except (ValueError, IndexError):
-                    header['estimated_axles_per_truck_positive_direction'] = 0
-                header['estimated_axles_per_truck_total'] = ((data.loc[data['vehicle_class_code_secondary_scheme']==2].count()[0]*2+data.loc[data['vehicle_class_code_secondary_scheme']==3].count()[0]*5+data.loc[data['vehicle_class_code_secondary_scheme']==4].count()[0]*7)/(data.loc[data['vehicle_class_code_secondary_scheme']==2].count()[0]+data.loc[data['vehicle_class_code_secondary_scheme']==3].count()[0]+data.loc[data['vehicle_class_code_secondary_scheme']==4].count()[0])).round(2)
-                try:
-                    header['percentage_speeding_positive_direction'] = ((data.loc[(data['vehicle_speed']>speed_limit)&(data['direction']=='P')].count()[0]/data.loc[data['direction'=='P']].count()[0])*100).round(2)
-                except (ValueError, IndexError):
-                    header['percentage_speeding_positive_direction'] = 0
-                try:
-                    header['percentage_speeding_negative_direction'] = ((data.loc[(data['vehicle_speed']>speed_limit)&(data['direction']=='N')].count()[0]/data.loc[data['direction'=='N']].count()[0])*100).round(2)
-                except (ValueError, IndexError):
-                    header['percentage_speeding_negative_direction'] = 0
-                header['percentage_speeding_total'] = ((data.loc[data['vehicle_speed']>speed_limit].count()[0]/data.count()[0])*100).round(2)
-                try:
-                    header['vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire'] = data.loc[(data['vehicle_following_code']==2)&data['direction']=='N'].count()[0]
-                except (ValueError, IndexError):
-                    header['vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire'] = 0
-                try:
-                    header['vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire'] = data.loc[(data['vehicle_following_code']==2)&data['direction']=='P'].count()[0]
-                except (ValueError, IndexError):
-                    header['vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire'] = 0
-                header['vehicles_with_rear_to_rear_headway_less_than_2sec_total'] = data.loc[data['vehicle_following_code']==2].count()[0]
-                try:
-                    header['estimated_e80_negative_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']==2)&(data['direction']=='N')].count()[0]*0.6+data.loc[(data['vehicle_class_code_secondary_scheme']==3)&(data['direction']=='N')].count()[0]*2.5+data.loc[(data['vehicle_class_code_secondary_scheme']==4)&(data['direction']=='N')].count()[0]*2.1
-                except (ValueError, IndexError):
-                    header['estimated_e80_negative_direction'] = 0
-                try:
-                    header['estimated_e80_positive_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']==2)&(data['direction']=='P')].count()[0]*0.6+data.loc[(data['vehicle_class_code_secondary_scheme']==3)&(data['direction']=='P')].count()[0]*2.5+data.loc[(data['vehicle_class_code_secondary_scheme']==4)&(data['direction']=='P')].count()[0]*2.1
-                except (ValueError, IndexError):
-                    header['estimated_e80_positive_direction'] = 0
-                header['estimated_e80_on_road'] = data.loc[data['vehicle_class_code_secondary_scheme']==2].count()[0]*0.6+data.loc[data['vehicle_class_code_secondary_scheme']==3].count()[0]*2.5+data.loc[data['vehicle_class_code_secondary_scheme']==4].count()[0]*2.1
-                try:
-                    header['adt_negative_direction'] = data.loc[data['direction']=='N'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().mean()[0].round().astype(int)
-                except (ValueError, IndexError):
-                    header['adt_negative_direction'] = 0
-                try:
-                    header['adt_positive_direction'] = data.loc[data['direction']=='P'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().mean()[0].round().astype(int)
-                except (ValueError, IndexError):
-                    header['adt_positive_direction'] = 0
-                header['adt_total'] = data.groupby(pd.Grouper(key='start_datetime',freq='D')).count().mean()[0].round().astype(int)
-                try:
-                    header['adtt_negative_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='N')].groupby(pd.Grouper(key='start_datetime',freq='D')).count().mean()[0].round().astype(int)
-                except (ValueError, IndexError):
-                    header['adtt_negative_direction'] = 0
-                try:
-                    header['adtt_positive_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme']>1)&(data['direction']=='P')].groupby(pd.Grouper(key='start_datetime',freq='D')).count().mean()[0].round().astype(int)
-                except (ValueError, IndexError):
-                    header['adtt_positive_direction'] = 0
-                header['adtt_total'] = data.loc[data['vehicle_class_code_secondary_scheme']>1].groupby(pd.Grouper(key='start_datetime',freq='D')).count().mean()[0].round().astype(int)
-                try:
-                    header['highest_volume_per_hour_negative_direction'] = data.loc[data['direction']=='N'].groupby(pd.Grouper(key='start_datetime',freq='H')).count().max()[0]
-                except (ValueError, IndexError):
-                    header['highest_volume_per_hour_negative_direction'] = 0
-                try:
-                    header['highest_volume_per_hour_positive_direction'] = data.loc[data['direction']=='P'].groupby(pd.Grouper(key='start_datetime',freq='H')).count().max()[0]
-                except (ValueError, IndexError):
-                    header['highest_volume_per_hour_positive_direction'] = 0
-                header['highest_volume_per_hour_total'] = data.groupby(pd.Grouper(key='start_datetime',freq='H')).count().max()[0]
-                try:
-                    header["15th_highest_volume_per_hour_negative_direction"] = round(data.loc[data['direction']=='N'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.15)[0].round().astype(int))
-                except (ValueError, IndexError):
-                    header["15th_highest_volume_per_hour_negative_direction"] = 0
-                try:
-                    header["15th_highest_volume_per_hour_positive_direction"] = round(data.loc[data['direction']=='P'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.15)[0].round().astype(int))
-                except (ValueError, IndexError):
-                    header["15th_highest_volume_per_hour_positive_direction"] = 0
-                header["15th_highest_volume_per_hour_total"] = data.groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.15)[0].round().astype(int)
-                try:
-                    header["30th_highest_volume_per_hour_negative_direction"] = round(data.loc[data['direction']=='N'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.30)[0].round().astype(int))
-                except (ValueError, IndexError):
-                    header["30th_highest_volume_per_hour_negative_direction"] = 0
-                try:
-                    header["30th_highest_volume_per_hour_positive_direction"] = round(data.loc[data['direction']=='P'].groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.30)[0].round().astype(int))
-                except (ValueError, IndexError):
-                    header["30th_highest_volume_per_hour_positive_direction"] = 0
-                header["30th_highest_volume_per_hour_total"] = data.groupby(pd.Grouper(key='start_datetime',freq='D')).count().quantile(0.30)[0].round().astype(int)
-                try:
-                    header["15th_percentile_speed_negative_direction"] = data.loc[data['direction']=='N']['vehicle_speed'].quantile(0.15).round(2)
-                except (ValueError, IndexError):
-                    header["15th_percentile_speed_negative_direction"] = 0
-                try:
-                    header["15th_percentile_speed_positive_direction"] = data.loc[data['direction']=='P']['vehicle_speed'].quantile(0.15).round(2)
-                except (ValueError, IndexError):
-                    header["15th_percentile_speed_positive_direction"] = 0
-                header["15th_percentile_speed_total"] = data['vehicle_speed'].quantile(0.15).round(2)
-                try:
-                    header["85th_percentile_speed_negative_direction"] = data.loc[data['direction']=='N']['vehicle_speed'].quantile(0.85).round(2)
-                except (ValueError, IndexError):
-                    header["85th_percentile_speed_negative_direction"] = 0
-                try:
-                    header["85th_percentile_speed_positive_direction"] = data.loc[data['direction']=='P']['vehicle_speed'].quantile(0.85).round(2)
-                except (ValueError, IndexError):
-                    header["85th_percentile_speed_positive_direction"] = 0
-                header["85th_percentile_speed_total"] = data['vehicle_speed'].quantile(0.85).round(2)
-                header['avg_weekday_traffic'] = data.groupby(pd.Grouper(key='start_datetime',freq='B')).count().mean()[0].round().astype(int)
-                header['number_of_days_counted'] = data.groupby([data['start_datetime'].dt.to_period('D')]).count().count()[0]
-                header['duration_hours'] = data.groupby([data['start_datetime'].dt.to_period('H')]).count().count()[0]
-
-                return header
-
-            elif type == 60:
-                
-                return header
+            if data.empty:
+                pass
             else:
-                return header
+                data = data.fillna(0, axis=0)
+                if type == 10:
+                    try:
+                        header['total_light_negative_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme'] <= 1) & (
+                            data['direction'] == 'N')].count()[0].round().astype(int)
+                    except (ValueError, IndexError):
+                        header['total_light_negative_direction'] = 0
+                    try:
+                        header['total_light_positive_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme'] <= 1) & (
+                            data['direction'] == 'P')].count()[0].round().astype(int)
+                    except (ValueError, IndexError):
+                        header['total_light_positive_direction'] = 0
+                    header['total_light_vehicles'] = data.loc[data['vehicle_class_code_secondary_scheme'] <= 1].count()[
+                        0].round().astype(int)
+                    try:
+                        header['total_heavy_negative_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme'] > 1) & (
+                            data['direction'] == 'N')].count()[0].round().astype(int)
+                    except (ValueError, IndexError):
+                        header['total_heavy_negative_direction'] = 0
+                    try:
+                        header['total_heavy_positive_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme'] > 1) & (
+                            data['direction'] == 'P')].count()[0].round().astype(int)
+                    except (ValueError, IndexError):
+                        header['total_heavy_positive_direction'] = 0
+                    header['total_heavy_vehicles'] = data.loc[data['vehicle_class_code_secondary_scheme'] > 1].count()[
+                        0].round().astype(int)
+                    try:
+                        header['total_short_heavy_negative_direction'] = data.loc[(
+                            data['vehicle_class_code_secondary_scheme'] == 2) & (data['direction'] == 'N')].count()[0].round().astype(int)
+                    except (ValueError, IndexError):
+                        header['total_short_heavy_negative_direction'] = 0
+                    try:
+                        header['total_short_heavy_positive_direction'] = data.loc[(
+                            data['vehicle_class_code_secondary_scheme'] == 2) & (data['direction'] == 'P')].count()[0].round().astype(int)
+                    except (ValueError, IndexError):
+                        header['total_short_heavy_positive_direction'] = 0
+                    header['total_short_heavy_vehicles'] = data.loc[data['vehicle_class_code_secondary_scheme'] == 2].count()[
+                        0].round().astype(int)
+                    try:
+                        header['total_medium_heavy_negative_direction'] = data.loc[(
+                            data['vehicle_class_code_secondary_scheme'] == 3) & (data['direction'] == 'N')].count()[0].round().astype(int)
+                    except (ValueError, IndexError):
+                        header['total_medium_heavy_negative_direction'] = 0
+                    try:
+                        header['total_medium_heavy_positive_direction'] = data.loc[(
+                            data['vehicle_class_code_secondary_scheme'] == 3) & (data['direction'] == 'P')].count()[0].round().astype(int)
+                    except (ValueError, IndexError):
+                        header['total_medium_heavy_positive_direction'] = 0
+                    header['total_medium_heavy_vehicles'] = data.loc[data['vehicle_class_code_secondary_scheme'] == 3].count()[
+                        0].round().astype(int)
+                    try:
+                        header['total_long_heavy_negative_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme'] == 4) & (
+                            data['direction'] == 'N')].count()[0].round().astype(int)
+                    except (ValueError, IndexError):
+                        header['total_long_heavy_negative_direction'] = 0
+                    try:
+                        header['total_long_heavy_positive_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme'] == 4) & (
+                            data['direction'] == 'P')].count()[0].round().astype(int)
+                    except (ValueError, IndexError):
+                        header['total_long_heavy_positive_direction'] = 0
+                    header['total_long_heavy_vehicles'] = data.loc[data['vehicle_class_code_secondary_scheme'] == 4].count()[
+                        0].round().astype(int)
+                    try:
+                        header['total_vehicles_negative_direction'] = data.loc[data['direction'] == 'N'].count()[
+                            0].round().astype(int)
+                    except (ValueError, IndexError):
+                        header['total_vehicles_negative_direction'] = 0
+                    try:
+                        header['total_vehicles_positive_direction'] = data.loc[data['direction'] == 'P'].count()[
+                            0].round().astype(int)
+                    except (ValueError, IndexError):
+                        header['total_vehicles_positive_direction'] = 0
+                    header['total_vehicles'] = data.count()[
+                        0].round().astype(int)
+                    try:
+                        header['average_speed_negative_direction'] = data.loc[data['direction']
+                                                                              == 'N']['vehicle_speed'].mean().round(2)
+                    except (ValueError, IndexError):
+                        header['average_speed_negative_direction'] = 0
+                    try:
+                        header['average_speed_positive_direction'] = data.loc[data['direction']
+                                                                              == 'P']['vehicle_speed'].mean().round(2)
+                    except (ValueError, IndexError):
+                        header['average_speed_positive_direction'] = 0
+                    header['average_speed'] = data['vehicle_speed'].mean().round(2)
+                    try:
+                        header['average_speed_light_vehicles_negative_direction'] = data['vehicle_speed'].loc[(
+                            data['vehicle_class_code_secondary_scheme'] <= 1) & (data['direction'] == 'N')].mean().round(2)
+                    except (ValueError, IndexError):
+                        header['average_speed_light_vehicles_negative_direction'] = 0
+                    try:
+                        header['average_speed_light_vehicles_positive_direction'] = data['vehicle_speed'].loc[(
+                            data['vehicle_class_code_secondary_scheme'] <= 1) & (data['direction'] == 'P')].mean().round(2)
+                    except (ValueError, IndexError):
+                        header['average_speed_light_vehicles_positive_direction'] = 0
+                    header['average_speed_light_vehicles'] = data['vehicle_speed'].loc[
+                        data['vehicle_class_code_secondary_scheme'] <= 1].mean().round(2)
+                    try:
+                        header['average_speed_heavy_vehicles_negative_direction'] = data['vehicle_speed'].loc[(
+                            data['vehicle_class_code_secondary_scheme'] > 1) & (data['direction'] == 'N')].mean().round(2)
+                    except (ValueError, IndexError):
+                        header['average_speed_heavy_vehicles_negative_direction'] = 0
+                    try:
+                        header['average_speed_heavy_vehicles_positive_direction'] = data['vehicle_speed'].loc[(
+                            data['vehicle_class_code_secondary_scheme'] > 1) & (data['direction'] == 'P')].mean().round(2)
+                    except (ValueError, IndexError):
+                        header['average_speed_heavy_vehicles_positive_direction'] = 0
+                    header['average_speed_heavy_vehicles'] = data['vehicle_speed'].loc[data['vehicle_class_code_secondary_scheme'] > 1].mean(
+                    ).round(2)
+                    try:
+                        header['truck_split_negative_direction'] = {str((((data.loc[(data['vehicle_class_code_secondary_scheme'] == 2) & (data['direction'] == 'N')].count()/data.loc[(data['vehicle_class_code_secondary_scheme'] > 1) & (data['direction'] == 'N')].count())[0])*100).round().astype(int)) + ":" + str((((data.loc[(data['vehicle_class_code_secondary_scheme'] == 3) & (data['direction'] == 'N')].count(
+                        )/data.loc[(data['vehicle_class_code_secondary_scheme'] > 1) & (data['direction'] == 'N')].count())[0])*100).round().astype(int)) + ":" + str((((data.loc[(data['vehicle_class_code_secondary_scheme'] == 4) & (data['direction'] == 'N')].count()/data.loc[(data['vehicle_class_code_secondary_scheme'] > 1) & (data['direction'] == 'N')].count())[0])*100).round().astype(int))}
+                    except (ValueError, IndexError):
+                        header['truck_split_negative_direction'] = 0
+                    try:
+                        header['truck_split_positive_direction'] = {str((((data.loc[(data['vehicle_class_code_secondary_scheme'] == 2) & (data['direction'] == 'P')].count()/data.loc[(data['vehicle_class_code_secondary_scheme'] > 1) & (data['direction'] == 'P')].count())[0])*100).round().astype(int)) + ":" + str((((data.loc[(data['vehicle_class_code_secondary_scheme'] == 3) & (data['direction'] == 'P')].count(
+                        )/data.loc[(data['vehicle_class_code_secondary_scheme'] > 1) & (data['direction'] == 'P')].count())[0])*100).round().astype(int)) + ":" + str((((data.loc[(data['vehicle_class_code_secondary_scheme'] == 4) & (data['direction'] == 'P')].count()/data.loc[(data['vehicle_class_code_secondary_scheme'] > 1) & (data['direction'] == 'P')].count())[0])*100).round().astype(int))}
+                    except (ValueError, IndexError):
+                        header['truck_split_positive_direction'] = 0
+                    header['truck_split_total'] = {str((((data.loc[data['vehicle_class_code_secondary_scheme'] == 2].count()/data.loc[data['vehicle_class_code_secondary_scheme'] > 1].count())[0])*100).round().astype(int)) + ":" + str((((data.loc[data['vehicle_class_code_secondary_scheme'] == 3].count(
+                    )/data.loc[data['vehicle_class_code_secondary_scheme'] > 1].count())[0])*100).round().astype(int)) + ":" + str((((data.loc[data['vehicle_class_code_secondary_scheme'] == 4].count()/data.loc[data['vehicle_class_code_secondary_scheme'] > 1].count())[0])*100).round().astype(int))}
+                    try:
+                        header['estimated_axles_per_truck_negative_direction'] = ((data.loc[(data['vehicle_class_code_secondary_scheme'] == 2) & (data['direction'] == 'N')].count()[0]*2+data.loc[(data['vehicle_class_code_secondary_scheme'] == 3) & (data['direction'] == 'N')].count()[0]*5+data.loc[(data['vehicle_class_code_secondary_scheme'] == 4) & (data['direction'] == 'N')].count()[
+                            0]*7)/(data.loc[(data['vehicle_class_code_secondary_scheme'] == 2) & (data['direction'] == 'N')].count()[0]+data.loc[(data['vehicle_class_code_secondary_scheme'] == 3) & (data['direction'] == 'N')].count()[0]+data.loc[(data['vehicle_class_code_secondary_scheme'] == 4) & (data['direction'] == 'N')].count()[0])).round(2)
+                    except (ValueError, IndexError):
+                        header['estimated_axles_per_truck_negative_direction'] = 0
+                    try:
+                        header['estimated_axles_per_truck_positive_direction'] = ((data.loc[(data['vehicle_class_code_secondary_scheme'] == 2) & (data['direction'] == 'P')].count()[0]*2+data.loc[(data['vehicle_class_code_secondary_scheme'] == 3) & (data['direction'] == 'P')].count()[0]*5+data.loc[(data['vehicle_class_code_secondary_scheme'] == 4) & (data['direction'] == 'P')].count()[
+                            0]*7)/(data.loc[(data['vehicle_class_code_secondary_scheme'] == 2) & (data['direction'] == 'P')].count()[0]+data.loc[(data['vehicle_class_code_secondary_scheme'] == 3) & (data['direction'] == 'P')].count()[0]+data.loc[(data['vehicle_class_code_secondary_scheme'] == 4) & (data['direction'] == 'P')].count()[0])).round(2)
+                    except (ValueError, IndexError):
+                        header['estimated_axles_per_truck_positive_direction'] = 0
+                    header['estimated_axles_per_truck_total'] = ((data.loc[data['vehicle_class_code_secondary_scheme'] == 2].count()[0]*2+data.loc[data['vehicle_class_code_secondary_scheme'] == 3].count()[0]*5+data.loc[data['vehicle_class_code_secondary_scheme'] == 4].count()[
+                        0]*7)/(data.loc[data['vehicle_class_code_secondary_scheme'] == 2].count()[0]+data.loc[data['vehicle_class_code_secondary_scheme'] == 3].count()[0]+data.loc[data['vehicle_class_code_secondary_scheme'] == 4].count()[0])).round(2)
+                    try:
+                        header['percentage_speeding_positive_direction'] = ((data.loc[(data['vehicle_speed'] > speed_limit) & (
+                            data['direction'] == 'P')].count()[0]/data.loc[data['direction' == 'P']].count()[0])*100).round(2)
+                    except (ValueError, IndexError):
+                        header['percentage_speeding_positive_direction'] = 0
+                    try:
+                        header['percentage_speeding_negative_direction'] = ((data.loc[(data['vehicle_speed'] > speed_limit) & (
+                            data['direction'] == 'N')].count()[0]/data.loc[data['direction' == 'N']].count()[0])*100).round(2)
+                    except (ValueError, IndexError):
+                        header['percentage_speeding_negative_direction'] = 0
+                    header['percentage_speeding_total'] = (
+                        (data.loc[data['vehicle_speed'] > speed_limit].count()[0]/data.count()[0])*100).round(2)
+                    try:
+                        header['vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire'] = data.loc[(
+                            data['vehicle_following_code'] == 2) & data['direction'] == 'N'].count()[0]
+                    except (ValueError, IndexError):
+                        header['vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire'] = 0
+                    try:
+                        header['vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire'] = data.loc[(
+                            data['vehicle_following_code'] == 2) & data['direction'] == 'P'].count()[0]
+                    except (ValueError, IndexError):
+                        header['vehicles_with_rear_to_rear_headway_less_than_2sec_positive_dire'] = 0
+                    header['vehicles_with_rear_to_rear_headway_less_than_2sec_total'] = data.loc[data['vehicle_following_code'] == 2].count()[
+                        0]
+                    try:
+                        header['estimated_e80_negative_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme'] == 2) & (data['direction'] == 'N')].count()[0]*0.6+data.loc[(
+                            data['vehicle_class_code_secondary_scheme'] == 3) & (data['direction'] == 'N')].count()[0]*2.5+data.loc[(data['vehicle_class_code_secondary_scheme'] == 4) & (data['direction'] == 'N')].count()[0]*2.1
+                    except (ValueError, IndexError):
+                        header['estimated_e80_negative_direction'] = 0
+                    try:
+                        header['estimated_e80_positive_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme'] == 2) & (data['direction'] == 'P')].count()[0]*0.6+data.loc[(
+                            data['vehicle_class_code_secondary_scheme'] == 3) & (data['direction'] == 'P')].count()[0]*2.5+data.loc[(data['vehicle_class_code_secondary_scheme'] == 4) & (data['direction'] == 'P')].count()[0]*2.1
+                    except (ValueError, IndexError):
+                        header['estimated_e80_positive_direction'] = 0
+                    header['estimated_e80_on_road'] = data.loc[data['vehicle_class_code_secondary_scheme'] == 2].count(
+                    )[0]*0.6+data.loc[data['vehicle_class_code_secondary_scheme'] == 3].count()[0]*2.5+data.loc[data['vehicle_class_code_secondary_scheme'] == 4].count()[0]*2.1
+                    try:
+                        header['adt_negative_direction'] = data.loc[data['direction'] == 'N'].groupby(
+                            pd.Grouper(key='start_datetime', freq='D')).count().mean()[0].round().astype(int)
+                    except (ValueError, IndexError):
+                        header['adt_negative_direction'] = 0
+                    try:
+                        header['adt_positive_direction'] = data.loc[data['direction'] == 'P'].groupby(
+                            pd.Grouper(key='start_datetime', freq='D')).count().mean()[0].round().astype(int)
+                    except (ValueError, IndexError):
+                        header['adt_positive_direction'] = 0
+                    header['adt_total'] = data.groupby(pd.Grouper(
+                        key='start_datetime', freq='D')).count().mean()[0].round().astype(int)
+                    try:
+                        header['adtt_negative_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme'] > 1) & (
+                            data['direction'] == 'N')].groupby(pd.Grouper(key='start_datetime', freq='D')).count().mean()[0].round().astype(int)
+                    except (ValueError, IndexError):
+                        header['adtt_negative_direction'] = 0
+                    try:
+                        header['adtt_positive_direction'] = data.loc[(data['vehicle_class_code_secondary_scheme'] > 1) & (
+                            data['direction'] == 'P')].groupby(pd.Grouper(key='start_datetime', freq='D')).count().mean()[0].round().astype(int)
+                    except (ValueError, IndexError):
+                        header['adtt_positive_direction'] = 0
+                    header['adtt_total'] = data.loc[data['vehicle_class_code_secondary_scheme'] > 1].groupby(
+                        pd.Grouper(key='start_datetime', freq='D')).count().mean()[0].round().astype(int)
+                    try:
+                        header['highest_volume_per_hour_negative_direction'] = data.loc[data['direction'] == 'N'].groupby(
+                            pd.Grouper(key='start_datetime', freq='H')).count().max()[0]
+                    except (ValueError, IndexError):
+                        header['highest_volume_per_hour_negative_direction'] = 0
+                    try:
+                        header['highest_volume_per_hour_positive_direction'] = data.loc[data['direction'] == 'P'].groupby(
+                            pd.Grouper(key='start_datetime', freq='H')).count().max()[0]
+                    except (ValueError, IndexError):
+                        header['highest_volume_per_hour_positive_direction'] = 0
+                    header['highest_volume_per_hour_total'] = data.groupby(
+                        pd.Grouper(key='start_datetime', freq='H')).count().max()[0]
+                    try:
+                        header["15th_highest_volume_per_hour_negative_direction"] = round(data.loc[data['direction'] == 'N'].groupby(
+                            pd.Grouper(key='start_datetime', freq='D')).count().quantile(0.15)[0].round().astype(int))
+                    except (ValueError, IndexError):
+                        header["15th_highest_volume_per_hour_negative_direction"] = 0
+                    try:
+                        header["15th_highest_volume_per_hour_positive_direction"] = round(data.loc[data['direction'] == 'P'].groupby(
+                            pd.Grouper(key='start_datetime', freq='D')).count().quantile(0.15)[0].round().astype(int))
+                    except (ValueError, IndexError):
+                        header["15th_highest_volume_per_hour_positive_direction"] = 0
+                    header["15th_highest_volume_per_hour_total"] = data.groupby(pd.Grouper(
+                        key='start_datetime', freq='D')).count().quantile(0.15)[0].round().astype(int)
+                    try:
+                        header["30th_highest_volume_per_hour_negative_direction"] = round(data.loc[data['direction'] == 'N'].groupby(
+                            pd.Grouper(key='start_datetime', freq='D')).count().quantile(0.30)[0].round().astype(int))
+                    except (ValueError, IndexError):
+                        header["30th_highest_volume_per_hour_negative_direction"] = 0
+                    try:
+                        header["30th_highest_volume_per_hour_positive_direction"] = round(data.loc[data['direction'] == 'P'].groupby(
+                            pd.Grouper(key='start_datetime', freq='D')).count().quantile(0.30)[0].round().astype(int))
+                    except (ValueError, IndexError):
+                        header["30th_highest_volume_per_hour_positive_direction"] = 0
+                    header["30th_highest_volume_per_hour_total"] = data.groupby(pd.Grouper(
+                        key='start_datetime', freq='D')).count().quantile(0.30)[0].round().astype(int)
+                    try:
+                        header["15th_percentile_speed_negative_direction"] = data.loc[data['direction']
+                                                                                      == 'N']['vehicle_speed'].quantile(0.15).round(2)
+                    except (ValueError, IndexError):
+                        header["15th_percentile_speed_negative_direction"] = 0
+                    try:
+                        header["15th_percentile_speed_positive_direction"] = data.loc[data['direction']
+                                                                                      == 'P']['vehicle_speed'].quantile(0.15).round(2)
+                    except (ValueError, IndexError):
+                        header["15th_percentile_speed_positive_direction"] = 0
+                    header["15th_percentile_speed_total"] = data['vehicle_speed'].quantile(
+                        0.15).round(2)
+                    try:
+                        header["85th_percentile_speed_negative_direction"] = data.loc[data['direction']
+                                                                                      == 'N']['vehicle_speed'].quantile(0.85).round(2)
+                    except (ValueError, IndexError):
+                        header["85th_percentile_speed_negative_direction"] = 0
+                    try:
+                        header["85th_percentile_speed_positive_direction"] = data.loc[data['direction']
+                                                                                      == 'P']['vehicle_speed'].quantile(0.85).round(2)
+                    except (ValueError, IndexError):
+                        header["85th_percentile_speed_positive_direction"] = 0
+                    header["85th_percentile_speed_total"] = data['vehicle_speed'].quantile(
+                        0.85).round(2)
+                    header['avg_weekday_traffic'] = data.groupby(pd.Grouper(
+                        key='start_datetime', freq='B')).count().mean()[0].round().astype(int)
+                    header['number_of_days_counted'] = data.groupby(
+                        [data['start_datetime'].dt.to_period('D')]).count().count()[0]
+                    header['duration_hours'] = data.groupby(
+                        [data['start_datetime'].dt.to_period('H')]).count().count()[0]
+
+                    return header
         except IndexError:
             return header
 
-    def wim_header_upsert(self):
+    def wim_header_upsert(self) -> str:
         UPSERT_STRING = F"""INSERT INTO trafc.electronic_count_header_hswim (
             header_id,
             egrl_percent,
@@ -1424,12 +1586,12 @@ class Wim():
         """
         return UPSERT_STRING
 
-    def get_headers_to_update(self):
+    def get_headers_to_update(self) -> pd.DataFrame:
         print('fetching headers to update')
         header_ids = pd.read_sql_query(q.GET_HSWIM_HEADER_IDS, config.ENGINE)
         return header_ids
 
-    def wim_header_upsert_func1(self, header_id):
+    def wim_header_upsert_func1(self, header_id: str) -> str:
         SELECT_TYPE10_QRY = f"""SELECT * FROM trafc.electronic_count_data_type_10 t10
             left join traf_lu.vehicle_classes_scheme08 c on c.id = t10.vehicle_class_code_primary_scheme
             where t10.header_id = '{header_id}'
@@ -1468,97 +1630,104 @@ class Wim():
             where t10.header_id = '{header_id}'
             """
         return SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, WHEEL_MASS_SELECT_QRY
-    
-    def wim_header_upsert_func2(self, SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, WHEEL_MASS_SELECT_QRY):
-        df = pd.read_sql_query(SELECT_TYPE10_QRY,config.ENGINE)
+
+    def wim_header_upsert_func2(self, SELECT_TYPE10_QRY: str, AXLE_SPACING_SELECT_QRY: str, WHEEL_MASS_SELECT_QRY: str) -> pd.DataFrame:
+        df = pd.read_sql_query(SELECT_TYPE10_QRY, config.ENGINE)
         df = df.fillna(0)
-        df2 = pd.read_sql_query(AXLE_SPACING_SELECT_QRY,config.ENGINE)
+        df2 = pd.read_sql_query(AXLE_SPACING_SELECT_QRY, config.ENGINE)
         df2 = df2.fillna(0)
-        df3 = pd.read_sql_query(WHEEL_MASS_SELECT_QRY,config.ENGINE)
+        df3 = pd.read_sql_query(WHEEL_MASS_SELECT_QRY, config.ENGINE)
         df3 = df3.fillna(0)
         return df, df2, df3
 
     def main(self):
-        if self.data_df is not None and self.header_id is not None:
+        try:
+            if self.data_df is not None and self.header_id is not None:
+                data, sub_data = self.type_10()
+                data = data[data.columns.intersection(self.t10_cols)]
+                main.push_to_db(data, config.TYPE_10_TBL_NAME)
 
-            data, sub_data = self.type_10()
-            data = data[data.columns.intersection(t10_cols)]
-            tools.push_to_db(data, config.TYPE_10_TBL_NAME)
+                self.sub_data = sub_data.replace(r'^\s*$', np.NaN, regex=True)
+                self.sub_data = sub_data.drop("index", axis=1, errors='ignore')
+                self.wx_data = sub_data.loc[sub_data['sub_data_type_code'].str.lower(
+                ).str[0] == 'w']
+                self.sx_data = sub_data.loc[sub_data['sub_data_type_code'].str.lower(
+                ).str[0] == 's']
+                self.gx_data = sub_data.loc[sub_data['sub_data_type_code'].str.lower(
+                ).str[0] == 'g']
+                self.vx_data = sub_data.loc[sub_data['sub_data_type_code'].str.lower(
+                ).str[0] == 'v']
+                self.tx_data = sub_data.loc[sub_data['sub_data_type_code'].str.lower(
+                ).str[0] == 't']
+                self.ax_data = sub_data.loc[sub_data['sub_data_type_code'].str.lower(
+                ).str[0] == 'a']
+                self.cx_data = sub_data.loc[sub_data['sub_data_type_code'].str.lower(
+                ).str[0] == 'c']
 
-            self.get_sub_data(sub_data)
-
-            if self.wx_data.empty:
-                pass
-            else:
-                self.wx_data.rename(columns = {"value":"wheel_mass", "number":"wheel_mass_number", "id":"type10_id"}, inplace=True)
-                push_to_db(self.wx_data, config.WX_TABLE)
-                
-            if self.ax_data.empty:
-                pass
-            else:
-                push_to_db(self.ax_data, config.AX_TABLE)
-                
-            if self.gx_data.empty:
-                pass
-            else:
-                push_to_db(self.gx_data, config.GX_TABLE)
-                
-            if self.sx_data.empty:
-                pass
-            else:
-                self.sx_data.rename(columns = {"value":"axle_spacing_cm", "number":"axle_spacing_number", "id":"type10_id"}, inplace=True)
-                self.sx_data = self.sx_data.drop(["offset_sensor_detection_code","mass_measurement_resolution_kg"], axis=1)
-                push_to_db(self.sx_data, config.SX_TABLE)
-                
-            if self.tx_data.empty:
-                pass
-            else:
-                self.tx_data.rename(columns = {"value":"tyre_code", "number":"tyre_number", "id":"type10_id"}, inplace=True)
-                self.tx_data = self.tx_data.drop(["offset_sensor_detection_code","mass_measurement_resolution_kg"], axis=1)
-                push_to_db(self.tx_data, config.TX_TABLE)
-                
-            if self.cx_data.empty:
-                pass
-            else:
-                push_to_db(self.cx_data, config.CX_TABLE)
-                
-            if self.vx_data.empty:
-                pass
-            else:
-                self.vx_data.rename(columns = {"value":"group_axle_count", "offset_sensor_detection_code":"vehicle_registration_number" ,"number":"group_axle_number", "id":"type10_id"}, inplace=True)
-                self.vx_data = self.vx_data.drop(["mass_measurement_resolution_kg"], axis=1)
-                push_to_db(self.vx_data, config.VX_TABLE)
-
-        else:
-            for header_id in list(self.header_ids['header_id'].astype(str)):
-                SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, WHEEL_MASS_SELECT_QRY = self.wim_header_upsert_func1(header_id)
-                df, df2, df3 = self.wim_header_upsert_func2(SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, WHEEL_MASS_SELECT_QRY)
-                if df2 is None or df3 is None:
+                if self.wx_data.empty:
                     pass
                 else:
-                    print(f'working on {header_id}')
-                    self.calcs(df,df2,df3)
-                    insert_string = self.wim_header_upsert()
-                    with config.ENGINE.connect() as conn:
-                        print(f'upserting: {header_id}')
-                        conn.execute(insert_string)
-                        print('COMPLETE')
+                    self.wx_data.rename(columns={
+                                        "value": "wheel_mass", "number": "wheel_mass_number", "id": "type10_id"}, inplace=True)
+                    main.push_to_db(self.wx_data, config.WX_TABLE)
 
-def push_to_db(df: pd.DataFrame, table_name: str):
-    try:
-        df = df.loc[:,~df.columns.duplicated()]
-        df.to_sql(
-            table_name,
-            con=config.ENGINE,
-            schema=config.TRAFFIC_SCHEMA,
-            if_exists="append",
-            index=False,
-            method=tools.psql_insert_copy,
-        )
-    except (UniqueViolation, NotNullViolation, ExclusionViolation):
-        print("Data already in : " + table_name)
-        pass
+                if self.ax_data.empty:
+                    pass
+                else:
+                    main.push_to_db(self.ax_data, config.AX_TABLE)
 
+                if self.gx_data.empty:
+                    pass
+                else:
+                    main.push_to_db(self.gx_data, config.GX_TABLE)
 
-if __name__ == "__main__":
-    upsert = Wim()
+                if self.sx_data.empty:
+                    pass
+                else:
+                    self.sx_data.rename(columns={
+                                        "value": "axle_spacing_cm", "number": "axle_spacing_number", "id": "type10_id"}, inplace=True)
+                    self.sx_data = self.sx_data.drop(
+                        ["offset_sensor_detection_code", "mass_measurement_resolution_kg"], axis=1)
+                    main.push_to_db(self.sx_data, config.SX_TABLE)
+
+                if self.tx_data.empty:
+                    pass
+                else:
+                    self.tx_data.rename(columns={
+                                        "value": "tyre_code", "number": "tyre_number", "id": "type10_id"}, inplace=True)
+                    self.tx_data = self.tx_data.drop(
+                        ["offset_sensor_detection_code", "mass_measurement_resolution_kg"], axis=1)
+                    main.push_to_db(self.tx_data, config.TX_TABLE)
+
+                if self.cx_data.empty:
+                    pass
+                else:
+                    main.push_to_db(self.cx_data, config.CX_TABLE)
+
+                if self.vx_data.empty:
+                    pass
+                else:
+                    self.vx_data.rename(columns={"value": "group_axle_count", "offset_sensor_detection_code":
+                                        "vehicle_registration_number", "number": "group_axle_number", "id": "type10_id"}, inplace=True)
+                    self.vx_data = self.vx_data.drop(
+                        ["mass_measurement_resolution_kg"], axis=1)
+                    main.push_to_db(self.vx_data, config.VX_TABLE)
+
+            else:
+                for header_id in list(self.header_ids['header_id'].astype(str)):
+                    SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, WHEEL_MASS_SELECT_QRY = self.wim_header_upsert_func1(
+                        header_id)
+                    df, df2, df3 = self.wim_header_upsert_func2(
+                        SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, WHEEL_MASS_SELECT_QRY)
+                    if df2 is None or df3 is None:
+                        pass
+                    else:
+                        print(f'working on {header_id}')
+                        self.wim_header_calcs(df, df2, df3)
+                        insert_string = self.wim_header_upsert()
+                        with config.ENGINE.connect() as conn:
+                            print(f'upserting: {header_id}')
+                            conn.execute(insert_string)
+                            print('COMPLETE')
+        except Exception:
+            traceback.print_exc()

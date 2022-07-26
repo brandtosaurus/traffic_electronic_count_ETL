@@ -186,7 +186,7 @@ CREATE UNIQUE INDEX electronic_count_header_un ON {config.TRAFFIC_SCHEMA}.electr
 CREATE INDEX electronic_count_header_year_idx ON {config.TRAFFIC_SCHEMA}.electronic_count_header USING btree (year);
 """
 
-FUNCTION_CREATEPARTITIONIFNOTEXISTS ="""
+FUNCTION_CREATEPARTITIONIFNOTEXISTS = """
 CREATE OR REPLACE FUNCTION {config.TRAFFIC_SCHEMA}.createpartitionifnotexists(start_datetime date)
  RETURNS void
  LANGUAGE plpgsql
@@ -683,6 +683,11 @@ SELECT_CLASSIFICAITON_SCHEME_5 = f"""
 SELECT_CLASSIFICAITON_SCHEME_9 = f"""
 	SELECT * FROM traf_lu.vehicle_classes_scheme09 ;
 """
+
 SELECT_LANES_LIMIT1 = f"""
-	SELECT * FROM {config.TRAFFIC_SCHEMA}.traffic_lane_configuration limit 1;
+	SELECT * FROM {config.TRAFFIC_SCHEMA}.traffic_lane_configuration LIMIT 1;
+"""
+
+SEELECT_HSWIM_HEADER_COLS = f"""
+	SELECT * from {config.TRAFFIC_SCHEMA}.electronic_count_header_hswim LIMIT 1;
 """
