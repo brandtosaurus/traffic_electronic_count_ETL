@@ -1,3 +1,4 @@
+from distutils.debug import DEBUG
 import os
 import csv
 import pandas as pd
@@ -24,6 +25,7 @@ pd.options.mode.chained_assignment = None
 pd.set_option("display.max_columns", None)
 pd.set_option("display.max_rows", 20)
 
+# Reading the columns from the database and storing them in a list.
 pt_cols = list(pd.read_sql_query(
     q.SELECT_PARTITION_TABLE_LIMIT1, config.ENGINE).columns)
 t21_cols = list(pd.read_sql_query(
@@ -79,6 +81,11 @@ class Traffic():
         self.t60_table = config.TYPE_60_TBL_NAME
 
     def to_df(self) -> pd.DataFrame:  # CSV to DataFrame
+        """
+        It takes a CSV file, reads it in as a DataFrame, splits the first column on a variety of
+        delimiters, and returns the resulting DataFrame.
+        :return: A DataFrame
+        """
         try:
             df = pd.read_csv(self.file, header=None, dtype=str,
                              sep="\s+\t", engine='python')
@@ -89,6 +96,15 @@ class Traffic():
                 "to_df function did not work properly: " + str(exc))
 
     def get_head(self, df) -> pd.DataFrame:
+        """
+        It returns a dataframe that contains all rows where the first column is either H0, S0, I0, S1,
+        D0, D1, D3, L0, L1, or where the first column is either 21, 22, 70, 30, 31, 60 and the third
+        column is less than 80, or where the first column is 10 and the second column is 1, 8, 5, 9, 01,
+        08, 05, or 09
+
+        :param df: the dataframe to be processed
+        :return: A dataframe
+        """
         try:
             df = pd.DataFrame(df.loc[
                 (df[0].isin(["H0", "S0", "I0", "S1", "D0", "D1", "D3", "L0", "L1"]))
@@ -107,6 +123,15 @@ class Traffic():
             traceback.print_exc()
 
     def get_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        It filters out rows that have a value in column 0 that is not in the list ["H0", "H9", "S0",
+        "I0", "S1", "D0", "D1", "D3", "L0", "L1"] and that have a value in column 1 that is in the list
+        ["0", "1", "2", "3", "4"] and that have a value in column 2 that is greater than 80
+
+        :param df: pd.DataFrame - the dataframe to be filtered
+        :type df: pd.DataFrame
+        :return: A dataframe
+        """
         try:
             df = pd.DataFrame(df.loc[
                 (~df[0].isin(["H0", "H9", "S0", "I0",
@@ -128,6 +153,21 @@ class Traffic():
             print(exc)
 
     def get_lanes(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        It takes a dataframe, checks if it's empty, if it's not empty, it checks if the first column is
+        equal to "L1", if it is, it drops all columns that have null values, drops duplicates, resets
+        the index, and copies the dataframe. If the dataframe is empty, it checks if the first column is
+        equal to "L0", if it is, it drops all columns that have null values, drops duplicates, resets
+        the index, and copies the dataframe. It then sets the max_lanes variable to the first value in
+        the second column of the dataframe. It then renames the columns. If the dataframe has 5 columns,
+        it renames the columns to "lane_number", "direction_code", "lane_type_code", and
+        "traffic_stream_number". If the dataframe has 11 columns, it renames the columns to
+        "lane_number", "direction
+
+        :param df: pd.DataFrame
+        :type df: pd.DataFrame
+        :return: A dataframe with the columns:
+        """
         if df.empty:
             pass
         else:
@@ -204,7 +244,16 @@ class Traffic():
                         lanes['lane_number'].drop_duplicates().count())
                 return lanes
 
+    # !most likely to go wrong
     def process_datetimes(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        It takes a dataframe, checks if the first column is equal to 10, if it is, it does one thing, if
+        it isn't, it does another
+
+        :param df: the dataframe
+        :type df: pd.DataFrame
+        :return: A dataframe with the columns renamed and the datetime columns added.
+        """
         if df.loc[df[0] == "10"].empty:
             duration_min_col = 4
             date_col = 2
@@ -264,6 +313,13 @@ class Traffic():
         return df
 
     def get_direction(self, df):
+        """
+        It takes a dataframe and returns a dataframe with the columns 'direction', 'direction_code', and
+        'compass_heading' added
+
+        :param df: the dataframe that contains the data
+        :return: A dataframe with the following columns:
+        """
         try:
             if df.loc[df[0] == "10"].empty:
                 lane_col = 5
@@ -324,6 +380,14 @@ class Traffic():
             return df
 
     def header(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        It takes a dataframe, finds the header information, and returns a dataframe with the header
+        information
+
+        :param df: pd.DataFrame
+        :type df: pd.DataFrame
+        :return: A dataframe
+        """
         df = df.reset_index(drop=True)
         st_nd = df.loc[df[0].isin(["D1", "D3"]), 0:4].reset_index(
             drop=True).copy()
@@ -654,11 +718,16 @@ class Traffic():
                     ddf['year'] = int(ddf['start_datetime'].str[:4][0])
 
                 ddf["site_id"] = self.site_id
-                ddf["header_id"] = self.header_id
+                # ddf["header_id"] = self.header_id
 
                 return ddf
 
     def type_30(self) -> pd.DataFrame:
+        """
+        It takes a dataframe, splits it into two dataframes, then loops through the second dataframe and
+        inserts the data into a database
+        :return: A dataframe
+        """
         if self.data_df is None:
             pass
         else:
@@ -718,29 +787,55 @@ class Traffic():
                                 '5': 'lane_number',
                                 str(i): 'number_of_vehicles'
                             }, inplace=True)
-                            df3 = pd.concat([df3, join_to_df3], keys=[
-                                            'start_datetime', 'lane_number'], ignore_index=True, axis=0)
-                    df3 = df3.apply(pd.to_numeric, axis=1, errors="ignore")
-                    df3['classification_scheme'] = int(classification_scheme)
-                    df3['site_id'] = self.site_id
-                    # df3["header_id"] = self.header_id
-                    df3['year'] = int(data['start_datetime'].at[0].year)
-                    df3[['edit_code',
-                         'duration_of_summary',
-                         'lane_number',
-                         'number_of_vehicles',
-                         'class_number',
-                         'compass_heading',
-                         'classification_scheme',
-                         'year']] = df3[[
-                             'edit_code',
-                             'duration_of_summary',
-                             'lane_number',
-                             'number_of_vehicles',
-                             'class_number',
-                             'compass_heading',
-                             'classification_scheme',
-                             'year']].apply(pd.to_numeric, errors="ignore")
+                            # TODO: test efficiency of this vs merge then insert
+                            # OPTIMIZE: merge then insert
+                            # df3 = pd.concat([df3, join_to_df3], keys=[
+                            #                 'start_datetime', 'lane_number'], ignore_index=True, axis=0)
+                            # df3 = df3.apply(pd.to_numeric, axis=1, errors="ignore")
+                            # df3["header_id"] = self.header_id
+                            join_to_df3['classification_scheme'] = int(
+                                classification_scheme)
+                            join_to_df3['site_id'] = self.site_id
+                            join_to_df3['year'] = int(
+                                data['start_datetime'].at[0].year)
+                            join_to_df3[['edit_code',
+                                         'duration_of_summary',
+                                         'lane_number',
+                                         'number_of_vehicles',
+                                         'class_number',
+                                         'compass_heading',
+                                         'classification_scheme',
+                                         'year']] = join_to_df3[[
+                                             'edit_code',
+                                             'duration_of_summary',
+                                             'lane_number',
+                                             'number_of_vehicles',
+                                             'class_number',
+                                             'compass_heading',
+                                             'classification_scheme',
+                                             'year']].apply(pd.to_numeric, errors="ignore")
+                            push_to_db(join_to_df3, config.TYPE_30_TBL_NAME)
+                    # df3['classification_scheme'] = int(classification_scheme)
+                    # df3['site_id'] = self.site_id
+                    # df3['year'] = int(
+                    #     data['start_datetime'].at[0].year)
+                    # df3[['edit_code',
+                    #     'duration_of_summary',
+                    #         'lane_number',
+                    #         'number_of_vehicles',
+                    #         'class_number',
+                    #         'compass_heading',
+                    #         'classification_scheme',
+                    #         'year']] = df3[[
+                    #             'edit_code',
+                    #             'duration_of_summary',
+                    #             'lane_number',
+                    #             'number_of_vehicles',
+                    #             'class_number',
+                    #             'compass_heading',
+                    #             'classification_scheme',
+                    #             'year']].apply(pd.to_numeric, errors="ignore")
+                    # push_to_db(df3, config.TYPE_30_TBL_NAME)
                     return df3
                 else:
                     pass
@@ -869,11 +964,15 @@ class Traffic():
                 ddf[m.columns] = m.round().astype('Int32')
                 ddf['year'] = ddf['start_datetime'].dt.year
                 ddf["site_id"] = self.site_id
-                ddf["header_id"] = self.header_id
+                # ddf["header_id"] = self.header_id
 
                 return ddf
 
     def type_60(self) -> pd.DataFrame:
+        """
+        It takes a dataframe, and returns a dataframe
+        :return: A dataframe
+        """
         if self.data_df is None:
             pass
         else:
@@ -942,12 +1041,23 @@ class Traffic():
                                             axis=0, ignore_index=True)
                     df3 = df3.apply(pd.to_numeric, axis=1, errors="ignore")
                     df3['site_id'] = self.site_id
-                    df3["header_id"] = self.header_id
+                    # df3["header_id"] = self.header_id
                 else:
                     pass
                 return df3
 
     def header_calcs(self, header: pd.DataFrame, data: pd.DataFrame, type: int) -> pd.DataFrame:
+        """
+        It takes a dataframe, and a type, and returns a dataframe
+
+        :param header: a dataframe with the header information
+        :type header: pd.DataFrame
+        :param data: pd.DataFrame
+        :type data: pd.DataFrame
+        :param type: int
+        :type type: int
+        :return: A dataframe with the calculated values.
+        """
         try:
             if data is None and header is None:
                 pass
@@ -1125,8 +1235,36 @@ class Traffic():
                         header['30th_highest_volume_per_hour_total'] = round(data['total_vehicles_type21'].groupby(
                             [data['start_datetime'].dt.to_period('H')]).sum().quantile(q=0.3, interpolation='linear'))
 
-                        # header['average_speed_positive_direction'] =
-                        # header['average_speed_negative_direction'] =
+                        header['average_speed_positive_direction'] = (int((
+                            (header['speedbin1'] * data.loc[data['direction'] == 'P', 'speedbin1'].sum()) +
+                            (header['speedbin2'] * data.loc[data['direction'] == 'P', 'speedbin2'].sum()) +
+                            (header['speedbin3'] * data.loc[data['direction'] == 'P', 'speedbin3'].sum()) +
+                            (header['speedbin4'] * data.loc[data['direction'] == 'P', 'speedbin4'].sum()) +
+                            (header['speedbin5'] * data.loc[data['direction'] == 'P', 'speedbin5'].sum()) +
+                            (header['speedbin6'] * data.loc[data['direction'] == 'P', 'speedbin6'].sum()) +
+                            (header['speedbin7'] * data.loc[data['direction'] == 'P', 'speedbin7'].sum()) +
+                            (header['speedbin8'] * data.loc[data['direction'] == 'P', 'speedbin8'].sum()) +
+                            (header['speedbin9'] * data.loc[data['direction']
+                                                            == 'P', 'speedbin9'].sum())
+                        ))
+                            / data.loc[data['direction'] == 'P', 'sum_of_heavy_vehicle_speeds'].astype(int).sum()
+                        )
+
+                        header['average_speed_negative_direction'] = (int((
+                            (header['speedbin1'] * data.loc[data['direction'] == 'N', 'speedbin1'].sum()) +
+                            (header['speedbin2'] * data.loc[data['direction'] == 'N', 'speedbin2'].sum()) +
+                            (header['speedbin3'] * data.loc[data['direction'] == 'N', 'speedbin3'].sum()) +
+                            (header['speedbin4'] * data.loc[data['direction'] == 'N', 'speedbin4'].sum()) +
+                            (header['speedbin5'] * data.loc[data['direction'] == 'N', 'speedbin5'].sum()) +
+                            (header['speedbin6'] * data.loc[data['direction'] == 'N', 'speedbin6'].sum()) +
+                            (header['speedbin7'] * data.loc[data['direction'] == 'N', 'speedbin7'].sum()) +
+                            (header['speedbin8'] * data.loc[data['direction'] == 'N', 'speedbin8'].sum()) +
+                            (header['speedbin9'] * data.loc[data['direction']
+                                                            == 'N', 'speedbin9'].sum())
+                        ))
+                            / data.loc[data['direction'] == 'N', 'sum_of_heavy_vehicle_speeds'].astype(int).sum()
+                        )
+
                         try:
                             header['average_speed'] = (int((
                                 (header['speedbin1'] * data['speedbin1'].sum()) +
@@ -1139,7 +1277,7 @@ class Traffic():
                                 (header['speedbin8'] * data['speedbin8'].sum()) +
                                 (header['speedbin9'] * data['speedbin9'].sum())
                             ))
-                                / data['sum_of_heavy_vehicle_speeds'].astype(int).sum()
+                                / data['total_vehicles_type21'].astype(int).sum()
                             )
                         except TypeError:
                             header['average_speed'] = (((
@@ -1154,10 +1292,40 @@ class Traffic():
                                 (header['speedbin9'] *
                                  data['speedbin9'].astype(int).sum())
                             ))
-                                / data['sum_of_heavy_vehicle_speeds'].astype(int).sum()
+                                / data['total_vehicles_type21'].astype(int).sum()
                             )
-                        # header['average_speed_light_vehicles_positive_direction'] =
-                        # header['average_speed_light_vehicles_negative_direction'] =
+
+                        header['average_speed_light_vehicles_positive_direction'] = (int((
+                            (header['speedbin1'] * data.loc[data['direction'] == 'P', 'speedbin1'].sum()) +
+                            (header['speedbin2'] * data.loc[data['direction'] == 'P', 'speedbin2'].sum()) +
+                            (header['speedbin3'] * data.loc[data['direction'] == 'P', 'speedbin3'].sum()) +
+                            (header['speedbin4'] * data.loc[data['direction'] == 'P', 'speedbin4'].sum()) +
+                            (header['speedbin5'] * data.loc[data['direction'] == 'P', 'speedbin5'].sum()) +
+                            (header['speedbin6'] * data.loc[data['direction'] == 'P', 'speedbin6'].sum()) +
+                            (header['speedbin7'] * data.loc[data['direction'] == 'P', 'speedbin7'].sum()) +
+                            (header['speedbin8'] * data.loc[data['direction'] == 'P', 'speedbin8'].sum()) +
+                            (header['speedbin9'] * data.loc[data['direction'] == 'P', 'speedbin9'].sum()) -
+                            data.loc[data['direction'] == 'P',
+                                     'sum_of_heavy_vehicle_speeds'].sum()
+                        ))
+                            / data.loc[data['direction'] == 'P', 'total_Light_vehicles_type21'].astype(int).sum()
+                        )
+
+                        header['average_speed_light_vehicles_negative_direction'] = (int((
+                            (header['speedbin1'] * data.loc[data['direction'] == 'N', 'speedbin1'].sum()) +
+                            (header['speedbin2'] * data.loc[data['direction'] == 'N', 'speedbin2'].sum()) +
+                            (header['speedbin3'] * data.loc[data['direction'] == 'N', 'speedbin3'].sum()) +
+                            (header['speedbin4'] * data.loc[data['direction'] == 'N', 'speedbin4'].sum()) +
+                            (header['speedbin5'] * data.loc[data['direction'] == 'N', 'speedbin5'].sum()) +
+                            (header['speedbin6'] * data.loc[data['direction'] == 'N', 'speedbin6'].sum()) +
+                            (header['speedbin7'] * data.loc[data['direction'] == 'N', 'speedbin7'].sum()) +
+                            (header['speedbin8'] * data.loc[data['direction'] == 'N', 'speedbin8'].sum()) +
+                            (header['speedbin9'] * data.loc[data['direction'] == 'N', 'speedbin9'].sum()) -
+                            data.loc[data['direction'] == 'N',
+                                     'sum_of_heavy_vehicle_speeds'].sum()
+                        ))
+                            / data.loc[data['direction'] == 'N', 'total_Light_vehicles_type21'].astype(int).sum()
+                        )
 
                         header['average_speed_light_vehicles'] = ((
                             (header['speedbin1'] * data['speedbin1'].sum()) +
@@ -1171,12 +1339,23 @@ class Traffic():
                             (header['speedbin9'] * data['speedbin9'].sum()) -
                             data['sum_of_heavy_vehicle_speeds'].sum()
                         )
-                            / data['sum_of_heavy_vehicle_speeds'].sum()
+                            / data['total_Light_vehicles_type21'].sum()
                         )
 
-                        # header['average_speed_heavy_vehicles_positive_direction'] =
-                        # header['average_speed_heavy_vehicles_negative_direction'] =
-                        # header['average_speed_heavy_vehicles'] =
+                        header['average_speed_heavy_vehicles_positive_direction'] = (int((
+                            data.loc[data['direction'] == 'P', 'sum_of_heavy_vehicle_speeds'].sum(
+                            ) / data.loc[data['direction'] == 'P', 'total_heavy_vehicles'].sum()
+                        )))
+
+                        header['average_speed_heavy_vehicles_negative_direction'] = (int((
+                            data.loc[data['direction'] == 'N', 'sum_of_heavy_vehicle_speeds'].sum(
+                            ) / data.loc[data['direction'] == 'N', 'total_heavy_vehicles'].sum()
+                        )))
+
+                        header['average_speed_heavy_vehicles'] = (int((
+                            data['sum_of_heavy_vehicle_speeds'].sum(
+                            ) / data['total_heavy_vehicles'].sum()
+                        )))
 
                         try:
                             shv_p = str(round(
@@ -1240,6 +1419,20 @@ class Traffic():
                             lhv_t = "0"
                         header['truck_split_total'] = str(str(
                             shv_t) + ' : ' + str(mhv_t) + ' : ' + str(lhv_t))
+
+                        header['percentage_heavy_vehicles_positive_direction'] = float(round(
+                            data.loc[data['direction'] == 'P', 'heavy_vehicles_type21'].sum()/data.loc[data['direction'] == 'P', 'total_vehicles_type21'].sum(), 2))
+                        header['percentage_heavy_vehicles_negative_direction'] = float(round(
+                            data.loc[data['direction'] == 'N', 'heavy_vehicles_type21'].sum()/data.loc[data['direction'] == 'N', 'total_vehicles_type21'].sum(), 2))
+                        header['percentage_heavy_vehicles'] = float(round(
+                            data['heavy_vehicles_type21'].sum()/data['total_vehicles_type21'].sum(), 2))
+
+                        header['night_adt'] = data.loc[data['start_datetime'].dt.hour >=
+                                                       18 and data['start_datetime'].dt.hour <= 6]['total_vehicles_type21'].sum()
+                        header['night_adtt'] = data.loc[data['start_datetime'].dt.hour >=
+                                                        18 and data['start_datetime'].dt.hour <= 6]['total_heavy_vehicles_type21'].sum()
+
+                        # TODO: add percentile speeds (15th, 30th, 85th)
 
                     except KeyError:
                         pass
@@ -1389,6 +1582,15 @@ class Traffic():
 
 
 def merge_summary_dataframes(join_this_df: pd.DataFrame, onto_this_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    It takes two dataframes, joins them together, and then drops any duplicate columns
+
+    :param join_this_df: The dataframe that you want to join onto the other dataframe
+    :type join_this_df: pd.DataFrame
+    :param onto_this_df: The dataframe that you want to merge the other dataframe onto
+    :type onto_this_df: pd.DataFrame
+    :return: A dataframe with the columns from the two dataframes merged.
+    """
     onto_this_df = pd.concat([onto_this_df, join_this_df], keys=[
                              "site_id", "start_datetime", "lane_number"], ignore_index=False, axis=1)
     onto_this_df = onto_this_df.droplevel(0, axis=1)
@@ -1398,6 +1600,14 @@ def merge_summary_dataframes(join_this_df: pd.DataFrame, onto_this_df: pd.DataFr
 
 
 def push_to_db(df: pd.DataFrame, table_name: str):
+    """
+    It takes a dataframe and a table name, and pushes the dataframe to the table name
+
+    :param df: pd.DataFrame
+    :type df: pd.DataFrame
+    :param table_name: the name of the table in the database
+    :type table_name: str
+    """
     try:
         df = df.loc[:, ~df.columns.duplicated()]
         df.to_sql(
@@ -1416,6 +1626,26 @@ def push_to_db(df: pd.DataFrame, table_name: str):
 
 
 def get_files(files: str) -> List:
+    """
+    It takes a list of files, checks if they are in a zip file, if not, it gets the files from the
+    directory, if they are in a zip file, it exits. 
+
+    Then it checks if the file exists, if not, it creates it. 
+
+    Then it reads the file, if it can't read it, it creates an empty list. 
+
+    Then it checks if the files are in the list, if they are, it removes them. 
+
+    Then it checks if the directory exists, if not, it creates it. 
+
+    Then it checks if the file exists, if not, it creates it. 
+
+    Then it returns the list of files.
+
+    :param files: str = "C:/Users/user/Desktop/files"
+    :type files: str
+    :return: A list of files that are not in the fileComplete list.
+    """
     if tools.is_zip(files) == False:
         files = tools.getfiles(files)
     else:
@@ -1450,6 +1680,12 @@ def get_files(files: str) -> List:
 
 # Multiprocessing
 def run_multiprocess(path):
+    """
+    It takes a path, gets all the files in that path, creates a pool of processes equal to the number of
+    CPU cores, and then runs the main function on each file in the path.
+
+    :param path: The path to the folder containing the files you want to process
+    """
     files = get_files(path)
     try:
         pool = mp.Pool(int(mp.cpu_count()))
@@ -1463,6 +1699,11 @@ def run_multiprocess(path):
 
 
 def run_individually(path):
+    """
+    It takes a path, gets all the files in that path, and then runs the main function on each file
+
+    :param path: the path to the folder containing the files
+    """
     files = get_files(path)
 
     for file in files:
@@ -1474,19 +1715,25 @@ def run_individually(path):
 
 
 def main(file: str):
+    """
+    It reads a file, does some stuff, and then writes the results to a database.
+
+    :param file: str
+    :type file: str
+    """
     print(f"-- Busy With {file}")
-    T = Traffic(file)
-    head_df = T.head_df
-    header = T.header_df
+    TR = Traffic(file)
+    head_df = TR.head_df
+    header = TR.header_df
 
     if header is None:
         raise Exception(
             "check get_head and header methods: header returned NoneType")
     else:
-        lanes = T.lanes
-        site_id = T.site_id
-        header_id = T.header_id
-        data_df = T.data_df
+        lanes = TR.lanes
+        site_id = TR.site_id
+        header_id = TR.header_id
+        data_df = TR.data_df
 
         pt_df = pd.DataFrame()
 
@@ -1499,13 +1746,13 @@ def main(file: str):
         if head_df.loc[head_df[0] == "21"].empty:
             pass
         else:
-            data = T.type_21()
+            data = TR.type_21()
             if data is None:
                 pass
             else:
                 pt_df = data
                 pt_df = merge_summary_dataframes(data, pt_df)
-                header = T.header_calcs(header, data, 21)
+                header = TR.header_calcs(header, data, 21)
                 data.rename(
                     columns=config.ELECTRONIC_COUNT_DATA_TYPE21_NAME_CHANGE, inplace=True)
                 data = data[data.columns.intersection(t21_cols)]
@@ -1514,16 +1761,16 @@ def main(file: str):
         if head_df.loc[head_df[0] == "30"].empty:
             pass
         else:
-            data = T.type_30()
-            # header = T.header_calcs(header, data, 30)
+            data = TR.type_30()
+            # header = TR.header_calcs(header, data, 30)
             data = data[data.columns.intersection(t30_cols)]
-            push_to_db(data, config.TYPE_30_TBL_NAME)
+            # push_to_db(data, config.TYPE_30_TBL_NAME)
 
         if head_df.loc[head_df[0] == "60"].empty:
             pass
         else:
-            data = T.type_60()
-            header = T.header_calcs(header, data, 60)
+            data = TR.type_60()
+            # header = TR.header_calcs(header, data, 60)
             if data is None:
                 pass
             else:
@@ -1533,8 +1780,8 @@ def main(file: str):
         if head_df.loc[head_df[0] == "70"].empty:
             pass
         else:
-            data = T.type_70()
-            header = T.header_calcs(header, data, 70)
+            data = TR.type_70()
+            header = TR.header_calcs(header, data, 70)
             if data is None:
                 pass
             else:
@@ -1584,6 +1831,7 @@ def main(file: str):
         gc.collect()
 
 
+# The above code is running the main function in the multiprocessing module.
 if __name__ == "__main__":
     PATH = config.PATH
 

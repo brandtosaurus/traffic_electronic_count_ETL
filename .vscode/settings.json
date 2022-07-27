@@ -16,5 +16,9 @@
       "username": "postgres",
       "password": "Lin3@r1in3!431"
     }
-  ]
+  ],
+  "docwriter.progress.trackMethods": true,
+  "docwriter.progress.trackClasses": false,
+  "docwriter.progress.trackTypes": false,
+  "docwriter.progress.trackFunctions": true
 }

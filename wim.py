@@ -15,10 +15,13 @@ class Wim():
         self.data_df = data
         self.head_df = head_df
         self.pt_cols = pt_cols
-        self.primary_vehicle_class = int(
-            self.head_df.loc[self.head_df[0] == "10", 1].values[0])
-        self.secondary_vehicle_class = int(
-            self.head_df.loc[self.head_df[0] == "10", 2].values[0])
+        if self.head_df is None:
+            pass
+        else:
+            self.primary_vehicle_class = int(
+                self.head_df.loc[self.head_df[0] == "10", 1].values[0])
+            self.secondary_vehicle_class = int(
+                self.head_df.loc[self.head_df[0] == "10", 2].values[0])
         self.header_ids = self.get_headers_to_update()
         self.t10_cols = list(pd.read_sql_query(
             q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_10_LIMIT1, config.ENGINE).columns)
@@ -28,6 +31,17 @@ class Wim():
             f"SELECT * FROM {config.TRAFFIC_LOOKUP_SCHEMA}.gross_vehicle_mass_limits;", config.ENGINE)
 
     def type_10(self) -> pd.DataFrame:
+        """
+        It takes a dataframe, checks if it's empty, if not, it checks if it's empty, if not, it checks
+        if it's empty, if not, it does some stuff, then it checks if it's empty, if not, it does some
+        stuff, then it checks if it's empty, if not, it does some stuff, then it checks if it's empty,
+        if not, it does some stuff, then it checks if it's empty, if not, it does some stuff, then it
+        checks if it's empty, if not, it does some stuff, then it checks if it's empty, if not, it does
+        some stuff, then it checks if it's empty, if not, it does some stuff, then it checks if it's
+        empty, if not, it does some stuff, then it checks if it's empty, if not, it does some stuff,
+        then it checks if it's empty, if not, it does
+        :return: A tuple of two dataframes.
+        """
         if self.data_df is None:
             pass
         else:
@@ -829,7 +843,7 @@ class Wim():
         except IndexError:
             return header
 
-    def wim_header_upsert(self) -> str:
+    def wim_header_upsert(self, header_id) -> str:
         UPSERT_STRING = F"""INSERT INTO trafc.electronic_count_header_hswim (
             header_id,
             egrl_percent,
@@ -1082,7 +1096,7 @@ class Wim():
             wst_7_axle_multi_trailer_tonperhv,
             wst_8_or_more_axle_multi_trailer_tonperhv)
         VALUES(
-            '{self.header_id}',
+            '{header_id}',
             {self.egrl_percent},
             {self.egrw_percent},
             {self.mean_equivalent_axle_mass},
@@ -1587,11 +1601,22 @@ class Wim():
         return UPSERT_STRING
 
     def get_headers_to_update(self) -> pd.DataFrame:
+        """
+        It fetches a list of header ids from a database table and returns them as a pandas dataframe
+        :return: A dataframe with the header_ids
+        """
         print('fetching headers to update')
         header_ids = pd.read_sql_query(q.GET_HSWIM_HEADER_IDS, config.ENGINE)
         return header_ids
 
     def wim_header_upsert_func1(self, header_id: str) -> str:
+        """
+        It returns a tuple of three strings, each of which is a SQL query.
+
+        :param header_id: str = '1'
+        :type header_id: str
+        :return: a tuple of 3 strings.
+        """
         SELECT_TYPE10_QRY = f"""SELECT * FROM trafc.electronic_count_data_type_10 t10
             left join traf_lu.vehicle_classes_scheme08 c on c.id = t10.vehicle_class_code_primary_scheme
             where t10.header_id = '{header_id}'
@@ -1632,6 +1657,17 @@ class Wim():
         return SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, WHEEL_MASS_SELECT_QRY
 
     def wim_header_upsert_func2(self, SELECT_TYPE10_QRY: str, AXLE_SPACING_SELECT_QRY: str, WHEEL_MASS_SELECT_QRY: str) -> pd.DataFrame:
+        """
+        This function takes in three SQL queries and returns three dataframes
+
+        :param SELECT_TYPE10_QRY: str = "SELECT * FROM trafc.electronic_count_data_type_10 t10 limit 1"
+        :type SELECT_TYPE10_QRY: str
+        :param AXLE_SPACING_SELECT_QRY: str = "SELECT * FROM axle_spacinglimit 1"
+        :type AXLE_SPACING_SELECT_QRY: str
+        :param WHEEL_MASS_SELECT_QRY: str = "select * from wheel_masslimit 1"
+        :type WHEEL_MASS_SELECT_QRY: str
+        :return: A tuple of 3 dataframes
+        """
         df = pd.read_sql_query(SELECT_TYPE10_QRY, config.ENGINE)
         df = df.fillna(0)
         df2 = pd.read_sql_query(AXLE_SPACING_SELECT_QRY, config.ENGINE)
@@ -1640,9 +1676,38 @@ class Wim():
         df3 = df3.fillna(0)
         return df, df2, df3
 
+    def update_existing(self):
+        """
+        It takes a list of header_ids, and for each header_id, it runs a series of functions that calculate
+        values for the header_id, and then upserts the calculated values into the database
+        """
+        header_ids = self.header_ids
+        print(header_ids)
+        for header_id in list(header_ids['header_id'].astype(str)):
+            SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, WHEEL_MASS_SELECT_QRY = self.wim_header_upsert_func1(
+                header_id)
+            df, df2, df3 = self.wim_header_upsert_func2(
+                SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, WHEEL_MASS_SELECT_QRY)
+            if df2 is None or df3 is None:
+                print(f"passing {header_id}")
+            else:
+                print(f'working on {header_id}')
+                self.wim_header_calcs(df, df2, df3)
+                insert_string = self.wim_header_upsert(header_id)
+                with config.ENGINE.connect() as conn:
+                    print(f'upserting: {header_id}')
+                    conn.execute(insert_string)
+                    print('COMPLETE')
+
     def main(self):
+        """
+        It takes a dataframe, splits it into two dataframes, then pushes the first dataframe to a
+        database table, and the second dataframe to a number of other database tables
+        """
         try:
             if self.data_df is not None and self.header_id is not None:
+                pass
+            else:
                 data, sub_data = self.type_10()
                 data = data[data.columns.intersection(self.t10_cols)]
                 main.push_to_db(data, config.TYPE_10_TBL_NAME)
@@ -1712,22 +1777,10 @@ class Wim():
                     self.vx_data = self.vx_data.drop(
                         ["mass_measurement_resolution_kg"], axis=1)
                     main.push_to_db(self.vx_data, config.VX_TABLE)
-
-            else:
-                for header_id in list(self.header_ids['header_id'].astype(str)):
-                    SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, WHEEL_MASS_SELECT_QRY = self.wim_header_upsert_func1(
-                        header_id)
-                    df, df2, df3 = self.wim_header_upsert_func2(
-                        SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, WHEEL_MASS_SELECT_QRY)
-                    if df2 is None or df3 is None:
-                        pass
-                    else:
-                        print(f'working on {header_id}')
-                        self.wim_header_calcs(df, df2, df3)
-                        insert_string = self.wim_header_upsert()
-                        with config.ENGINE.connect() as conn:
-                            print(f'upserting: {header_id}')
-                            conn.execute(insert_string)
-                            print('COMPLETE')
         except Exception:
             traceback.print_exc()
+
+
+if __name__ == '__main__':
+    WIM = Wim(None, None, None, None, None)
+    WIM.update_existing
