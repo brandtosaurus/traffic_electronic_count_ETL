@@ -32,8 +32,8 @@ VX_TABLE = "traffic_e_type10_identification_data_images"
 OUTPUT_FILE = r"C:" + r"\FTP\import_results\rsa_traffic_counts"
 FILES_COMPLETE = r"C:" + r"\FTP\import_results\rsa_traffic_counts\RSA_FILES_COMPLETE.csv"
 PATH = r"C:" + r"\FTP"
-PROBLEM_FILES = r"C:" + \
-    r"\FTP\import_results\rsa_traffic_counts\RSA_COUNT_PROBLEM_FILES.csv"
+FILES_FAILED = r"C:" + \
+    r"\FTP\import_results\rsa_traffic_counts\FILES_FAILED.csv"
 
 DATA_IMPORTANT_COLUMNS = [
     "site_id",

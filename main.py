@@ -67,18 +67,25 @@ class Traffic():
         self.file = file
         self.header_id = str(uuid.uuid4())
         self.df = self.to_df()
-        self.head_df = self.get_head(self.df)
-        self.site_id = self.head_df.loc[self.head_df[0] == "S0", 1].iat[0]
-        self.site_id = self.site_id.replace('.rsa', '')
-        self.lanes = self.get_lanes(self.head_df)
-        self.header_df = self.header(self.head_df)
-        self.data_df = self.get_data(self.df)
-        self.data_df = self.process_datetimes(self.data_df)
-        self.data_df = self.get_direction(self.data_df)
-        self.t21_table = config.TYPE_21_TBL_NAME
-        self.t30_table = config.TYPE_30_TBL_NAME
-        self.t70_table = config.TYPE_70_TBL_NAME
-        self.t60_table = config.TYPE_60_TBL_NAME
+        if self.df is None:
+            print(f"Empty DataFrame: {self.file}")
+            self.head_df = None
+            self.header_df = None
+            pass
+        else:
+            self.head_df = self.get_head(self.df)
+            self.site_id = self.head_df.loc[self.head_df[0]
+                                            == "S0", 1].iat[0]
+            self.site_id = self.site_id.replace('.rsa', '')
+            self.lanes = self.get_lanes(self.head_df)
+            self.header_df = self.header(self.head_df)
+            self.data_df = self.get_data(self.df)
+            self.data_df = self.process_datetimes(self.data_df)
+            self.data_df = self.get_direction(self.data_df)
+            self.t21_table = config.TYPE_21_TBL_NAME
+            self.t30_table = config.TYPE_30_TBL_NAME
+            self.t70_table = config.TYPE_70_TBL_NAME
+            self.t60_table = config.TYPE_60_TBL_NAME
 
     def to_df(self) -> pd.DataFrame:  # CSV to DataFrame
         """
@@ -90,10 +97,14 @@ class Traffic():
             df = pd.read_csv(self.file, header=None, dtype=str,
                              sep="\s+\t", engine='python')
             df = df[0].str.split("\s+|,\s+|,|;|;\s+", expand=True)
+            df = df.dropna(axis=1, how='all')
             return df
         except Exception as exc:
-            raise Exception(
-                "to_df function did not work properly: " + str(exc))
+            traceback.print_exc()
+            with open(os.path.expanduser(config.FILES_FAILED), "a", newline="",) as f:
+                write = csv.writer(f)
+                write.writerows([[self.file]])
+            gc.collect()
 
     def get_head(self, df) -> pd.DataFrame:
         """
@@ -119,8 +130,11 @@ class Traffic():
             ]).dropna(axis=1, how="all").reset_index(drop=True).copy()
             return df
         except KeyError as exc:
-            print("!!! Check get_head() method : " + str(exc) + str(self.file))
             traceback.print_exc()
+            with open(os.path.expanduser(config.FILES_FAILED), "a", newline="") as f:
+                write = csv.writer(f)
+                write.writerows([[self.file]])
+            gc.collect()
 
     def get_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -135,11 +149,11 @@ class Traffic():
         try:
             df = pd.DataFrame(df.loc[
                 (~df[0].isin(["H0", "H9", "S0", "I0",
-                 "S1", "D0", "D1", "D3", "L0", "L1"]))
+                              "S1", "D0", "D1", "D3", "L0", "L1"]))
                 & ((
                     (df[0].isin(["21", "22", "70", "30", "31", "60"]))
                     & (df[1].isin(["0", "1", "2", "3", "4"]))
-                    & (df.loc[df[0].isin(["21", "70", "30", "13", "60"]), 2].fillna("0").astype(int) > 80)
+                    & (df.loc[df[0].isin(["21", "22", "70", "30", "31", "60"]), 2].fillna("0").astype(int) > 80)
                 ) | (
                     (df[0].isin(["10"]))
                     & (~df[1].isin(["1", "8", "5", "9", "01", "08", "05", "09"]))
@@ -147,10 +161,17 @@ class Traffic():
                     & (~df[0].isin(["H0", "H9", "S0", "I0", "S1", "D0", "D1", "D3", "L0", "L1"]))
                 ))
             ]).dropna(axis=1, how="all").reset_index(drop=True).copy()
+            df = df.dropna(axis=0, how="all").reset_index(drop=True)
             return df
         except TypeError as exc:
             print(f"gat_data func: check filtering and file {self.file}")
             print(exc)
+        except Exception as exc:
+            traceback.print_exc()
+            with open(os.path.expanduser(config.FILES_FAILED), "a", newline="") as f:
+                write = csv.writer(f)
+                write.writerows([[self.file]])
+            gc.collect()
 
     def get_lanes(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -519,31 +540,31 @@ class Traffic():
                             axis=0).bfill().ffill().drop_duplicates()
 
         try:
-            headers["type_21_count_interval_minutes"] = int(
+            headers["summary_interval_minutes"] = int(
                 df.loc[df[0] == "21", 1].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_30_summary_interval_minutes"] = int(
+            headers["summary_interval_minutes"] = int(
                 df.loc[df[0] == "21", 1].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_70_summary_interval_minutes"] = int(
+            headers["summary_interval_minutes"] = int(
                 df.loc[df[0] == "21", 1].drop_duplicates().reset_index(drop=True)[0])
         except KeyError:
             pass
         try:
-            headers["type_30_summary_interval_minutes"] = int(
+            headers["summary_interval_minutes"] = int(
                 df.loc[df[0] == "30", 1].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_21_count_interval_minutes"] = int(
+            headers["summary_interval_minutes"] = int(
                 df.loc[df[0] == "30", 1].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_70_summary_interval_minutes"] = int(
+            headers["summary_interval_minutes"] = int(
                 df.loc[df[0] == "30", 1].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_30_vehicle_classification_scheme"] = int(
+            headers["vehicle_classification_scheme"] = int(
                 df.loc[df[0] == "30", 3].drop_duplicates().reset_index(drop=True)[0])
         except KeyError:
             pass
         try:
-            headers["type_30_summary_interval_minutes"] = int(
+            headers["summary_interval_minutes"] = int(
                 df.loc[df[0] == "70", 1].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_21_count_interval_minutes"] = int(
+            headers["summary_interval_minutes"] = int(
                 df.loc[df[0] == "70", 1].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_70_summary_interval_minutes"] = int(
+            headers["summary_interval_minutes"] = int(
                 df.loc[df[0] == "70", 1].drop_duplicates().reset_index(drop=True)[0])
         except KeyError:
             pass
@@ -558,13 +579,13 @@ class Traffic():
             headers['dir2_id'] = 4
 
         try:
-            headers["type_70_vehicle_classification_scheme"] = int(df.loc[
+            headers["vehicle_classification_scheme"] = int(df.loc[
                 df[0] == "70", 2].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_70_maximum_gap_milliseconds"] = int(df.loc[
+            headers["maximum_gap_milliseconds"] = int(df.loc[
                 df[0] == "70", 3].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_70_maximum_differential_speed"] = int(df.loc[
+            headers["maximum_differential_speed"] = int(df.loc[
                 df[0] == "70", 4].drop_duplicates().reset_index(drop=True)[0])
-            headers["type_70_error_bin_code"] = int(df.loc[
+            headers["error_bin_code"] = int(df.loc[
                 df[0] == "70", 5].drop_duplicates().reset_index(drop=True)[0])
         except KeyError:
             pass
@@ -588,8 +609,6 @@ class Traffic():
             else:
                 if (data[1] == "0").any():
                     ddf = data
-                    # ddf = data.iloc[:, 2:]
-
                     ddf.rename(columns={
                         4: "duration_min",
                         5: "lane_number",
@@ -614,8 +633,6 @@ class Traffic():
 
                 elif (data[1] == "1").any():
                     ddf = data
-                    # ddf = data.iloc[:, 3:]
-
                     ddf.rename(columns={
                         4: "duration_min",
                         5: "lane_number",
@@ -640,77 +657,57 @@ class Traffic():
 
                 ddf = ddf.fillna(0)
 
-                ddf["duration_min"] = ddf["duration_min"].astype(int)
-                ddf["lane_number"] = ddf["lane_number"].astype(int)
-                ddf["speedbin0"] = ddf["speedbin0"].astype(int)
-                ddf["speedbin1"] = ddf["speedbin1"].astype(int)
-                ddf["speedbin2"] = ddf["speedbin2"].astype(int)
-                ddf["speedbin3"] = ddf["speedbin3"].astype(int)
-                ddf["speedbin4"] = ddf["speedbin4"].astype(int)
-                ddf["speedbin5"] = ddf["speedbin5"].astype(int)
-                ddf["speedbin6"] = ddf["speedbin6"].astype(int)
-                ddf["speedbin7"] = ddf["speedbin7"].astype(int)
-                ddf["speedbin8"] = ddf["speedbin8"].astype(int)
-                ddf["speedbin9"] = ddf["speedbin9"].astype(int)
-                ddf["speedbin10"] = ddf["speedbin10"].astype(int)
-                ddf["sum_of_heavy_vehicle_speeds"] = ddf[
-                    "sum_of_heavy_vehicle_speeds"
-                ].astype(int)
-                ddf["short_heavy_vehicles"] = ddf["short_heavy_vehicles"].astype(
-                    int)
-                ddf["medium_heavy_vehicles"] = ddf["medium_heavy_vehicles"].astype(
-                    int)
-                ddf["long_heavy_vehicles"] = ddf["long_heavy_vehicles"].astype(
-                    int)
-                ddf["rear_to_rear_headway_shorter_than_2_seconds"] = ddf[
-                    "rear_to_rear_headway_shorter_than_2_seconds"
-                ].astype(int)
-                ddf["rear_to_rear_headways_shorter_than_programmed_time"] = ddf[
-                    "rear_to_rear_headways_shorter_than_programmed_time"
-                ].astype(int)
+                ddf[["duration_min",
+                    "lane_number",
+                     "speedbin0",
+                     "speedbin1",
+                     "speedbin2",
+                     "speedbin3",
+                     "speedbin4",
+                     "speedbin5",
+                     "speedbin6",
+                     "speedbin7",
+                     "speedbin8",
+                     "speedbin9",
+                     "speedbin10",
+                     "sum_of_heavy_vehicle_speeds",
+                     "short_heavy_vehicles",
+                     "medium_heavy_vehicles",
+                     "long_heavy_vehicles",
+                     "rear_to_rear_headway_shorter_than_2_seconds",
+                     "rear_to_rear_headways_shorter_than_programmed_time"
+                     ]] = ddf[["duration_min",
+                               "lane_number",
+                               "speedbin0",
+                               "speedbin1",
+                               "speedbin2",
+                               "speedbin3",
+                               "speedbin4",
+                               "speedbin5",
+                               "speedbin6",
+                               "speedbin7",
+                               "speedbin8",
+                               "speedbin9",
+                               "speedbin10",
+                               "sum_of_heavy_vehicle_speeds",
+                               "short_heavy_vehicles",
+                               "medium_heavy_vehicles",
+                               "long_heavy_vehicles",
+                               "rear_to_rear_headway_shorter_than_2_seconds",
+                               "rear_to_rear_headways_shorter_than_programmed_time"]].astype('Int32')
 
-                ddf["total_heavy_vehicles_type21"] = (
-                    ddf["short_heavy_vehicles"]
-                    + ddf["medium_heavy_vehicles"]
-                    + ddf["long_heavy_vehicles"]
+                ddf["total_heavy_vehicles"] = (
+                    ddf[["short_heavy_vehicles", "medium_heavy_vehicles",
+                        "long_heavy_vehicles"]].astype(int).sum(axis=1)
                 )
-                ddf["total_heavy_vehicles_type21"] = ddf[
-                    "total_heavy_vehicles_type21"
-                ].astype(int)
 
-                ddf["total_light_vehicles_type21"] = (
-                    ddf["speedbin1"]
-                    + ddf["speedbin2"]
-                    + ddf["speedbin3"]
-                    + ddf["speedbin4"]
-                    + ddf["speedbin5"]
-                    + ddf["speedbin6"]
-                    + ddf["speedbin7"]
-                    + ddf["speedbin8"]
-                    + ddf["speedbin9"]
-                    + ddf["speedbin10"]
-                    - ddf["short_heavy_vehicles"]
-                    - ddf["medium_heavy_vehicles"]
-                    - ddf["long_heavy_vehicles"]
+                ddf["total_light_vehicles"] = (
+                    ddf[["speedbin0", "speedbin1", "speedbin2", "speedbin3", "speedbin4", "speedbin5", "speedbin6", "speedbin7", "speedbin8", "speedbin9", "speedbin10"]].astype(
+                        int).sum() - ddf[["short_heavy_vehicles", "medium_heavy_vehicles", "long_heavy_vehicles"]].astype(int).sum()
                 )
-                ddf["total_light_vehicles_type21"] = ddf[
-                    "total_light_vehicles_type21"
-                ].astype(int)
 
-                ddf["total_vehicles_type21"] = (
-                    ddf["speedbin1"]
-                    + ddf["speedbin2"]
-                    + ddf["speedbin3"]
-                    + ddf["speedbin4"]
-                    + ddf["speedbin5"]
-                    + ddf["speedbin6"]
-                    + ddf["speedbin7"]
-                    + ddf["speedbin8"]
-                    + ddf["speedbin9"]
-                    + ddf["speedbin10"]
-                )
-                ddf["total_vehicles_type21"] = ddf["total_vehicles_type21"].astype(
-                    int)
+                ddf["total_vehicles"] = (ddf[["speedbin0", "speedbin1", "speedbin2", "speedbin3", "speedbin4", "speedbin5", "speedbin6", "speedbin7", "speedbin8", "speedbin9", "speedbin10"]].astype(int).sum()
+                                         )
 
                 try:
                     ddf['year'] = ddf['start_datetime'].dt.year
@@ -718,7 +715,7 @@ class Traffic():
                     ddf['year'] = int(ddf['start_datetime'].str[:4][0])
 
                 ddf["site_id"] = self.site_id
-                # ddf["header_id"] = self.header_id
+                ddf["header_id"] = self.header_id
 
                 return ddf
 
@@ -792,7 +789,7 @@ class Traffic():
                             # df3 = pd.concat([df3, join_to_df3], keys=[
                             #                 'start_datetime', 'lane_number'], ignore_index=True, axis=0)
                             # df3 = df3.apply(pd.to_numeric, axis=1, errors="ignore")
-                            # df3["header_id"] = self.header_id
+                            df3["header_id"] = self.header_id
                             join_to_df3['classification_scheme'] = int(
                                 classification_scheme)
                             join_to_df3['site_id'] = self.site_id
@@ -813,33 +810,11 @@ class Traffic():
                                              'class_number',
                                              'compass_heading',
                                              'classification_scheme',
-                                             'year']].apply(pd.to_numeric, errors="ignore")
+                                             'year']].apply(pd.to_numeric, errors="coerce")
                             push_to_db(join_to_df3, config.TYPE_30_TBL_NAME)
-                    # df3['classification_scheme'] = int(classification_scheme)
-                    # df3['site_id'] = self.site_id
-                    # df3['year'] = int(
-                    #     data['start_datetime'].at[0].year)
-                    # df3[['edit_code',
-                    #     'duration_of_summary',
-                    #         'lane_number',
-                    #         'number_of_vehicles',
-                    #         'class_number',
-                    #         'compass_heading',
-                    #         'classification_scheme',
-                    #         'year']] = df3[[
-                    #             'edit_code',
-                    #             'duration_of_summary',
-                    #             'lane_number',
-                    #             'number_of_vehicles',
-                    #             'class_number',
-                    #             'compass_heading',
-                    #             'classification_scheme',
-                    #             'year']].apply(pd.to_numeric, errors="ignore")
-                    # push_to_db(df3, config.TYPE_30_TBL_NAME)
                     return df3
                 else:
                     pass
-            return df3
 
     def type_70(self) -> pd.DataFrame:
         if self.data_df is None:
@@ -878,7 +853,7 @@ class Traffic():
                         22: "sum_of_squared_speeds_for_following_heavies",
                     }, inplace=True)
 
-                else:  # data[1].all() == '0':
+                else:
                     ddf = data.iloc[:, 2:]
                     ddf = pd.DataFrame(ddf).dropna(
                         axis=1, how="all").reset_index(drop=True)
@@ -906,65 +881,49 @@ class Traffic():
 
                 ddf = ddf.fillna(0)
 
-                ddf["duration_min"] = ddf["duration_min"].astype(int)
-                ddf["lane_number"] = ddf["lane_number"].astype(int)
-                ddf["number_of_error_vehicles"] = ddf["number_of_error_vehicles"].astype(
-                    int
-                )
-                ddf["total_free_flowing_light_vehicles"] = ddf[
-                    "total_free_flowing_light_vehicles"
-                ].astype(int)
-                ddf["total_following_light_vehicles"] = ddf[
-                    "total_following_light_vehicles"
-                ].astype(int)
-                ddf["total_free_flowing_heavy_vehicles"] = ddf[
-                    "total_free_flowing_heavy_vehicles"
-                ].astype(int)
-                ddf["total_following_heavy_vehicles"] = ddf[
-                    "total_following_heavy_vehicles"
-                ].astype(int)
-                ddf["sum_of_inverse_of_speeds_for_free_flowing_lights"] = ddf[
-                    "sum_of_inverse_of_speeds_for_free_flowing_lights"
-                ].astype(int)
-                ddf["sum_of_inverse_of_speeds_for_following_lights"] = ddf[
-                    "sum_of_inverse_of_speeds_for_following_lights"
-                ].astype(int)
-                ddf["sum_of_inverse_of_speeds_for_free_flowing_heavies"] = ddf[
-                    "sum_of_inverse_of_speeds_for_free_flowing_heavies"
-                ].astype(int)
-                ddf["sum_of_inverse_of_speeds_for_following_heavies"] = ddf[
-                    "sum_of_inverse_of_speeds_for_following_heavies"
-                ].astype(int)
-                ddf["sum_of_speeds_for_free_flowing_lights"] = ddf[
-                    "sum_of_speeds_for_free_flowing_lights"
-                ].astype(int)
-                ddf["sum_of_speeds_for_following_lights"] = ddf[
-                    "sum_of_speeds_for_following_lights"
-                ].astype(int)
-                ddf["sum_of_speeds_for_free_flowing_heavies"] = ddf[
-                    "sum_of_speeds_for_free_flowing_heavies"
-                ].astype(int)
-                ddf["sum_of_speeds_for_following_heavies"] = ddf[
-                    "sum_of_speeds_for_following_heavies"
-                ].astype(int)
-                ddf["sum_of_squared_speeds_of_free_flowing_lights"] = ddf[
-                    "sum_of_squared_speeds_of_free_flowing_lights"
-                ].astype(int)
-                ddf["sum_of_squared_speeds_for_following_lights"] = ddf[
-                    "sum_of_squared_speeds_for_following_lights"
-                ].astype(int)
-                ddf["sum_of_squared_speeds_of_free_flowing_heavies"] = ddf[
-                    "sum_of_squared_speeds_of_free_flowing_heavies"
-                ].astype(int)
-                ddf["sum_of_squared_speeds_for_following_heavies"] = ddf[
-                    "sum_of_squared_speeds_for_following_heavies"
-                ].astype(int)
+                ddf[["duration_min",
+                     "lane_number",
+                     "number_of_error_vehicles",
+                     "total_free_flowing_light_vehicles",
+                     "total_following_light_vehicles",
+                     "total_free_flowing_heavy_vehicles",
+                     "total_following_heavy_vehicles",
+                    "sum_of_inverse_of_speeds_for_free_flowing_lights",
+                     "sum_of_inverse_of_speeds_for_following_lights",
+                     "sum_of_inverse_of_speeds_for_free_flowing_heavies",
+                     "sum_of_inverse_of_speeds_for_following_heavies",
+                     "sum_of_speeds_for_free_flowing_lights",
+                     "sum_of_speeds_for_following_lights",
+                     "sum_of_speeds_for_free_flowing_heavies",
+                     "sum_of_speeds_for_following_heavies",
+                     "sum_of_squared_speeds_of_free_flowing_lights",
+                     "sum_of_squared_speeds_for_following_lights",
+                     "sum_of_squared_speeds_of_free_flowing_heavies",
+                     "sum_of_squared_speeds_for_following_heavies"]] = ddf[["duration_min",
+                                                                           "lane_number",
+                                                                            "number_of_error_vehicles",
+                                                                            "total_free_flowing_light_vehicles",
+                                                                            "total_following_light_vehicles",
+                                                                            "total_free_flowing_heavy_vehicles",
+                                                                            "total_following_heavy_vehicles",
+                                                                            "sum_of_inverse_of_speeds_for_free_flowing_lights",
+                                                                            "sum_of_inverse_of_speeds_for_following_lights",
+                                                                            "sum_of_inverse_of_speeds_for_free_flowing_heavies",
+                                                                            "sum_of_inverse_of_speeds_for_following_heavies",
+                                                                            "sum_of_speeds_for_free_flowing_lights",
+                                                                            "sum_of_speeds_for_following_lights",
+                                                                            "sum_of_speeds_for_free_flowing_heavies",
+                                                                            "sum_of_speeds_for_following_heavies",
+                                                                            "sum_of_squared_speeds_of_free_flowing_lights",
+                                                                            "sum_of_squared_speeds_for_following_lights",
+                                                                            "sum_of_squared_speeds_of_free_flowing_heavies",
+                                                                            "sum_of_squared_speeds_for_following_heavies"]].astype('Int32')
 
                 m = ddf.select_dtypes(np.number)
                 ddf[m.columns] = m.round().astype('Int32')
                 ddf['year'] = ddf['start_datetime'].dt.year
                 ddf["site_id"] = self.site_id
-                # ddf["header_id"] = self.header_id
+                ddf["header_id"] = self.header_id
 
                 return ddf
 
@@ -1041,7 +1000,19 @@ class Traffic():
                                             axis=0, ignore_index=True)
                     df3 = df3.apply(pd.to_numeric, axis=1, errors="ignore")
                     df3['site_id'] = self.site_id
-                    # df3["header_id"] = self.header_id
+                    df3["header_id"] = self.header_id
+                    try:
+                        if df3 is None:
+                            pass
+                        else:
+                            df3 = df3[df3.columns.intersection(t60_cols)]
+                            push_to_db(df3, config.TYPE_60_TBL_NAME)
+                    except Exception as exc:
+                        traceback.print_exc()
+                        with open(os.path.expanduser(config.FILES_FAILED), "a", newline="",) as f:
+                            write = csv.writer(f)
+                            write.writerows([[self.file]])
+                        gc.collect()
                 else:
                     pass
                 return df3
@@ -1072,76 +1043,77 @@ class Traffic():
                 data = data.fillna(0)
                 if type == 21:
                     try:
-                        header['adt_total'] = data['total_vehicles_type21'].groupby(
+                        header['adt_total'] = data['total_vehicles'].groupby(
                             [data['start_datetime'].dt.to_period('D')]).sum().mean().round().astype(int)
                         try:
-                            header['adt_positive_direction'] = round(data['total_vehicles_type21'].groupby(
+                            header['adt_positive_direction'] = round(data['total_vehicles'].groupby(
                                 [data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'P']]).sum().mean())
                         except ValueError:
                             header['adt_positive_direction'] = 0
                         try:
-                            header['adt_negative_direction'] = round(data['total_vehicles_type21'].groupby(
+                            header['adt_negative_direction'] = round(data['total_vehicles'].groupby(
                                 [data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'N']]).sum().mean())
                         except ValueError:
                             header['adt_negative_direction'] = 0
 
-                        header['adtt_total'] = data['total_heavy_vehicles_type21'].groupby(
+                        header['adtt_total'] = data['total_heavy_vehicles'].groupby(
                             [data['start_datetime'].dt.to_period('D')]).sum().mean().round().astype(int)
                         try:
-                            header['adtt_positive_direction'] = round(data['total_vehicles_type21'].groupby(
+                            header['adtt_positive_direction'] = round(data['total_vehicles'].groupby(
                                 [data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'P']]).sum().mean())
                         except ValueError:
                             header['adtt_positive_direction'] = 0
                         try:
-                            header['adtt_negative_direction'] = round(data['total_vehicles_type21'].groupby(
+                            header['adtt_negative_direction'] = round(data['total_vehicles'].groupby(
                                 [data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'N']]).sum().mean())
                         except ValueError:
                             header['adtt_negative_direction'] = 0
 
-                        header['total_vehicles'] = data['total_vehicles_type21'].sum()
+                        header['total_vehicles'] = data['total_vehicles'].astype(
+                            int).sum()
                         try:
-                            header['total_vehicles_positive_direction'] = data['total_vehicles_type21'].groupby(
-                                data['direction'].loc[data['direction'] == 'P']).sum()[0]
+                            header['total_vehicles_positive_direction'] = data['total_vehicles'].groupby(
+                                data['direction'].loc[data['direction'] == 'P']).astype(int).sum()[0]
                         except IndexError:
                             header['total_vehicles_positive_direction'] = 0
                         try:
-                            header['total_vehicles_negative_direction'] = data['total_vehicles_type21'].groupby(
-                                data['direction'].loc[data['direction'] == 'N']).sum()[0]
+                            header['total_vehicles_negative_direction'] = data['total_vehicles'].groupby(
+                                data['direction'].loc[data['direction'] == 'N']).astype(int).sum()[0]
                         except IndexError:
                             header['total_vehicles_negative_direction'] = 0
 
-                        header['total_heavy_vehicles'] = data['total_heavy_vehicles_type21'].sum(
+                        header['total_heavy_vehicles'] = data['total_heavy_vehicles'].sum(
                         )
                         try:
-                            header['total_heavy_negative_direction'] = data['total_heavy_vehicles_type21'].groupby(
-                                [data['direction'].loc[data['direction'] == 'N']]).sum()[0]
+                            header['total_heavy_negative_direction'] = data['total_heavy_vehicles'].groupby(
+                                [data['direction'].loc[data['direction'] == 'N']]).astype(int).sum()[0]
                         except IndexError:
                             header['total_heavy_negative_direction'] = 0
                         try:
-                            header['total_heavy_positive_direction'] = data['total_heavy_vehicles_type21'].groupby(
-                                [data['direction'].loc[data['direction'] == 'P']]).sum()[0]
+                            header['total_heavy_positive_direction'] = data['total_heavy_vehicles'].groupby(
+                                [data['direction'].loc[data['direction'] == 'P']]).astype(int).sum()[0]
                         except IndexError:
                             header['total_heavy_positive_direction'] = 0
                         try:
-                            header['truck_split_negative_direction'] = data['total_heavy_vehicles_type21'].groupby(
-                                [data['direction'].loc[data['direction'] == 'N']]).sum()[0] / data['total_heavy_vehicles_type21'].sum()
+                            header['truck_split_negative_direction'] = data['total_heavy_vehicles'].groupby(
+                                [data['direction'].loc[data['direction'] == 'N']]).sum()[0] / data['total_heavy_vehicles'].sum()
                         except IndexError:
                             header['truck_split_negative_direction'] = 0
                         try:
-                            header['truck_split_positive_direction'] = data['total_heavy_vehicles_type21'].groupby(
-                                [data['direction'].loc[data['direction'] == 'P']]).sum()[0] / data['total_heavy_vehicles_type21'].sum()
+                            header['truck_split_positive_direction'] = data['total_heavy_vehicles'].groupby(
+                                [data['direction'].loc[data['direction'] == 'P']]).sum()[0] / data['total_heavy_vehicles'].sum()
                         except IndexError:
                             header['truck_split_positive_direction'] = 0
 
-                        header['total_light_vehicles'] = data['total_light_vehicles_type21'].sum(
+                        header['total_light_vehicles'] = data['total_light_vehicles'].sum(
                         )
                         try:
-                            header['total_light_positive_direction'] = data['total_light_vehicles_type21'].groupby(
+                            header['total_light_positive_direction'] = data['total_light_vehicles'].groupby(
                                 [data['direction'].loc[data['direction'] == 'P']]).sum()[0]
                         except IndexError:
                             header['total_light_positive_direction'] = 0
                         try:
-                            header['total_light_negative_direction'] = data['total_light_vehicles_type21'].groupby(
+                            header['total_light_negative_direction'] = data['total_light_vehicles'].groupby(
                                 [data['direction'].loc[data['direction'] == 'N']]).sum()[0]
                         except IndexError:
                             header['total_light_negative_direction'] = 0
@@ -1194,48 +1166,48 @@ class Traffic():
                             header['vehicles_with_rear_to_rear_headway_less_than_2sec_negative_dire'] = 0
                         header['vehicles_with_rear_to_rear_headway_less_than_2sec_total'] = data['rear_to_rear_headway_shorter_than_2_seconds'].sum()
 
-                        header['type_21_count_interval_minutes'] = data['duration_min'].mean()
+                        header['summary_interval_minutes'] = data['duration_min'].mean()
 
                         try:
-                            header['highest_volume_per_hour_positive_direction'] = round(data['total_vehicles_type21'].groupby(
+                            header['highest_volume_per_hour_positive_direction'] = round(data['total_vehicles'].groupby(
                                 [data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'P']]).sum().max())
                         except ValueError:
                             header['highest_volume_per_hour_positive_direction'] = 0
                         try:
-                            header['highest_volume_per_hour_negative_direction'] = round(data['total_vehicles_type21'].groupby(
+                            header['highest_volume_per_hour_negative_direction'] = round(data['total_vehicles'].groupby(
                                 [data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'N']]).sum().max())
                         except ValueError:
                             header['highest_volume_per_hour_negative_direction'] = 0
-                        header['highest_volume_per_hour_total'] = data['total_vehicles_type21'].groupby(
+                        header['highest_volume_per_hour_total'] = data['total_vehicles'].groupby(
                             [data['start_datetime'].dt.to_period('H')]).sum().max()
 
                         try:
-                            header['15th_highest_volume_per_hour_positive_direction'] = round(data['total_vehicles_type21'].groupby(
+                            header['15th_highest_volume_per_hour_positive_direction'] = round(data['total_vehicles'].groupby(
                                 [data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'P']]).sum().quantile(q=0.15,  interpolation='linear'))
                         except ValueError:
                             header['15th_highest_volume_per_hour_positive_direction'] = 0
                         try:
-                            header['15th_highest_volume_per_hour_negative_direction'] = round(data['total_vehicles_type21'].groupby(
+                            header['15th_highest_volume_per_hour_negative_direction'] = round(data['total_vehicles'].groupby(
                                 [data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'N']]).sum().quantile(q=0.15,  interpolation='linear'))
                         except ValueError:
                             header['15th_highest_volume_per_hour_negative_direction'] = 0
-                        header['15th_highest_volume_per_hour_total'] = round(data['total_vehicles_type21'].groupby(
+                        header['15th_highest_volume_per_hour_total'] = round(data['total_vehicles'].groupby(
                             [data['start_datetime'].dt.to_period('H')]).sum().quantile(q=0.15, interpolation='linear'))
 
                         try:
-                            header['30th_highest_volume_per_hour_positive_direction'] = round(data['total_vehicles_type21'].groupby(
+                            header['30th_highest_volume_per_hour_positive_direction'] = round(data['total_vehicles'].groupby(
                                 [data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'P']]).sum().quantile(q=0.3,  interpolation='linear'))
                         except ValueError:
                             header['30th_highest_volume_per_hour_positive_direction'] = 0
                         try:
-                            header['30th_highest_volume_per_hour_negative_direction'] = round(data['total_vehicles_type21'].groupby(
+                            header['30th_highest_volume_per_hour_negative_direction'] = round(data['total_vehicles'].groupby(
                                 [data['start_datetime'].dt.to_period('H'), data['direction'].loc[data['direction'] == 'N']]).sum().quantile(q=0.3, interpolation='linear'))
                         except ValueError:
                             header['30th_highest_volume_per_hour_negative_direction'] = 0
-                        header['30th_highest_volume_per_hour_total'] = round(data['total_vehicles_type21'].groupby(
+                        header['30th_highest_volume_per_hour_total'] = round(data['total_vehicles'].groupby(
                             [data['start_datetime'].dt.to_period('H')]).sum().quantile(q=0.3, interpolation='linear'))
 
-                        header['average_speed_positive_direction'] = (int((
+                        header['average_speed_positive_direction'] = (round((
                             (header['speedbin1'] * data.loc[data['direction'] == 'P', 'speedbin1'].sum()) +
                             (header['speedbin2'] * data.loc[data['direction'] == 'P', 'speedbin2'].sum()) +
                             (header['speedbin3'] * data.loc[data['direction'] == 'P', 'speedbin3'].sum()) +
@@ -1250,7 +1222,7 @@ class Traffic():
                             / data.loc[data['direction'] == 'P', 'sum_of_heavy_vehicle_speeds'].astype(int).sum()
                         )
 
-                        header['average_speed_negative_direction'] = (int((
+                        header['average_speed_negative_direction'] = (round((
                             (header['speedbin1'] * data.loc[data['direction'] == 'N', 'speedbin1'].sum()) +
                             (header['speedbin2'] * data.loc[data['direction'] == 'N', 'speedbin2'].sum()) +
                             (header['speedbin3'] * data.loc[data['direction'] == 'N', 'speedbin3'].sum()) +
@@ -1260,42 +1232,26 @@ class Traffic():
                             (header['speedbin7'] * data.loc[data['direction'] == 'N', 'speedbin7'].sum()) +
                             (header['speedbin8'] * data.loc[data['direction'] == 'N', 'speedbin8'].sum()) +
                             (header['speedbin9'] * data.loc[data['direction']
-                                                            == 'N', 'speedbin9'].sum())
+                             == 'N', 'speedbin9'].sum())
                         ))
                             / data.loc[data['direction'] == 'N', 'sum_of_heavy_vehicle_speeds'].astype(int).sum()
                         )
 
-                        try:
-                            header['average_speed'] = (int((
-                                (header['speedbin1'] * data['speedbin1'].sum()) +
-                                (header['speedbin2'] * data['speedbin2'].sum()) +
-                                (header['speedbin3'] * data['speedbin3'].sum()) +
-                                (header['speedbin4'] * data['speedbin4'].sum()) +
-                                (header['speedbin5'] * data['speedbin5'].sum()) +
-                                (header['speedbin6'] * data['speedbin6'].sum()) +
-                                (header['speedbin7'] * data['speedbin7'].sum()) +
-                                (header['speedbin8'] * data['speedbin8'].sum()) +
-                                (header['speedbin9'] * data['speedbin9'].sum())
-                            ))
-                                / data['total_vehicles_type21'].astype(int).sum()
-                            )
-                        except TypeError:
-                            header['average_speed'] = (((
-                                (header['speedbin1'] * data['speedbin1'].astype(int).sum()) +
-                                (header['speedbin2'] * data['speedbin2'].astype(int).sum()) +
-                                (header['speedbin3'] * data['speedbin3'].astype(int).sum()) +
-                                (header['speedbin4'] * data['speedbin4'].astype(int).sum()) +
-                                (header['speedbin5'] * data['speedbin5'].astype(int).sum()) +
-                                (header['speedbin6'] * data['speedbin6'].astype(int).sum()) +
-                                (header['speedbin7'] * data['speedbin7'].astype(int).sum()) +
-                                (header['speedbin8'] * data['speedbin8'].astype(int).sum()) +
-                                (header['speedbin9'] *
-                                 data['speedbin9'].astype(int).sum())
-                            ))
-                                / data['total_vehicles_type21'].astype(int).sum()
-                            )
+                        header['average_speed'] = (round((
+                            (header['speedbin1'] * data['speedbin1'].sum()) +
+                            (header['speedbin2'] * data['speedbin2'].sum()) +
+                            (header['speedbin3'] * data['speedbin3'].sum()) +
+                            (header['speedbin4'] * data['speedbin4'].sum()) +
+                            (header['speedbin5'] * data['speedbin5'].sum()) +
+                            (header['speedbin6'] * data['speedbin6'].sum()) +
+                            (header['speedbin7'] * data['speedbin7'].sum()) +
+                            (header['speedbin8'] * data['speedbin8'].sum()) +
+                            (header['speedbin9'] * data['speedbin9'].sum())
+                        ))
+                            / data['total_vehicles'].astype(int).sum()
+                        )
 
-                        header['average_speed_light_vehicles_positive_direction'] = (int((
+                        header['average_speed_light_vehicles_positive_direction'] = (round((
                             (header['speedbin1'] * data.loc[data['direction'] == 'P', 'speedbin1'].sum()) +
                             (header['speedbin2'] * data.loc[data['direction'] == 'P', 'speedbin2'].sum()) +
                             (header['speedbin3'] * data.loc[data['direction'] == 'P', 'speedbin3'].sum()) +
@@ -1308,10 +1264,10 @@ class Traffic():
                             data.loc[data['direction'] == 'P',
                                      'sum_of_heavy_vehicle_speeds'].sum()
                         ))
-                            / data.loc[data['direction'] == 'P', 'total_Light_vehicles_type21'].astype(int).sum()
+                            / data.loc[data['direction'] == 'P', 'total_light_vehicles'].astype(int).sum()
                         )
 
-                        header['average_speed_light_vehicles_negative_direction'] = (int((
+                        header['average_speed_light_vehicles_negative_direction'] = (round((
                             (header['speedbin1'] * data.loc[data['direction'] == 'N', 'speedbin1'].sum()) +
                             (header['speedbin2'] * data.loc[data['direction'] == 'N', 'speedbin2'].sum()) +
                             (header['speedbin3'] * data.loc[data['direction'] == 'N', 'speedbin3'].sum()) +
@@ -1324,10 +1280,10 @@ class Traffic():
                             data.loc[data['direction'] == 'N',
                                      'sum_of_heavy_vehicle_speeds'].sum()
                         ))
-                            / data.loc[data['direction'] == 'N', 'total_Light_vehicles_type21'].astype(int).sum()
+                            / data.loc[data['direction'] == 'N', 'total_light_vehicles'].astype(int).sum()
                         )
 
-                        header['average_speed_light_vehicles'] = ((
+                        header['average_speed_light_vehicles'] = (round(
                             (header['speedbin1'] * data['speedbin1'].sum()) +
                             (header['speedbin2'] * data['speedbin2'].sum()) +
                             (header['speedbin3'] * data['speedbin3'].sum()) +
@@ -1339,7 +1295,7 @@ class Traffic():
                             (header['speedbin9'] * data['speedbin9'].sum()) -
                             data['sum_of_heavy_vehicle_speeds'].sum()
                         )
-                            / data['total_Light_vehicles_type21'].sum()
+                            / data['total_light_vehicles'].sum()
                         )
 
                         header['average_speed_heavy_vehicles_positive_direction'] = (int((
@@ -1360,19 +1316,19 @@ class Traffic():
                         try:
                             shv_p = str(round(
                                 round(data['short_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'P']]).sum().values[0]) /
-                                round(data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P']]).sum().values[0]*100)))
+                                round(data['total_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'P']]).sum().values[0]*100)))
                         except (ValueError, IndexError, ZeroDivisionError):
                             shv_p = 0
                         try:
                             mhv_p = str(round(
                                 round(data['medium_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'P']]).sum().values[0]) /
-                                round(data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P']]).sum()[0]*100)))
+                                round(data['total_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'P']]).sum()[0]*100)))
                         except (ValueError, IndexError, ZeroDivisionError):
                             mhv_p = 0
                         try:
                             lhv_p = str(round(
                                 round(data['long_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'P']]).sum().values[0]) /
-                                round(data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'P']]).sum()[0]*100)))
+                                round(data['total_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'P']]).sum()[0]*100)))
                         except (ValueError, IndexError, ZeroDivisionError):
                             lhv_p = 0
                         header['truck_split_positive_direction'] = str(str(
@@ -1381,19 +1337,19 @@ class Traffic():
                         try:
                             shv_n = str(round(
                                 round(data['short_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'N']]).sum().values[0]) /
-                                round(data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N']]).sum().values[0]*100)))
+                                round(data['total_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'N']]).sum().values[0]*100)))
                         except (ValueError, IndexError, ZeroDivisionError):
                             shv_n = "0"
                         try:
                             mhv_n = str(round(
                                 round(data['medium_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'N']]).sum().values[0]) /
-                                round(data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N']]).sum()[0]*100)))
+                                round(data['total_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'N']]).sum()[0]*100)))
                         except (ValueError, IndexError, ZeroDivisionError):
                             mhv_n = "0"
                         try:
                             lhv_n = str(round(
                                 round(data['long_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'N']]).sum().values[0]) /
-                                round(data['total_heavy_vehicles_type21'].groupby([data['direction'].loc[data['direction'] == 'N']]).sum()[0]*100)))
+                                round(data['total_heavy_vehicles'].groupby([data['direction'].loc[data['direction'] == 'N']]).sum()[0]*100)))
                         except (ValueError, IndexError, ZeroDivisionError):
                             lhv_n = "0"
                         header['truck_split_positive_direction'] = str(str(
@@ -1402,42 +1358,42 @@ class Traffic():
                         try:
                             shv_t = str(round(
                                 round(data['short_heavy_vehicles'].sum()) /
-                                round(data['total_heavy_vehicles_type21'].sum()*100)))
+                                round(data['total_heavy_vehicles'].sum()*100)))
                         except (ValueError, IndexError, ZeroDivisionError):
                             shv_t = "0"
                         try:
                             mhv_t = str(round(
                                 round(data['medium_heavy_vehicles'].sum()) /
-                                round(data['total_heavy_vehicles_type21'].sum()*100)))
+                                round(data['total_heavy_vehicles'].sum()*100)))
                         except (ValueError, IndexError, ZeroDivisionError):
                             mhv_t = "0"
                         try:
                             lhv_t = str(round(
                                 round(data['long_heavy_vehicles'].sum()) /
-                                round(data['total_heavy_vehicles_type21'].sum()*100)))
+                                round(data['total_heavy_vehicles'].sum()*100)))
                         except (ValueError, IndexError, ZeroDivisionError):
                             lhv_t = "0"
                         header['truck_split_total'] = str(str(
                             shv_t) + ' : ' + str(mhv_t) + ' : ' + str(lhv_t))
 
                         header['percentage_heavy_vehicles_positive_direction'] = float(round(
-                            data.loc[data['direction'] == 'P', 'heavy_vehicles_type21'].sum()/data.loc[data['direction'] == 'P', 'total_vehicles_type21'].sum(), 2))
+                            data.loc[data['direction'] == 'P', 'heavy_vehicles_type21'].sum()/data.loc[data['direction'] == 'P', 'total_vehicles'].sum(), 2))
                         header['percentage_heavy_vehicles_negative_direction'] = float(round(
-                            data.loc[data['direction'] == 'N', 'heavy_vehicles_type21'].sum()/data.loc[data['direction'] == 'N', 'total_vehicles_type21'].sum(), 2))
+                            data.loc[data['direction'] == 'N', 'heavy_vehicles_type21'].sum()/data.loc[data['direction'] == 'N', 'total_vehicles'].sum(), 2))
                         header['percentage_heavy_vehicles'] = float(round(
-                            data['heavy_vehicles_type21'].sum()/data['total_vehicles_type21'].sum(), 2))
+                            data['heavy_vehicles_type21'].sum()/data['total_vehicles'].sum(), 2))
 
                         header['night_adt'] = data.loc[data['start_datetime'].dt.hour >=
-                                                       18 and data['start_datetime'].dt.hour <= 6]['total_vehicles_type21'].sum()
+                                                       18 and data['start_datetime'].dt.hour <= 6]['total_vehicles'].sum()
                         header['night_adtt'] = data.loc[data['start_datetime'].dt.hour >=
-                                                        18 and data['start_datetime'].dt.hour <= 6]['total_heavy_vehicles_type21'].sum()
+                                                        18 and data['start_datetime'].dt.hour <= 6]['total_heavy_vehicles'].sum()
 
                         # TODO: add percentile speeds (15th, 30th, 85th)
 
                     except KeyError:
                         pass
                     try:
-                        header["type_21_count_interval_minutes"] = header["type_21_count_interval_minutes"].round(
+                        header["summary_interval_minutes"] = header["summary_interval_minutes"].round(
                         ).astype(int)
                     except (KeyError, pd.errors.IntCastingNaNError):
                         pass
@@ -1447,15 +1403,15 @@ class Traffic():
                 elif type == 30:
                     try:
                         if header['adt_total'].isnull().all():
-                            header['adt_total'] = data['total_vehicles_type30'].groupby(
+                            header['adt_total'] = data['total_vehicles'].groupby(
                                 [data['start_datetime'].dt.to_period('D')]).sum().mean().astype(int)
                             try:
-                                header['adt_positive_direction'] = round(data['total_vehicles_type30'].groupby(
+                                header['adt_positive_direction'] = round(data['total_vehicles'].groupby(
                                     [data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'P']]).sum().mean())
                             except (ValueError, IndexError):
                                 header['adt_positive_direction'] = 0
                             try:
-                                header['adt_negative_direction'] = round(data['total_vehicles_type30'].groupby(
+                                header['adt_negative_direction'] = round(data['total_vehicles'].groupby(
                                     [data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'N']]).sum().mean())
                             except (ValueError, IndexError):
                                 header['adt_negative_direction'] = 0
@@ -1463,15 +1419,15 @@ class Traffic():
                             pass
 
                         if header['adtt_total'].isnull().all():
-                            header['adtt_total'] = data['total_heavy_vehicles_type30'].groupby(
+                            header['adtt_total'] = data['total_heavy_vehicles'].groupby(
                                 [data['start_datetime'].dt.to_period('D')]).sum().mean().astype(int)
                             try:
-                                header['adtt_positive_direction'] = round(data['total_vehicles_type30'].groupby(
+                                header['adtt_positive_direction'] = round(data['total_vehicles'].groupby(
                                     [data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'P']]).sum().mean())
                             except (ValueError, IndexError):
                                 header['adtt_positive_direction'] = 0
                             try:
-                                header['adtt_negative_direction'] = round(data['total_vehicles_type30'].groupby(
+                                header['adtt_negative_direction'] = round(data['total_vehicles'].groupby(
                                     [data['start_datetime'].dt.to_period('D'), data['direction'].loc[data['direction'] == 'N']]).sum().mean())
                             except (ValueError, IndexError):
                                 header['adtt_negative_direction'] = 0
@@ -1479,14 +1435,14 @@ class Traffic():
                             pass
 
                         if header['total_vehicles'].isnull().all():
-                            header['total_vehicles'] = data['total_vehicles_type30'].sum()
+                            header['total_vehicles'] = data['total_vehicles'].sum()
                             try:
-                                header['total_vehicles_positive_direction'] = data['total_vehicles_type30'].groupby(
+                                header['total_vehicles_positive_direction'] = data['total_vehicles'].groupby(
                                     data['direction'].loc[data['direction'] == 'P']).sum()[0]
                             except (ValueError, IndexError):
                                 header['total_vehicles_positive_direction'] = 0
                             try:
-                                header['total_vehicles_negative_direction'] = data['total_vehicles_type30'].groupby(
+                                header['total_vehicles_negative_direction'] = data['total_vehicles'].groupby(
                                     data['direction'].loc[data['direction'] == 'N']).sum()[0]
                             except (ValueError, IndexError):
                                 header['total_vehicles_negative_direction'] = 0
@@ -1494,41 +1450,41 @@ class Traffic():
                             pass
 
                         if header['total_heavy_vehicles'].isnull().all():
-                            header['total_heavy_vehicles'] = data['total_heavy_vehicles_type21'].sum(
+                            header['total_heavy_vehicles'] = data['total_heavy_vehicles'].sum(
                             )
                             try:
-                                header['total_heavy_negative_direction'] = data['total_heavy_vehicles_type21'].groupby(
+                                header['total_heavy_negative_direction'] = data['total_heavy_vehicles'].groupby(
                                     [data['direction'].loc[data['direction'] == 'N']]).sum()[0]
                             except (ValueError, IndexError):
                                 header['total_heavy_negative_direction'] = 0
                             try:
-                                header['total_heavy_positive_direction'] = data['total_heavy_vehicles_type21'].groupby(
+                                header['total_heavy_positive_direction'] = data['total_heavy_vehicles'].groupby(
                                     [data['direction'].loc[data['direction'] == 'P']]).sum()[0]
                             except (ValueError, IndexError):
                                 header['total_heavy_positive_direction'] = 0
                             try:
-                                header['truck_split_negative_direction'] = data['total_heavy_vehicles_type21'].groupby(
-                                    [data['direction'].loc[data['direction'] == 'N']]).sum()[0] / data['total_heavy_vehicles_type21'].sum()
+                                header['truck_split_negative_direction'] = data['total_heavy_vehicles'].groupby(
+                                    [data['direction'].loc[data['direction'] == 'N']]).sum()[0] / data['total_heavy_vehicles'].sum()
                             except (ValueError, IndexError):
                                 header['truck_split_negative_direction'] = 0
                             try:
-                                header['truck_split_positive_direction'] = data['total_heavy_vehicles_type21'].groupby(
-                                    [data['direction'].loc[data['direction'] == 'P']]).sum()[0] / data['total_heavy_vehicles_type21'].sum()
+                                header['truck_split_positive_direction'] = data['total_heavy_vehicles'].groupby(
+                                    [data['direction'].loc[data['direction'] == 'P']]).sum()[0] / data['total_heavy_vehicles'].sum()
                             except (ValueError, IndexError):
                                 header['truck_split_positive_direction'] = 0
                         else:
                             pass
 
                         if header['total_light_vehicles'].isnull().all():
-                            header['total_light_vehicles'] = data['total_light_vehicles_type30'].sum(
+                            header['total_light_vehicles'] = data['total_light_vehicles'].sum(
                             )
                             try:
-                                header['total_light_positive_direction'] = data['total_light_vehicles_type30'].groupby(
+                                header['total_light_positive_direction'] = data['total_light_vehicles'].groupby(
                                     [data['direction'].loc[data['direction'] == 'P']]).sum()[0]
                             except (ValueError, IndexError):
                                 header['total_light_positive_direction'] = 0
                             try:
-                                header['total_light_negative_direction'] = data['total_light_vehicles_type30'].groupby(
+                                header['total_light_negative_direction'] = data['total_light_vehicles'].groupby(
                                     [data['direction'].loc[data['direction'] == 'N']]).sum()[0]
                             except (ValueError, IndexError):
                                 header['total_light_negative_direction'] = 0
@@ -1538,7 +1494,7 @@ class Traffic():
                         pass
 
                     try:
-                        header['type_30_vehicle_classification_scheme'] = header['type_30_vehicle_classification_scheme'].round(
+                        header['vehicle_classification_scheme'] = header['vehicle_classification_scheme'].round(
                         ).astype(int)
                     except (KeyError, pd.errors.IntCastingNaNError):
                         pass
@@ -1546,9 +1502,17 @@ class Traffic():
                     return header
 
                 elif type == 70:
-
+                    header['total_vehicles'] = data[['number_of_error_vehicles',
+                                                     'total_free_flowing_light_vehicles',
+                                                     'total_following_light_vehicles',
+                                                     'total_free_flowing_heavy_vehicles',
+                                                     'total_following_heavy_vehicles']].astype(int).sum()
+                    header['total_light_vehicles'] = data[[
+                        'total_free_flowing_light_vehicles', 'total_following_light_vehicles']].astype(int).sum()
+                    header['total_heavy_vehicles'] = data[[
+                        'total_free_flowing_heavy_vehicles', 'total_following_heavy_vehicles']].astype(int).sum()
                     try:
-                        header['type_70_maximum_gap_milliseconds'] = header['type_70_maximum_gap_milliseconds'].round(
+                        header['maximum_gap_milliseconds'] = header['maximum_gap_milliseconds'].round(
                         ).astype(int)
                     except (KeyError, pd.errors.IntCastingNaNError):
                         pass
@@ -1556,8 +1520,8 @@ class Traffic():
                     return header
 
                 elif type == 60:
-
                     return header
+
                 else:
                     return header
         except (IndexError, AttributeError):
@@ -1657,23 +1621,20 @@ def get_files(files: str) -> List:
             "w",
         ) as f:
             pass
-    fileComplete = os.path.expanduser(config.FILES_COMPLETE)
+    files = os.path.expanduser(config.FILES_COMPLETE)
     try:
-        fileComplete = pd.read_csv(fileComplete, header=None)
-        fileComplete = fileComplete[0].tolist()
+        files = pd.read_csv(files, header=None)
+        files = files[0].tolist()
     except Exception:
-        fileComplete = []
+        files = []
 
-    files = [i for i in files if i not in fileComplete]
+    files = [i for i in files if i not in files]
 
     if not os.path.exists(os.path.expanduser(config.PATH)):
         os.makedirs(os.path.expanduser(config.PATH))
 
     if not os.path.exists(os.path.expanduser(config.PATH)):
-        with open(
-            os.path.expanduser(config.PROBLEM_FILES),
-            "w",
-        ) as f:
+        with open(os.path.expanduser(config.FILES_FAILED), "w",) as f:
             pass
     return files
 
@@ -1727,108 +1688,153 @@ def main(file: str):
     header = TR.header_df
 
     if header is None:
-        raise Exception(
-            "check get_head and header methods: header returned NoneType")
-    else:
-        lanes = TR.lanes
-        site_id = TR.site_id
-        header_id = TR.header_id
-        data_df = TR.data_df
-
-        pt_df = pd.DataFrame()
-
-        if lanes is None:
-            pass
-        else:
-            lanes = lanes[lanes.columns.intersection(lane_cols)]
-            push_to_db(lanes, config.LANES_TBL_NAME)
-
-        if head_df.loc[head_df[0] == "21"].empty:
-            pass
-        else:
-            data = TR.type_21()
-            if data is None:
-                pass
-            else:
-                pt_df = data
-                pt_df = merge_summary_dataframes(data, pt_df)
-                header = TR.header_calcs(header, data, 21)
-                data.rename(
-                    columns=config.ELECTRONIC_COUNT_DATA_TYPE21_NAME_CHANGE, inplace=True)
-                data = data[data.columns.intersection(t21_cols)]
-                push_to_db(data, config.TYPE_21_TBL_NAME)
-
-        if head_df.loc[head_df[0] == "30"].empty:
-            pass
-        else:
-            data = TR.type_30()
-            # header = TR.header_calcs(header, data, 30)
-            data = data[data.columns.intersection(t30_cols)]
-            # push_to_db(data, config.TYPE_30_TBL_NAME)
-
-        if head_df.loc[head_df[0] == "60"].empty:
-            pass
-        else:
-            data = TR.type_60()
-            # header = TR.header_calcs(header, data, 60)
-            if data is None:
-                pass
-            else:
-                data = data[data.columns.intersection(t60_cols)]
-            push_to_db(data, config.TYPE_60_TBL_NAME)
-
-        if head_df.loc[head_df[0] == "70"].empty:
-            pass
-        else:
-            data = TR.type_70()
-            header = TR.header_calcs(header, data, 70)
-            if data is None:
-                pass
-            else:
-                data = data[data.columns.intersection(t70_cols)]
-            pt_df = merge_summary_dataframes(data, pt_df)
-            push_to_db(data, config.TYPE_70_TBL_NAME)
-
-        if head_df.loc[head_df[0] == "10"].empty:
-            pass
-        elif data_df.loc[(data_df[0] == "10")].reset_index(drop=True)[0].empty:
-            pass
-        else:
-            try:
-                W = wim.Wim(
-                    data=data_df,
-                    head_df=head_df,
-                    header_id=header_id,
-                    site_id=site_id,
-                    pt_cols=pt_cols)
-                W.main()
-            except Exception:
-                traceback.print_exc()
-                pass
-
-        if header is None:
-            pass
-        else:
-            try:
-                header = header[header.columns.intersection(h_cols)]
-                push_to_db(header, config.HEADER_TBL_NAME)
-            except AttributeError as exc:
-                raise Exception("Issue with HEADER "+exc) from exc
-
-        pt_df = pt_df.apply(pd.to_numeric, axis=1, errors='ignore')
-        pt_df = pt_df[pt_df.columns.intersection(pt_cols)]
-        pt_df['site_id'] = site_id
-        push_to_db(pt_df, config.MAIN_TBL_NAME)
-
-        print('DONE WITH : '+file)
-        with open(
-            os.path.expanduser(config.FILES_COMPLETE),
-            "a",
-            newline="",
-        ) as f:
+        with open(os.path.expanduser(config.FILES_FAILED), "a", newline="",) as f:
             write = csv.writer(f)
             write.writerows([[file]])
         gc.collect()
+        pass
+    else:
+        try:
+            lanes = TR.lanes
+            site_id = TR.site_id
+            header_id = TR.header_id
+            data_df = TR.data_df
+
+            # pt_df = pd.DataFrame()
+
+            if lanes is None:
+                pass
+            else:
+                try:
+                    lanes = lanes[lanes.columns.intersection(lane_cols)]
+                    push_to_db(lanes, config.LANES_TBL_NAME)
+                except Exception as exc:
+                    traceback.print_exc()
+                    with open(os.path.expanduser(config.FILES_FAILED), "a", newline="",) as f:
+                        write = csv.writer(f)
+                        write.writerows([[file]])
+                    gc.collect()
+
+            if head_df.loc[head_df[0] == "21"].empty:
+                pass
+            else:
+                data = TR.type_21()
+                if data is None:
+                    pass
+                else:
+                    try:
+                        pt_df = data
+                        pt_df = merge_summary_dataframes(data, pt_df)
+                        header = TR.header_calcs(header, data, 21)
+                        data.rename(
+                            columns=config.ELECTRONIC_COUNT_DATA_TYPE21_NAME_CHANGE, inplace=True)
+                        data = data[data.columns.intersection(t21_cols)]
+                        push_to_db(data, config.TYPE_21_TBL_NAME)
+                    except Exception as exc:
+                        traceback.print_exc()
+                        with open(os.path.expanduser(config.FILES_FAILED), "a", newline="",) as f:
+                            write = csv.writer(f)
+                            write.writerows([[file]])
+                        gc.collect()
+
+            if head_df.loc[head_df[0] == "30"].empty:
+                pass
+            else:
+                try:
+                    data = TR.type_30()
+                    header = TR.header_calcs(header, data, 30)
+                    data = data[data.columns.intersection(t30_cols)]
+                    push_to_db(data, config.TYPE_30_TBL_NAME)
+                except Exception as exc:
+                    traceback.print_exc()
+                    with open(os.path.expanduser(config.FILES_FAILED), "a", newline="",) as f:
+                        write = csv.writer(f)
+                        write.writerows([[file]])
+                    gc.collect()
+
+            if head_df.loc[head_df[0] == "60"].empty:
+                pass
+            else:
+                try:
+                    data = TR.type_60()
+                    header = TR.header_calcs(header, data, 60)
+                    if data is None:
+                        pass
+                    else:
+                        data = data[data.columns.intersection(t60_cols)]
+                        push_to_db(data, config.TYPE_60_TBL_NAME)
+                except Exception as exc:
+                    traceback.print_exc()
+                    with open(os.path.expanduser(config.FILES_FAILED), "a", newline="",) as f:
+                        write = csv.writer(f)
+                        write.writerows([[file]])
+                    gc.collect()
+
+            if head_df.loc[head_df[0] == "70"].empty:
+                pass
+            else:
+                try:
+                    data = TR.type_70()
+                    header = TR.header_calcs(header, data, 70)
+                    if data is None:
+                        pass
+                    else:
+                        data = data[data.columns.intersection(t70_cols)]
+                        # pt_df = merge_summary_dataframes(data, pt_df)
+                    push_to_db(data, config.TYPE_70_TBL_NAME)
+                except Exception as exc:
+                    traceback.print_exc()
+                    with open(os.path.expanduser(config.FILES_FAILED), "a", newline="",) as f:
+                        write = csv.writer(f)
+                        write.writerows([[file]])
+                    gc.collect()
+
+            if head_df.loc[head_df[0] == "10"].empty:
+                pass
+            elif data_df.loc[(data_df[0] == "10")].reset_index(drop=True)[0].empty:
+                pass
+            else:
+                try:
+                    W = wim.Wim(
+                        data=data_df,
+                        head_df=head_df,
+                        header_id=header_id,
+                        site_id=site_id,
+                        pt_cols=pt_cols)
+                    W.main()
+                except Exception:
+                    traceback.print_exc()
+                    pass
+
+            if header is None:
+                pass
+            else:
+                try:
+                    header = header[header.columns.intersection(h_cols)]
+                    push_to_db(header, config.HEADER_TBL_NAME)
+                except AttributeError as exc:
+                    raise Exception("Issue with HEADER "+exc) from exc
+
+            pt_df = pt_df.apply(pd.to_numeric, axis=1, errors='ignore')
+            pt_df = pt_df[pt_df.columns.intersection(pt_cols)]
+            pt_df['site_id'] = site_id
+            push_to_db(pt_df, config.MAIN_TBL_NAME)
+
+            print('DONE WITH : '+file)
+            with open(
+                os.path.expanduser(config.FILES_COMPLETE),
+                "a",
+                newline="",
+            ) as f:
+                write = csv.writer(f)
+                write.writerows([[file]])
+            gc.collect()
+        except Exception as exc:
+            traceback.print_exc()
+            with open(os.path.expanduser(config.FILES_FAILED), "a", newline="",) as f:
+                write = csv.writer(f)
+                write.writerows([[file]])
+            gc.collect()
 
 
 # The above code is running the main function in the multiprocessing module.
@@ -1836,8 +1842,9 @@ if __name__ == "__main__":
     PATH = config.PATH
 
     # this is for local work only - comment this out when running on the server
-    PATH = r"C:\PQ410"
+    # PATH = r"C:\PQ410"
     # PATH = r"C:\FTP"
+    # PATH = r"C:\FTP\import_results\rsa_traffic_counts\FILES_FAILED.csv"
     # testfile = r"C:\FTP\Syntell\0087_20220331.RSA"
     # t10_file = r"C:\FTP\Syntell\SMEC RSV Files_GP PRM Sites_Dec21toFeb22_individuals\0400-20220222.RSV"
 
