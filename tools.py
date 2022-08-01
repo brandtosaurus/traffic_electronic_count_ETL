@@ -17,7 +17,8 @@ def is_zip(path: str) -> bool:
     for filename in path:
         return zipfile.is_zipfile(filename)
 
-def getfiles(path: str) -> List[str]:
+
+def get_files(path: str) -> List[str]:
     print("COLLECTING FILES......")
     src = []
     for root, dirs, files in os.walk(path):
@@ -33,6 +34,7 @@ def getfiles(path: str) -> List[str]:
     src = list(set(src))
     return src
 
+
 def to_df(file: str) -> pd.DataFrame:
     try:
         df = pd.read_csv(file, header=None)
@@ -46,12 +48,14 @@ def to_df(file: str) -> pd.DataFrame:
         df = None
         return df
 
+
 def get_direction(lane_number, df: pd.DataFrame) -> pd.DataFrame:
     filt = df[1] == lane_number
     df = df.where(filt)
     df = df[2].dropna()
     df = int(df)
     return df
+
 
 def get_lane_position(lane_number, df: pd.DataFrame) -> pd.DataFrame:
     filt = df[1] == lane_number
@@ -60,18 +64,21 @@ def get_lane_position(lane_number, df: pd.DataFrame) -> pd.DataFrame:
     df = str(df)
     return df
 
+
 def join_header_id(d2, header):
     if d2 is None:
         pass
     else:
         data = data_join(d2, header)
         # data.drop("station_name", axis=1, inplace=True)
-        data["start_datetime"] = data["start_datetime"].astype("datetime64[ns]")
+        data["start_datetime"] = data["start_datetime"].astype(
+            "datetime64[ns]")
         d2["start_datetime"] = d2["start_datetime"].astype("datetime64[ns]")
         data = data.merge(
             d2, how="outer", on=["site_id", "start_datetime", "lane_number"]
         )
     return data
+
 
 def data_join(data: pd.DataFrame, header: pd.DataFrame) -> pd.DataFrame:
     if data is None:
@@ -83,6 +90,7 @@ def data_join(data: pd.DataFrame, header: pd.DataFrame) -> pd.DataFrame:
         data = join(header, data)
     return data
 
+
 def join(header: pd.DataFrame, data: pd.DataFrame) -> pd.DataFrame:
     if data.empty:
         df = pd.DataFrame()
@@ -93,10 +101,11 @@ def join(header: pd.DataFrame, data: pd.DataFrame) -> pd.DataFrame:
         LEFT JOIN data ON data.start_datetime WHERE data.start_datetime >= header.start_datetime AND data.end_datetime <= header.end_datetime;
         """
         q2 = """UPDATE data set header_id = (SELECT header_id from header WHERE data.start_datetime >= header.start_datetime AND data.counttime_end <= header.enddate)"""
-        pysqldf = lambda q: sqldf(q, globals())
+        def pysqldf(q): return sqldf(q, globals())
         df = sqldf(q, locals())
         df = pd.DataFrame(df)
     return df
+
 
 def postgres_upsert(table, conn, keys, data_iter):
     data = [dict(zip(keys, row)) for row in data_iter]
@@ -107,6 +116,7 @@ def postgres_upsert(table, conn, keys, data_iter):
         set_={c.key: c for c in insert_statement.excluded},
     )
     conn.execute(upsert_statement)
+
 
 def push_to_db(df, table, subset) -> None:
     try:
@@ -129,8 +139,9 @@ def push_to_db(df, table, subset) -> None:
             method=psql_insert_copy,
         )
 
+
 def create_database_tables():
-    conn=config.CONN
+    conn = config.CONN
     cur = conn.cursor()
     cur.execute(q.CREATE_AXLE_GROUP_MASS_TABLE_GX)
     cur.execute(q.CREATE_AXLE_GROUP_CONFIG_TABLE_CX)
@@ -142,6 +153,7 @@ def create_database_tables():
     cur.execute(q.CREATE_WHEEL_MASS_TABLE_WX)
     cur.commit()
     cur.close()
+
 
 def psql_insert_copy(table, conn, keys, data_iter):
     """
@@ -172,6 +184,7 @@ def psql_insert_copy(table, conn, keys, data_iter):
         sql = "COPY {} ({}) FROM STDIN WITH CSV".format(table_name, columns)
         cur.copy_expert(sql=sql, file=s_buf)
 
+
 def save_to_temp_csv(df: pd.DataFrame, label: str):
     if not os.path.exists(os.path.expanduser(config.OUTPUT_FILE + label + ".csv")):
         df.to_csv(
@@ -187,6 +200,7 @@ def save_to_temp_csv(df: pd.DataFrame, label: str):
             header=False,
             index=False,
         )
+
 
 def push_to_partitioned_table(df, table, subset) -> None:
     yr = df['year'].unique()[0]
@@ -210,6 +224,7 @@ def push_to_partitioned_table(df, table, subset) -> None:
             method=psql_insert_copy,
         )
 
+
 def postgres_upsert(table, conn, keys, data_iter):
     data = [dict(zip(keys, row)) for row in data_iter]
 
@@ -220,8 +235,9 @@ def postgres_upsert(table, conn, keys, data_iter):
     )
     conn.execute(upsert_statement)
 
+
 def create_database_tables():
-    conn=config.CONN
+    conn = config.CONN
     cur = conn.cursor()
     cur.execute(q.CREATE_AXLE_GROUP_MASS_TABLE_GX)
     cur.execute(q.CREATE_AXLE_GROUP_CONFIG_TABLE_CX)
@@ -234,8 +250,8 @@ def create_database_tables():
     cur.commit()
     cur.close()
 
+
 def convert_float_to_int(df):
     m = df.select_dtypes(np.number)
-    df[m.columns]= m.round().astype('Int64')
+    df[m.columns] = m.round().astype('Int64')
     return df
-

@@ -292,10 +292,19 @@ class Traffic():
             time_col_name = "departure_time"
             typ = "indv"
             max_time_str_len = int(df[time_col].str.len().max())
+
+        if max_time_str_len > 6:
+            time_fmt = "%H%M%S%f"  # 00000000
+            time_format = "%H:%M:%S.%f"  # 00:00:00.00
+        elif max_time_str_len == 6:
+            time_fmt = "%H%M%S"  # 00000000
+            time_format = "%H:%M:%S"  # 00:00:00.00
+        elif max_time_str_len == 4:
+            time_fmt = "%H%M"  # 00000000
+            time_format = "%H:%M"  # 00:00:00.00
+
         date_fmt = "%Y%m%d"  # YYYYMMDD
         date_format = "%Y-%m-%d"  # YYYY-MM-DD
-        time_fmt = "%H%M%S%f"  # (includes 00000000, 0000000, 000000)
-        time_format = "%H:%M:%S.%f"  # 00:00:00.00
 
         df[time_col] = df[time_col].str.pad(
             width=max_time_str_len, side='right', fillchar="0")
@@ -597,7 +606,7 @@ class Traffic():
 
         return headers
 
-    def type_21(self) -> pd.DataFrame:  # deals with type 21
+    def type_21(self) -> pd.DataFrame:
         if self.data_df is None:
             pass
         else:
@@ -715,7 +724,7 @@ class Traffic():
                     ddf['year'] = int(ddf['start_datetime'].str[:4][0])
 
                 ddf["site_id"] = self.site_id
-                ddf["header_id"] = self.header_id
+                # ddf["header_id"] = self.header_id
 
                 return ddf
 
@@ -789,7 +798,7 @@ class Traffic():
                             # df3 = pd.concat([df3, join_to_df3], keys=[
                             #                 'start_datetime', 'lane_number'], ignore_index=True, axis=0)
                             # df3 = df3.apply(pd.to_numeric, axis=1, errors="ignore")
-                            df3["header_id"] = self.header_id
+                            # df3["header_id"] = self.header_id
                             join_to_df3['classification_scheme'] = int(
                                 classification_scheme)
                             join_to_df3['site_id'] = self.site_id
@@ -923,7 +932,7 @@ class Traffic():
                 ddf[m.columns] = m.round().astype('Int32')
                 ddf['year'] = ddf['start_datetime'].dt.year
                 ddf["site_id"] = self.site_id
-                ddf["header_id"] = self.header_id
+                # ddf["header_id"] = self.header_id
 
                 return ddf
 
@@ -1000,7 +1009,7 @@ class Traffic():
                                             axis=0, ignore_index=True)
                     df3 = df3.apply(pd.to_numeric, axis=1, errors="ignore")
                     df3['site_id'] = self.site_id
-                    df3["header_id"] = self.header_id
+                    # df3["header_id"] = self.header_id
                     try:
                         if df3 is None:
                             pass
@@ -1401,8 +1410,21 @@ class Traffic():
                     return header
 
                 elif type == 30:
+                    scheme = header['classification_scheme'].values[0]
+                    scheme_df = self.select_classification_scheme()
+                    scheme_heavy = list(
+                        scheme_df.loc[scheme['group'] == 'Heavy', id])
+
+                    if header['total_vehicles'].isna().all():
+                        header['total_vehicles'] = data['number_of_vehicles'].sum()
+                        header['total_vehicles_positive_direction'] = data['number_of_vehicles'].groupby(
+                            [data['direction'].loc['direction'] == 'P']).sum().values[0]
+                        header['total_vehicles_negative_direction'] = data['number_of_vehicles'].groupby(
+                            [data['direction'].loc['direction'] == 'N']).sum().values[0]
+                        header['total_heavy_vehicles'] = data.loc[data['vehicle_class'].isin(
+                            int) > 1].sum()
                     try:
-                        if header['adt_total'].isnull().all():
+                        if header['adt_total'].isna().all():
                             header['adt_total'] = data['total_vehicles'].groupby(
                                 [data['start_datetime'].dt.to_period('D')]).sum().mean().astype(int)
                             try:
@@ -1418,7 +1440,7 @@ class Traffic():
                         else:
                             pass
 
-                        if header['adtt_total'].isnull().all():
+                        if header['adtt_total'].isna().all():
                             header['adtt_total'] = data['total_heavy_vehicles'].groupby(
                                 [data['start_datetime'].dt.to_period('D')]).sum().mean().astype(int)
                             try:
@@ -1434,7 +1456,7 @@ class Traffic():
                         else:
                             pass
 
-                        if header['total_vehicles'].isnull().all():
+                        if header['total_vehicles'].isna().all():
                             header['total_vehicles'] = data['total_vehicles'].sum()
                             try:
                                 header['total_vehicles_positive_direction'] = data['total_vehicles'].groupby(
@@ -1449,7 +1471,7 @@ class Traffic():
                         else:
                             pass
 
-                        if header['total_heavy_vehicles'].isnull().all():
+                        if header['total_heavy_vehicles'].isna().all():
                             header['total_heavy_vehicles'] = data['total_heavy_vehicles'].sum(
                             )
                             try:
@@ -1475,7 +1497,7 @@ class Traffic():
                         else:
                             pass
 
-                        if header['total_light_vehicles'].isnull().all():
+                        if header['total_light_vehicles'].isna().all():
                             header['total_light_vehicles'] = data['total_light_vehicles'].sum(
                             )
                             try:
@@ -1589,7 +1611,7 @@ def push_to_db(df: pd.DataFrame, table_name: str):
         pass
 
 
-def get_files(files: str) -> List:
+def get_files(path: str) -> List:
     """
     It takes a list of files, checks if they are in a zip file, if not, it gets the files from the
     directory, if they are in a zip file, it exits. 
@@ -1610,32 +1632,29 @@ def get_files(files: str) -> List:
     :type files: str
     :return: A list of files that are not in the fileComplete list.
     """
-    if tools.is_zip(files) == False:
-        files = tools.getfiles(files)
-    else:
-        raise SystemExit
+    print("getting files")
+    if not os.path.exists(os.path.expanduser(config.PATH)):
+        os.makedirs(os.path.expanduser(config.PATH))
 
     if not os.path.exists(os.path.expanduser(config.FILES_COMPLETE)):
         with open(
-            os.path.expanduser(config.FILES_COMPLETE),
-            "w",
-        ) as f:
+                os.path.expanduser(config.FILES_COMPLETE), "w",) as f:
             pass
-    files = os.path.expanduser(config.FILES_COMPLETE)
-    try:
-        files = pd.read_csv(files, header=None)
-        files = files[0].tolist()
-    except Exception:
-        files = []
-
-    files = [i for i in files if i not in files]
-
-    if not os.path.exists(os.path.expanduser(config.PATH)):
-        os.makedirs(os.path.expanduser(config.PATH))
 
     if not os.path.exists(os.path.expanduser(config.PATH)):
         with open(os.path.expanduser(config.FILES_FAILED), "w",) as f:
             pass
+
+    file_complete = pd.read_csv(config.FILES_COMPLETE, header=None)
+    file_complete = file_complete[0].tolist()
+
+    if tools.is_zip(path) == False:
+        files = tools.get_files(path)
+    else:
+        raise SystemExit
+
+    files = [i for i in files if i not in file_complete]
+
     return files
 
 
@@ -1702,18 +1721,18 @@ def main(file: str):
 
             # pt_df = pd.DataFrame()
 
-            if lanes is None:
-                pass
-            else:
-                try:
-                    lanes = lanes[lanes.columns.intersection(lane_cols)]
-                    push_to_db(lanes, config.LANES_TBL_NAME)
-                except Exception as exc:
-                    traceback.print_exc()
-                    with open(os.path.expanduser(config.FILES_FAILED), "a", newline="",) as f:
-                        write = csv.writer(f)
-                        write.writerows([[file]])
-                    gc.collect()
+            # if lanes is None:
+            #     pass
+            # else:
+            #     try:
+            #         lanes = lanes[lanes.columns.intersection(lane_cols)]
+            #         push_to_db(lanes, config.LANES_TBL_NAME)
+            #     except Exception as exc:
+            #         traceback.print_exc()
+            #         with open(os.path.expanduser(config.FILES_FAILED), "a", newline="",) as f:
+            #             write = csv.writer(f)
+            #             write.writerows([[file]])
+            #         gc.collect()
 
             if head_df.loc[head_df[0] == "21"].empty:
                 pass
@@ -1723,9 +1742,9 @@ def main(file: str):
                     pass
                 else:
                     try:
-                        pt_df = data
-                        pt_df = merge_summary_dataframes(data, pt_df)
-                        header = TR.header_calcs(header, data, 21)
+                        # pt_df = data
+                        # pt_df = merge_summary_dataframes(data, pt_df)
+                        # header = TR.header_calcs(header, data, 21)
                         data.rename(
                             columns=config.ELECTRONIC_COUNT_DATA_TYPE21_NAME_CHANGE, inplace=True)
                         data = data[data.columns.intersection(t21_cols)]
@@ -1742,7 +1761,7 @@ def main(file: str):
             else:
                 try:
                     data = TR.type_30()
-                    header = TR.header_calcs(header, data, 30)
+                    # header = TR.header_calcs(header, data, 30)
                     data = data[data.columns.intersection(t30_cols)]
                     push_to_db(data, config.TYPE_30_TBL_NAME)
                 except Exception as exc:
@@ -1789,36 +1808,36 @@ def main(file: str):
                         write.writerows([[file]])
                     gc.collect()
 
-            if head_df.loc[head_df[0] == "10"].empty:
-                pass
-            elif data_df.loc[(data_df[0] == "10")].reset_index(drop=True)[0].empty:
-                pass
-            else:
-                try:
-                    W = wim.Wim(
-                        data=data_df,
-                        head_df=head_df,
-                        header_id=header_id,
-                        site_id=site_id,
-                        pt_cols=pt_cols)
-                    W.main()
-                except Exception:
-                    traceback.print_exc()
-                    pass
+            # if head_df.loc[head_df[0] == "10"].empty:
+            #     pass
+            # elif data_df.loc[(data_df[0] == "10")].reset_index(drop=True)[0].empty:
+            #     pass
+            # else:
+            #     try:
+            #         W = wim.Wim(
+            #             data=data_df,
+            #             head_df=head_df,
+            #             header_id=header_id,
+            #             site_id=site_id,
+            #             pt_cols=pt_cols)
+            #         W.main()
+            #     except Exception:
+            #         traceback.print_exc()
+            #         pass
 
-            if header is None:
-                pass
-            else:
-                try:
-                    header = header[header.columns.intersection(h_cols)]
-                    push_to_db(header, config.HEADER_TBL_NAME)
-                except AttributeError as exc:
-                    raise Exception("Issue with HEADER "+exc) from exc
+            # if header is None:
+            #     pass
+            # else:
+            #     try:
+            #         header = header[header.columns.intersection(h_cols)]
+            #         push_to_db(header, config.HEADER_TBL_NAME)
+            #     except AttributeError as exc:
+            #         raise Exception("Issue with HEADER "+exc) from exc
 
-            pt_df = pt_df.apply(pd.to_numeric, axis=1, errors='ignore')
-            pt_df = pt_df[pt_df.columns.intersection(pt_cols)]
-            pt_df['site_id'] = site_id
-            push_to_db(pt_df, config.MAIN_TBL_NAME)
+            # pt_df = pt_df.apply(pd.to_numeric, axis=1, errors='ignore')
+            # pt_df = pt_df[pt_df.columns.intersection(pt_cols)]
+            # pt_df['site_id'] = site_id
+            # push_to_db(pt_df, config.MAIN_TBL_NAME)
 
             print('DONE WITH : '+file)
             with open(
@@ -1842,7 +1861,7 @@ if __name__ == "__main__":
     PATH = config.PATH
 
     # this is for local work only - comment this out when running on the server
-    # PATH = r"C:\PQ410"
+    PATH = r"C:\PQ410"
     # PATH = r"C:\FTP"
     # PATH = r"C:\FTP\import_results\rsa_traffic_counts\FILES_FAILED.csv"
     # testfile = r"C:\FTP\Syntell\0087_20220331.RSA"
