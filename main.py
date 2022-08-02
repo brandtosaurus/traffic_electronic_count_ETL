@@ -1,4 +1,3 @@
-from distutils.debug import DEBUG
 import os
 import csv
 import pandas as pd
@@ -13,13 +12,13 @@ from typing import List
 import time
 import multiprocessing as mp
 import traceback
-import pdb
 import tqdm
 import config
 import queries as q
 import wim
 import tools
 import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.simplefilter(action='ignore', category=FutureWarning)
 pd.options.mode.chained_assignment = None
 pd.set_option("display.max_columns", None)
@@ -79,9 +78,20 @@ class Traffic():
             self.site_id = self.site_id.replace('.rsa', '')
             self.lanes = self.get_lanes(self.head_df)
             self.header_df = self.header(self.head_df)
-            self.data_df = self.get_data(self.df)
-            self.data_df = self.process_datetimes(self.data_df)
-            self.data_df = self.get_direction(self.data_df)
+            self.data_df = self.get_summary_data(self.df)
+            self.indv_data_df = self.get_indv_data(self.df)
+            if self.indv_data_df is None or (self.indv_data_df is not None and self.data_df is not None):
+                pass
+            else:
+                self.indv_data_df = self.process_datetimes(
+                    self.indv_data_df, "indv")
+                self.indv_data_df = self.get_direction(
+                    self.indv_data_df, "indv")
+            if self.data_df is None:
+                pass
+            else:
+                self.data_df = self.process_datetimes(self.data_df, "summary")
+                self.data_df = self.get_direction(self.data_df, "summary")
             self.t21_table = config.TYPE_21_TBL_NAME
             self.t30_table = config.TYPE_30_TBL_NAME
             self.t70_table = config.TYPE_70_TBL_NAME
@@ -135,14 +145,13 @@ class Traffic():
                 write = csv.writer(f)
                 write.writerows([[self.file]])
             gc.collect()
+            pass
 
-    def get_data(self, df: pd.DataFrame) -> pd.DataFrame:
+    def get_summary_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        It filters out rows that have a value in column 0 that is not in the list ["H0", "H9", "S0",
-        "I0", "S1", "D0", "D1", "D3", "L0", "L1"] and that have a value in column 1 that is in the list
-        ["0", "1", "2", "3", "4"] and that have a value in column 2 that is greater than 80
+        It takes a dataframe, filters it, and returns a dataframe
 
-        :param df: pd.DataFrame - the dataframe to be filtered
+        :param df: pd.DataFrame
         :type df: pd.DataFrame
         :return: A dataframe
         """
@@ -150,16 +159,40 @@ class Traffic():
             df = pd.DataFrame(df.loc[
                 (~df[0].isin(["H0", "H9", "S0", "I0",
                               "S1", "D0", "D1", "D3", "L0", "L1"]))
-                & ((
+                & (
                     (df[0].isin(["21", "22", "70", "30", "31", "60"]))
                     & (df[1].isin(["0", "1", "2", "3", "4"]))
                     & (df.loc[df[0].isin(["21", "22", "70", "30", "31", "60"]), 2].fillna("0").astype(int) > 80)
-                ) | (
+                )
+            ]).dropna(axis=1, how="all").reset_index(drop=True).copy()
+            df = df.dropna(axis=0, how="all").reset_index(drop=True)
+            return df
+        except TypeError as exc:
+            print(f"gat_data func: check filtering and file {self.file}")
+            print(exc)
+        except Exception as exc:
+            traceback.print_exc()
+            with open(os.path.expanduser(config.FILES_FAILED), "a", newline="") as f:
+                write = csv.writer(f)
+                write.writerows([[self.file]])
+            gc.collect()
+
+    def get_indv_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        It takes a dataframe, filters it, and returns a dataframe
+
+        :param df: pd.DataFrame
+        :type df: pd.DataFrame
+        :return: A dataframe
+        """
+        try:
+            df = pd.DataFrame(df.loc[
+                (
                     (df[0].isin(["10"]))
                     & (~df[1].isin(["1", "8", "5", "9", "01", "08", "05", "09"]))
                     & (df.loc[df[0].isin(["10"]), 4].fillna("0").astype(int) > 80)
                     & (~df[0].isin(["H0", "H9", "S0", "I0", "S1", "D0", "D1", "D3", "L0", "L1"]))
-                ))
+                )
             ]).dropna(axis=1, how="all").reset_index(drop=True).copy()
             df = df.dropna(axis=0, how="all").reset_index(drop=True)
             return df
@@ -266,7 +299,7 @@ class Traffic():
                 return lanes
 
     # !most likely to go wrong
-    def process_datetimes(self, df: pd.DataFrame) -> pd.DataFrame:
+    def process_datetimes(self, df: pd.DataFrame, type: str) -> pd.DataFrame:
         """
         It takes a dataframe, checks if the first column is equal to 10, if it is, it does one thing, if
         it isn't, it does another
@@ -275,23 +308,24 @@ class Traffic():
         :type df: pd.DataFrame
         :return: A dataframe with the columns renamed and the datetime columns added.
         """
-        if df.loc[df[0] == "10"].empty:
+
+        if type == "summary":
             duration_min_col = 4
             date_col = 2
             time_col = 3
             add_day = 1
             date_col_name = "end_date"
             time_col_name = "end_time"
-            typ = "sum"
             max_time_str_len = int(df[time_col].str.len().max())
-        else:
+        elif type == "indv":
             date_col = 4
             time_col = 5
             add_day = 0
             date_col_name = "departure_date"
             time_col_name = "departure_time"
-            typ = "indv"
             max_time_str_len = int(df[time_col].str.len().max())
+        else:
+            raise Exception("type must be either 'summary' or 'indv'")
 
         if max_time_str_len > 6:
             time_fmt = "%H%M%S%f"  # 00000000
@@ -314,7 +348,7 @@ class Traffic():
         df[date_col] = df[date_col].apply(lambda x: str(date.today())[:2]+x if int(x[:2]) <= 50 and len(
             x) == 6 else (str(int(str(date.today())[:2])-1)+x if int(x[:2]) > 50 and len(x) == 6 else x))
 
-        if typ == "indv":
+        if type == "indv":
             df[date_col] = pd.to_datetime(
                 df[date_col], format=date_fmt).dt.strftime(date_format)
         else:
@@ -342,7 +376,7 @@ class Traffic():
         }, inplace=True)
         return df
 
-    def get_direction(self, df):
+    def get_direction(self, df, type: str):
         """
         It takes a dataframe and returns a dataframe with the columns 'direction', 'direction_code', and
         'compass_heading' added
@@ -351,7 +385,7 @@ class Traffic():
         :return: A dataframe with the following columns:
         """
         try:
-            if df.loc[df[0] == "10"].empty:
+            if type == "indv":
                 lane_col = 5
             else:
                 lane_col = 6
@@ -518,17 +552,9 @@ class Traffic():
         headers['end_datetime'] = st_nd.groupby(
             st_nd['end_datetime'].dt.year).max()['end_datetime']
 
-        headers['site_id'] = self.site_id
-        headers['document_url'] = self.file
-        headers["header_id"] = self.header_id
-        headers['year'] = headers['start_datetime'].dt.year
+        headers['year'] = headers['start_datetime'].dt.year.round().astype(int)
         headers["number_of_lanes"] = int(
-            df.loc[df[0] == "L0", 2].drop_duplicates().reset_index(drop=True)[0])
-
-        station_name = df.loc[df[0].isin(["S0"]), 3:].reset_index(
-            drop=True).drop_duplicates().dropna(axis=1)
-        headers["station_name"] = station_name[station_name.columns].apply(
-            lambda row: ' '.join(row.values.astype(str)), axis=1)
+            df.loc[df[0] == "L0", 2].drop_duplicates().reset_index(drop=True).at[0])
 
         t21 = df.loc[df[0] == "21"].dropna(
             axis=1).drop_duplicates().reset_index().copy()
@@ -599,10 +625,18 @@ class Traffic():
         except KeyError:
             pass
 
-        headers = headers.reset_index(drop=True)
+        headers = headers.reset_index(drop=True).fillna(0)
 
-        m = headers.select_dtypes(np.number)
-        headers[m.columns] = m.round().astype('Int32')
+        headers[headers.select_dtypes(include=[np.number]).columns] = headers[
+            headers.select_dtypes(include=[np.number]).columns].astype(float).round().astype(int)
+
+        headers['document_url'] = self.file
+        headers["header_id"] = self.header_id
+        headers['site_id'] = self.site_id
+        station_name = df.loc[df[0].isin(["S0"]), 3:].reset_index(
+            drop=True).drop_duplicates().dropna(axis=1)
+        headers["station_name"] = station_name[station_name.columns].apply(
+            lambda row: ' '.join(row.values.astype(str)), axis=1)
 
         return headers
 
@@ -703,7 +737,7 @@ class Traffic():
                                "medium_heavy_vehicles",
                                "long_heavy_vehicles",
                                "rear_to_rear_headway_shorter_than_2_seconds",
-                               "rear_to_rear_headways_shorter_than_programmed_time"]].astype('Int32')
+                               "rear_to_rear_headways_shorter_than_programmed_time"]].astype(int)
 
                 ddf["total_heavy_vehicles"] = (
                     ddf[["short_heavy_vehicles", "medium_heavy_vehicles",
@@ -719,7 +753,7 @@ class Traffic():
                                          )
 
                 try:
-                    ddf['year'] = ddf['start_datetime'].dt.year
+                    ddf['year'] = ddf['start_datetime'].dt.year.astype(int)
                 except AttributeError:
                     ddf['year'] = int(ddf['start_datetime'].str[:4][0])
 
@@ -819,7 +853,7 @@ class Traffic():
                                              'class_number',
                                              'compass_heading',
                                              'classification_scheme',
-                                             'year']].apply(pd.to_numeric, errors="coerce")
+                                             'year']].astype(int)  # .apply(pd.to_numeric, errors="coerce")
                             push_to_db(join_to_df3, config.TYPE_30_TBL_NAME)
                     return df3
                 else:
@@ -926,11 +960,11 @@ class Traffic():
                                                                             "sum_of_squared_speeds_of_free_flowing_lights",
                                                                             "sum_of_squared_speeds_for_following_lights",
                                                                             "sum_of_squared_speeds_of_free_flowing_heavies",
-                                                                            "sum_of_squared_speeds_for_following_heavies"]].astype('Int32')
+                                                                            "sum_of_squared_speeds_for_following_heavies"]].astype(int)
 
                 m = ddf.select_dtypes(np.number)
-                ddf[m.columns] = m.round().astype('Int32')
-                ddf['year'] = ddf['start_datetime'].dt.year
+                ddf[m.columns] = m.round().astype(int)
+                ddf['year'] = ddf['start_datetime'].dt.year.astype(int)
                 ddf["site_id"] = self.site_id
                 # ddf["header_id"] = self.header_id
 
@@ -1632,7 +1666,6 @@ def get_files(path: str) -> List:
     :type files: str
     :return: A list of files that are not in the fileComplete list.
     """
-    print("getting files")
     if not os.path.exists(os.path.expanduser(config.PATH)):
         os.makedirs(os.path.expanduser(config.PATH))
 
@@ -1645,8 +1678,11 @@ def get_files(path: str) -> List:
         with open(os.path.expanduser(config.FILES_FAILED), "w",) as f:
             pass
 
-    file_complete = pd.read_csv(config.FILES_COMPLETE, header=None)
-    file_complete = file_complete[0].tolist()
+    try:
+        file_complete = pd.read_csv(config.FILES_COMPLETE, header=None)
+        file_complete = file_complete[0].tolist()
+    except pd.errors.EmptyDataError:
+        file_complete = []
 
     if tools.is_zip(path) == False:
         files = tools.get_files(path)
@@ -1685,6 +1721,7 @@ def run_individually(path):
     :param path: the path to the folder containing the files
     """
     files = get_files(path)
+    print(len(files))
 
     for file in files:
         try:
@@ -1717,7 +1754,7 @@ def main(file: str):
             lanes = TR.lanes
             site_id = TR.site_id
             header_id = TR.header_id
-            data_df = TR.data_df
+            indv_data_df = TR.data_df
 
             # pt_df = pd.DataFrame()
 
@@ -1744,7 +1781,7 @@ def main(file: str):
                     try:
                         # pt_df = data
                         # pt_df = merge_summary_dataframes(data, pt_df)
-                        # header = TR.header_calcs(header, data, 21)
+                        header = TR.header_calcs(header, data, 21)
                         data.rename(
                             columns=config.ELECTRONIC_COUNT_DATA_TYPE21_NAME_CHANGE, inplace=True)
                         data = data[data.columns.intersection(t21_cols)]
@@ -1776,7 +1813,7 @@ def main(file: str):
             else:
                 try:
                     data = TR.type_60()
-                    header = TR.header_calcs(header, data, 60)
+                    # header = TR.header_calcs(header, data, 60)
                     if data is None:
                         pass
                     else:
@@ -1810,12 +1847,12 @@ def main(file: str):
 
             # if head_df.loc[head_df[0] == "10"].empty:
             #     pass
-            # elif data_df.loc[(data_df[0] == "10")].reset_index(drop=True)[0].empty:
+            # elif indv_data_df.loc[(indv_data_df[0] == "10")].reset_index(drop=True)[0].empty:
             #     pass
             # else:
             #     try:
             #         W = wim.Wim(
-            #             data=data_df,
+            #             data=indv_data_df,
             #             head_df=head_df,
             #             header_id=header_id,
             #             site_id=site_id,
@@ -1825,14 +1862,14 @@ def main(file: str):
             #         traceback.print_exc()
             #         pass
 
-            # if header is None:
-            #     pass
-            # else:
-            #     try:
-            #         header = header[header.columns.intersection(h_cols)]
-            #         push_to_db(header, config.HEADER_TBL_NAME)
-            #     except AttributeError as exc:
-            #         raise Exception("Issue with HEADER "+exc) from exc
+            if header is None:
+                pass
+            else:
+                try:
+                    header = header[header.columns.intersection(h_cols)]
+                    push_to_db(header, config.HEADER_TBL_NAME)
+                except AttributeError as exc:
+                    raise Exception("Issue with HEADER "+exc) from exc
 
             # pt_df = pt_df.apply(pd.to_numeric, axis=1, errors='ignore')
             # pt_df = pt_df[pt_df.columns.intersection(pt_cols)]
@@ -1858,7 +1895,7 @@ def main(file: str):
 
 # The above code is running the main function in the multiprocessing module.
 if __name__ == "__main__":
-    PATH = config.PATH
+    # PATH = config.PATH
 
     # this is for local work only - comment this out when running on the server
     PATH = r"C:\PQ410"
