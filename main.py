@@ -540,9 +540,9 @@ class Traffic():
 
         # creates start_datetime and end_datetime
         st_nd["start_datetime"] = pd.to_datetime((st_nd[st_dt_col].astype(
-            str)+st_nd[st_tme_col].astype(str)), format='%Y-%m-%d%H:%M:%S')
+            str)), format='%Y-%m-%d')
         st_nd["end_datetime"] = pd.to_datetime((st_nd[end_dt_col].astype(
-            str)+st_nd[end_tme_col].astype(str)), format='%Y-%m-%d%H:%M:%S')
+            str)), format='%Y-%m-%d')
 
         st_nd = st_nd.iloc[:, 1:].drop_duplicates()
 
@@ -818,7 +818,7 @@ class Traffic():
                         for i in range(6, int(number_of_data_records)+6):
                             join_to_df3 = ddf.loc[ddf['5'].astype(int) == lane_no, [
                                 '1', 'start_datetime', 'end_date', 'end_time', '4', '5', str(i), 'direction', 'compass_heading']]
-                            join_to_df3['class_number'] = i-5
+                            join_to_df3['class_number'] = i-6
                             join_to_df3.rename(columns={
                                 '1': "edit_code",
                                 '2': "end_date",
@@ -1444,10 +1444,10 @@ class Traffic():
                     return header
 
                 elif type == 30:
-                    scheme = header['classification_scheme'].values[0]
-                    scheme_df = self.select_classification_scheme()
-                    scheme_heavy = list(
-                        scheme_df.loc[scheme['group'] == 'Heavy', id])
+                    # scheme = header['classification_scheme'].values[0]
+                    # scheme_df = self.select_classification_scheme()
+                    # scheme_heavy = list(
+                    #     scheme_df.loc[scheme['group'] == 'Heavy', id])
 
                     if header['total_vehicles'].isna().all():
                         header['total_vehicles'] = data['number_of_vehicles'].sum()
@@ -1558,19 +1558,22 @@ class Traffic():
                     return header
 
                 elif type == 70:
-                    header['total_vehicles'] = data[['number_of_error_vehicles',
-                                                     'total_free_flowing_light_vehicles',
-                                                     'total_following_light_vehicles',
-                                                     'total_free_flowing_heavy_vehicles',
-                                                     'total_following_heavy_vehicles']].astype(int).sum()
-                    header['total_light_vehicles'] = data[[
-                        'total_free_flowing_light_vehicles', 'total_following_light_vehicles']].astype(int).sum()
-                    header['total_heavy_vehicles'] = data[[
-                        'total_free_flowing_heavy_vehicles', 'total_following_heavy_vehicles']].astype(int).sum()
-                    try:
-                        header['maximum_gap_milliseconds'] = header['maximum_gap_milliseconds'].round(
-                        ).astype(int)
-                    except (KeyError, pd.errors.IntCastingNaNError):
+                    if header['total_vehicles'].isna().all():
+                        header['total_vehicles'] = data[['number_of_error_vehicles',
+                                                        'total_free_flowing_light_vehicles',
+                                                         'total_following_light_vehicles',
+                                                         'total_free_flowing_heavy_vehicles',
+                                                         'total_following_heavy_vehicles']].astype(int).sum()
+                        header['total_light_vehicles'] = data[[
+                            'total_free_flowing_light_vehicles', 'total_following_light_vehicles']].astype(int).sum()
+                        header['total_heavy_vehicles'] = data[[
+                            'total_free_flowing_heavy_vehicles', 'total_following_heavy_vehicles']].astype(int).sum()
+                        try:
+                            header['maximum_gap_milliseconds'] = header['maximum_gap_milliseconds'].round(
+                            ).astype(int)
+                        except (KeyError, pd.errors.IntCastingNaNError):
+                            pass
+                    else:
                         pass
 
                     return header
@@ -1599,6 +1602,78 @@ class Traffic():
         else:
             vc_df = None
         return vc_df
+
+
+def upd_main_with_t30():
+    select_qry = """
+    select distinct header_id from trafc.electronic_count_data_partitioned
+    where light_motor_vehicles is null
+    ;
+    """
+
+    df = pd.read_sql(select_qry, config.ENGINE)
+    df.dropna(subset=["header_id"], inplace=True)
+    list = df.header_id.astype(str).to_list()
+    cs1 = pd.read_sql_query(q.SELECT_CLASSIFICAITON_SCHEME_1, config.ENGINE)
+    cs5 = pd.read_sql_query(q.SELECT_CLASSIFICAITON_SCHEME_5, config.ENGINE)
+    cs8 = pd.read_sql_query(q.SELECT_CLASSIFICAITON_SCHEME_8, config.ENGINE)
+    for header_id in list:
+        df30 = pd.read_sql(f"""
+            select * from trafc.electronic_count_data_type_30 where header_id = '{header_id}';
+            """, config.ENGINE)
+
+        df30 = df30.groupby(['site_id', 'start_datetime', 'lane_number',
+                            'classification_scheme', 'class_number'])['number_of_vehicles'].sum()
+
+        for index, row in df30.iteritems():
+            site_id = index[0]
+            start_datetime = index[1]
+            lane_number = index[2]
+            classification_scheme = index[3]
+            class_number = index[4]
+            number_of_vehicles = row
+            if classification_scheme == 1:
+                update_qry = f"""
+                    update trafc.electronic_count_data_partitioned set
+                    {cs1['vehicle'].at[class_number].lower().replace(to_replace=[" ","-"],value="_").replace(to_replace=[",","(",")"],value="")} = {number_of_vehicles}
+                    where site_id = '{site_id}'
+                    and start_datetime = '{start_datetime}'
+                    and lane_number = {lane_number}
+                    and {cs1['vehicle'].at[class_number].lower().replace(to_replace=[" ","-"],value="_").replace(to_replace=[",","(",")"],value="")} is null;
+                """
+            elif classification_scheme == 5:
+                update_qry = f"""
+                    update trafc.electronic_count_data_partitioned set 
+                    {cs5['vehicle'].at[class_number].lower().replace(to_replace=[" ","-"],value="_").replace(to_replace=[",","(",")"],value="")} = {number_of_vehicles}
+                    where site_id = '{site_id}' 
+                    and start_datetime = '{start_datetime}'
+                    and lane_number = {lane_number}
+                    and {cs5['vehicle'].at[class_number].lower().replace(to_replace=[" ","-"],value="_").replace(to_replace=[",","(",")"],value="")} is null;            
+                """
+            elif classification_scheme == 8:
+                update_qry = f"""
+                    update trafc.electronic_count_data_partitioned set 
+                    {cs8['vehicle'].at[class_number].lower().replace(to_replace=[" ","-"],value="_").replace(to_replace=[",","(",")"],value="")} = {number_of_vehicles}
+                    where site_id = '{site_id}' 
+                    and start_datetime = '{start_datetime}'
+                    and lane_number = {lane_number}
+                    and {cs8['vehicle'].at[class_number].lower().replace(to_replace=[" ","-"],value="_").replace(to_replace=[",","(",")"],value="")} is null;            
+                """
+            else:
+                pass
+            try:
+                with config.CONN as conn:
+                    cur = conn.cursor()
+                    cur.execute(update_qry)
+                    conn.commit()
+            except Exception as e:
+                print(e)
+                print(update_qry)
+                traceback.print_exc()
+                conn.rollback()
+                conn.close()
+                gc.collect()
+                continue
 
 
 def merge_summary_dataframes(join_this_df: pd.DataFrame, onto_this_df: pd.DataFrame) -> pd.DataFrame:
@@ -1756,20 +1831,20 @@ def main(file: str):
             header_id = TR.header_id
             indv_data_df = TR.data_df
 
-            # pt_df = pd.DataFrame()
+            pt_df = pd.DataFrame()
 
-            # if lanes is None:
-            #     pass
-            # else:
-            #     try:
-            #         lanes = lanes[lanes.columns.intersection(lane_cols)]
-            #         push_to_db(lanes, config.LANES_TBL_NAME)
-            #     except Exception as exc:
-            #         traceback.print_exc()
-            #         with open(os.path.expanduser(config.FILES_FAILED), "a", newline="",) as f:
-            #             write = csv.writer(f)
-            #             write.writerows([[file]])
-            #         gc.collect()
+            if lanes is None:
+                pass
+            else:
+                try:
+                    lanes = lanes[lanes.columns.intersection(lane_cols)]
+                    push_to_db(lanes, config.LANES_TBL_NAME)
+                except Exception as exc:
+                    traceback.print_exc()
+                    with open(os.path.expanduser(config.FILES_FAILED), "a", newline="",) as f:
+                        write = csv.writer(f)
+                        write.writerows([[file]])
+                    gc.collect()
 
             if head_df.loc[head_df[0] == "21"].empty:
                 pass
@@ -1779,8 +1854,8 @@ def main(file: str):
                     pass
                 else:
                     try:
-                        # pt_df = data
-                        # pt_df = merge_summary_dataframes(data, pt_df)
+                        pt_df = data
+                        pt_df = merge_summary_dataframes(data, pt_df)
                         header = TR.header_calcs(header, data, 21)
                         data.rename(
                             columns=config.ELECTRONIC_COUNT_DATA_TYPE21_NAME_CHANGE, inplace=True)
@@ -1798,7 +1873,7 @@ def main(file: str):
             else:
                 try:
                     data = TR.type_30()
-                    # header = TR.header_calcs(header, data, 30)
+                    header = TR.header_calcs(header, data, 30)
                     data = data[data.columns.intersection(t30_cols)]
                     push_to_db(data, config.TYPE_30_TBL_NAME)
                 except Exception as exc:
@@ -1813,7 +1888,7 @@ def main(file: str):
             else:
                 try:
                     data = TR.type_60()
-                    # header = TR.header_calcs(header, data, 60)
+                    header = TR.header_calcs(header, data, 60)
                     if data is None:
                         pass
                     else:
@@ -1836,8 +1911,8 @@ def main(file: str):
                         pass
                     else:
                         data = data[data.columns.intersection(t70_cols)]
-                        # pt_df = merge_summary_dataframes(data, pt_df)
-                    push_to_db(data, config.TYPE_70_TBL_NAME)
+                        pt_df = merge_summary_dataframes(data, pt_df)
+                        push_to_db(data, config.TYPE_70_TBL_NAME)
                 except Exception as exc:
                     traceback.print_exc()
                     with open(os.path.expanduser(config.FILES_FAILED), "a", newline="",) as f:
@@ -1845,22 +1920,22 @@ def main(file: str):
                         write.writerows([[file]])
                     gc.collect()
 
-            # if head_df.loc[head_df[0] == "10"].empty:
-            #     pass
-            # elif indv_data_df.loc[(indv_data_df[0] == "10")].reset_index(drop=True)[0].empty:
-            #     pass
-            # else:
-            #     try:
-            #         W = wim.Wim(
-            #             data=indv_data_df,
-            #             head_df=head_df,
-            #             header_id=header_id,
-            #             site_id=site_id,
-            #             pt_cols=pt_cols)
-            #         W.main()
-            #     except Exception:
-            #         traceback.print_exc()
-            #         pass
+            if head_df.loc[head_df[0] == "10"].empty:
+                pass
+            elif indv_data_df.loc[(indv_data_df[0] == "10")].reset_index(drop=True)[0].empty:
+                pass
+            else:
+                try:
+                    W = wim.Wim(
+                        data=indv_data_df,
+                        head_df=head_df,
+                        header_id=header_id,
+                        site_id=site_id,
+                        pt_cols=pt_cols)
+                    W.main()
+                except Exception:
+                    traceback.print_exc()
+                    pass
 
             if header is None:
                 pass
@@ -1871,10 +1946,10 @@ def main(file: str):
                 except AttributeError as exc:
                     raise Exception("Issue with HEADER "+exc) from exc
 
-            # pt_df = pt_df.apply(pd.to_numeric, axis=1, errors='ignore')
-            # pt_df = pt_df[pt_df.columns.intersection(pt_cols)]
-            # pt_df['site_id'] = site_id
-            # push_to_db(pt_df, config.MAIN_TBL_NAME)
+            pt_df = pt_df.apply(pd.to_numeric, axis=1, errors='ignore')
+            pt_df = pt_df[pt_df.columns.intersection(pt_cols)]
+            pt_df['site_id'] = site_id
+            push_to_db(pt_df, config.MAIN_TBL_NAME)
 
             print('DONE WITH : '+file)
             with open(
@@ -1895,7 +1970,7 @@ def main(file: str):
 
 # The above code is running the main function in the multiprocessing module.
 if __name__ == "__main__":
-    # PATH = config.PATH
+    PATH = config.PATH
 
     # this is for local work only - comment this out when running on the server
     PATH = r"C:\PQ410"
