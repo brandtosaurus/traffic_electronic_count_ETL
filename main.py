@@ -1605,6 +1605,13 @@ class Traffic():
 
 
 def upd_main_with_t30():
+    """
+    It takes a list of header_ids, and for each header_id, it takes the data from the
+    electronic_count_data_type_30 table, groups it by site_id, start_datetime, lane_number,
+    classification_scheme, and class_number, and sums the number_of_vehicles column. Then, it updates
+    the electronic_count_data_partitioned table with the summed number_of_vehicles for each
+    classification_scheme and class_number.
+    """
     select_qry = """
     select distinct header_id from trafc.electronic_count_data_partitioned
     where light_motor_vehicles is null
