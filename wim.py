@@ -164,6 +164,12 @@ class Wim():
                 return ddf, sub_data_df
 
     def wim_header_calcs(self, df: pd.DataFrame, df2: pd.DataFrame, df3: pd.DataFrame):
+        """
+        df1 is the SELECT_TYPE10_QRY
+        df2 is the AXLE_SPACING_SELECT_QRY
+        df3 is the WHEEL_MASS_SELECT_QRY
+        """
+
         try:
             self.egrl_percent = 1-(
                 ((df.loc[df['edit_code'] == 2].count()[0])/(df.count()[0])))
@@ -352,86 +358,137 @@ class Wim():
                 df3['direction'] == 'N')]['wheel_mass']/8200)**4.2).sum().round()/df3.loc[(df3['vehicle_class_code_primary_scheme'] > 3) & (df3['direction'] == 'N')].count()[0])).round(4)
         except ZeroDivisionError:
             self.e80_per_heavy_vehicle_negative_direction = 0
-        self.worst_steering_single_axle_cnt = 0
-        self.worst_steering_single_axle_olhv_perc = 0
-        self.worst_steering_single_axle_tonperhv = 0
-        self.worst_steering_double_axle_cnt = 0
-        self.worst_steering_double_axle_olhv_perc = 0
-        self.worst_steering_double_axle_tonperhv = 0
-        self.worst_non_steering_single_axle_cnt = 0
-        self.worst_non_steering_single_axle_olhv_perc = 0
-        self.worst_non_steering_single_axle_tonperhv = 0
+            
+        # the below calculates the number of axle groups
+        try:
+            nr_axle_groups = df2.loc[df2.axle_spacing_cm <= 220].groupby(df2.id)['id'].count()
+            nr_axle_groups.name = 'nr_axle_groups'
+            df2 = df2.drop(columns=['nr_axle_groups'])
+            df2 = df2.join(nr_axle_groups, on='id')
+        except:
+            pass
+
+        
+        # The below gets the steering single axle vehicles.
+        mask = df2['id'].isin(df2.loc[(df2['axle_spacing_number'] == 1) & (df2['axle_spacing_cm'] > 220), 'id'].tolist())
+        steering_single_axles = df2.loc[mask].copy()
+        steering_single_axles_per_dir = steering_single_axles.loc[steering_single_axles.wheel_mass_number <= 2].groupby(['id','direction']).sum()
+        steering_single_axles = steering_single_axles.loc[steering_single_axles.wheel_mass_number <= 2].groupby('id').sum()
+
+        self.worst_steering_single_axle_cnt = steering_single_axles.loc[steering_single_axles.wheel_mass > 7500].count()
+        self.worst_steering_single_axle_olhv_perc = steering_single_axles.loc[steering_single_axles.wheel_mass > 7500].count() / steering_single_axles.count()
+        self.worst_steering_single_axle_tonperhv = steering_single_axles.loc[steering_single_axles.wheel_mass > 7500].sum() / steering_single_axles.loc[steering_single_axles.wheel_mass > 7500].count()
+        self.worst_steering_single_axle_cnt_positive_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir.direction == 'P') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()
+        self.worst_steering_single_axle_olhv_perc_positive_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir.direction == 'P') & (steering_single_axles_per_dir.wheel_mass > 7500)].count() / steering_single_axles_per_dir.loc[(steering_single_axles_per_dir.direction == 'P')].count()
+        self.worst_steering_single_axle_tonperhv_positive_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir.direction == 'P') & (steering_single_axles_per_dir.wheel_mass > 15000)].sum() / steering_single_axles_per_dir.loc[(steering_single_axles_per_dir.direction == 'P') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()
+        self.worst_steering_single_axle_cnt_negative_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir.direction == 'N') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()
+        self.worst_steering_single_axle_olhv_perc_negative_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir.direction == 'N') & (steering_single_axles_per_dir.wheel_mass > 7500)].count() / steering_single_axles_per_dir.loc[(steering_single_axles_per_dir.direction == 'N')].count()
+        self.worst_steering_single_axle_tonperhv_negative_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir.direction == 'N') & (steering_single_axles_per_dir.wheel_mass > 15000)].sum() / steering_single_axles_per_dir.loc[(steering_single_axles_per_dir.direction == 'N') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()
+        
+        
+        # The below gets the steering double axle vehicles.
+        mask = df2['id'].isin(df2.loc[(df2['axle_spacing_number'] == 1) & (df2['axle_spacing_cm'] <= 220), 'id'].tolist())
+        steering_double_axles = df2.loc[mask].copy()
+        steering_double_axles_per_dir = steering_double_axles.loc[steering_double_axles.wheel_mass_number <= 2].groupby(['id','direction']).sum()
+        steering_double_axles = steering_double_axles.loc[steering_double_axles.wheel_mass_number <= 2].groupby('id').sum()
+
+        self.worst_steering_double_axle_cnt = steering_double_axles.loc[steering_double_axles.wheel_mass > 15000].count()
+        self.worst_steering_double_axle_olhv_perc = steering_double_axles.loc[steering_double_axles.wheel_mass > 15000].count() / steering_double_axles.count()
+        self.worst_steering_double_axle_tonperhv = steering_double_axles.loc[steering_double_axles.wheel_mass > 15000].sum() / steering_double_axles.loc[steering_double_axles.wheel_mass > 15000].count()
+        self.worst_steering_double_axle_cnt_positive_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir.direction == 'P') & (steering_double_axles.wheel_mass > 15000)].count()
+        self.worst_steering_double_axle_olhv_perc_positive_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir.direction == 'P') & (steering_double_axles.wheel_mass > 15000)].count() / steering_double_axles_per_dir.loc[(steering_double_axles_per_dir.direction == 'P')].count()
+        self.worst_steering_double_axle_tonperhv_positive_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir.direction == 'P') & (steering_double_axles.wheel_mass > 15000)].sum() / steering_double_axles_per_dir.loc[(steering_double_axles_per_dir.direction == 'P') & (steering_double_axles_per_dir.wheel_mass > 15000)].count()
+        self.worst_steering_double_axle_cnt_negative_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir.direction == 'N') & (steering_double_axles_per_dir.wheel_mass > 15000)].count()
+        self.worst_steering_double_axle_olhv_perc_negative_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir.direction == 'N') & (steering_double_axles_per_dir.wheel_mass > 15000)].count() / steering_double_axles_per_dir.loc[(steering_double_axles_per_dir.direction == 'N')].count()
+        self.worst_steering_double_axle_tonperhv_negative_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir.direction == 'N') & (steering_double_axles_per_dir.wheel_mass > 15000)].sum() / steering_double_axles_per_dir.loc[(steering_double_axles_per_dir.direction == 'N') & (steering_double_axles_per_dir.wheel_mass > 15000)].count()
+
+        # The below gets the non-steering single axle vehicles.
+        mask = df2['id'].isin(df2.loc[(df2['axle_spacing_number'] == 1) & (df2['axle_spacing_cm'] > 220) & (df2['vehicle_class_code_primary_scheme'].isin([4,5,7])), 'id'].tolist())
+        non_steering_single_axles = df2.loc[mask].copy()
+        non_steering_single_axles_per_dir = non_steering_single_axles.loc[non_steering_single_axles.wheel_mass_number > 1].groupby(['id','direction']).sum()
+        non_steering_single_axles = non_steering_single_axles.loc[non_steering_single_axles.wheel_mass_number > 1].groupby('id').sum()
+
+        self.worst_non_steering_single_axle_cnt = non_steering_single_axles.loc[non_steering_single_axles.wheel_mass > 9000].count()
+        self.worst_non_steering_single_axle_olhv_perc = non_steering_single_axles.loc[non_steering_single_axles.wheel_mass > 9000].count() / non_steering_single_axles.count()
+        self.worst_non_steering_single_axle_tonperhv = non_steering_single_axles.loc[non_steering_single_axles.wheel_mass > 9000].sum() / non_steering_single_axles.loc[non_steering_single_axles.wheel_mass > 9000].count()
+        self.worst_non_steering_single_axle_cnt_positive_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir.direction == 'P') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()
+        self.worst_non_steering_single_axle_olhv_perc_positive_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir.direction == 'P') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count() / non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir.direction == 'P')].count()
+        self.worst_non_steering_single_axle_tonperhv_positive_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir.direction == 'P') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].sum() / non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir.direction == 'P') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()
+        self.worst_non_steering_single_axle_cnt_negative_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir.direction == 'N') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()
+        self.worst_non_steering_single_axle_olhv_perc_negative_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir.direction == 'N') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count() / non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir.direction == 'N')].count()
+        self.worst_non_steering_single_axle_tonperhv_negative_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir.direction == 'N') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].sum() / non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir.direction == 'N') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()
+
+        # The below gets the non-steering double axle vehicles.
+        mask = df2['id'].isin(df2.loc[(df2['axle_spacing_number'] == 1) & (df2['axle_spacing_cm'] > 220) & (df2['vehicle_class_code_primary_scheme'].isin([6,8,9,10,11,12,13,14,15,16,17])), 'id'].tolist())
+        non_steering_double_axles = df2.loc[mask].copy()
+        non_steering_double_axles_per_dir = non_steering_double_axles.loc[non_steering_double_axles.wheel_mass_number > 1].groupby(['id','direction']).sum()
+        non_steering_double_axles = non_steering_double_axles.loc[non_steering_double_axles.wheel_mass_number > 1].groupby('id').sum()
+        
         self.worst_non_steering_double_axle_cnt = 0
         self.worst_non_steering_double_axle_olhv_perc = 0
         self.worst_non_steering_double_axle_tonperhv = 0
+        self.worst_non_steering_double_axle_cnt_positive_direciton = 0
+        self.worst_non_steering_double_axle_olhv_perc_positive_direciton = 0
+        self.worst_non_steering_double_axle_tonperhv_positive_direciton = 0
+        self.worst_non_steering_double_axle_cnt_negative_direciton = 0
+        self.worst_non_steering_double_axle_olhv_perc_negative_direciton = 0
+        self.worst_non_steering_double_axle_tonperhv_negative_direciton = 0
+        
+        # The below gets the triple axle vehicles.
+        mask = df2['id'].isin(df2.loc[(df2['axle_spacing_number'] > 1) & (df2['axle_spacing_cm'] <= 220), 'id'].tolist())
+        triple_axles = df2.loc[mask].copy()
+        # triple_axles['check'] = triple_axles['axle_spacing_number'].diff().eq(1).any(axis=1).astype(int)
+        triple_axles_per_dir = triple_axles.loc[triple_axles.wheel_mass_number <= 2].groupby(['id','direction']).sum()
+        triple_axles = triple_axles.loc[triple_axles.wheel_mass_number <= 2].groupby('id').sum()
+
         self.worst_triple_axle_cnt = 0
         self.worst_triple_axle_olhv_perc = 0
         self.worst_triple_axle_tonperhv = 0
+        self.worst_triple_axle_cnt_positive_direciton = 0
+        self.worst_triple_axle_olhv_perc_positive_direciton = 0
+        self.worst_triple_axle_tonperhv_positive_direciton = 0
+        self.worst_triple_axle_cnt_negative_direciton = 0
+        self.worst_triple_axle_olhv_perc_negative_direciton = 0
+        self.worst_triple_axle_tonperhv_negative_direciton = 0
+
         self.bridge_formula_cnt = round(
             (18000 + 2.1 * (df2.loc[df2['axle_spacing_number'] > 1].groupby('id')['axle_spacing_cm'].sum().mean())), 2) or 0
         self.bridge_formula_olhv_perc = 0
         self.bridge_formula_tonperhv = 0
-        self.gross_formula_cnt = 0
-        self.gross_formula_olhv_perc = 0
-        self.gross_formula_tonperhv = 0
-        self.total_avg_cnt = df.loc[df['group'] == 'Heavy'].count()[0]
-        self.total_avg_olhv_perc = 0
-        self.total_avg_tonperhv = round(
-            ((df3['wheel_mass']).sum()/1000)/df.loc[df['group'] == 'Heavy'].count()[0], 2)
-        self.worst_steering_single_axle_cnt_positive_direciton = 0
-        self.worst_steering_single_axle_olhv_perc_positive_direciton = 0
-        self.worst_steering_single_axle_tonperhv_positive_direciton = 0
-        self.worst_steering_double_axle_cnt_positive_direciton = 0
-        self.worst_steering_double_axle_olhv_perc_positive_direciton = 0
-        self.worst_steering_double_axle_tonperhv_positive_direciton = 0
-        self.worst_non_steering_single_axle_cnt_positive_direciton = 0
-        self.worst_non_steering_single_axle_olhv_perc_positive_direciton = 0
-        self.worst_non_steering_single_axle_tonperhv_positive_direciton = 0
-        self.worst_non_steering_double_axle_cnt_positive_direciton = 0
-        self.worst_non_steering_double_axle_olhv_perc_positive_direciton = 0
-        self.worst_non_steering_double_axle_tonperhv_positive_direciton = 0
-        self.worst_triple_axle_cnt_positive_direciton = 0
-        self.worst_triple_axle_olhv_perc_positive_direciton = 0
-        self.worst_triple_axle_tonperhv_positive_direciton = 0
         self.bridge_formula_cnt_positive_direciton = round((18000 + 2.1 * (df2.loc[(df2['axle_spacing_number'] > 1) & (
             df2['direction'] == 'P')].groupby('id')['axle_spacing_cm'].sum().mean())), 2) or 0
         self.bridge_formula_olhv_perc_positive_direciton = 0
         self.bridge_formula_tonperhv_positive_direciton = 0
+        self.bridge_formula_cnt_negative_direciton = round((18000 + 2.1 * (df2.loc[(df2['axle_spacing_number'] > 1) & (
+            df2['direction'] == 'P')].groupby('id')['axle_spacing_cm'].sum().mean())), 2) or 0
+        self.bridge_formula_olhv_perc_negative_direciton = 0
+        self.bridge_formula_tonperhv_negative_direciton = 0
+
+        self.gross_formula_cnt = 0
+        self.gross_formula_olhv_perc = 0
+        self.gross_formula_tonperhv = 0
         self.gross_formula_cnt_positive_direciton = 0
         self.gross_formula_olhv_perc_positive_direciton = 0
         self.gross_formula_tonperhv_positive_direciton = 0
+        self.gross_formula_cnt_negative_direciton = 0
+        self.gross_formula_olhv_perc_negative_direciton = 0
+        self.gross_formula_tonperhv_negative_direciton = 0
+
+        self.total_avg_cnt = df.loc[df['group'] == 'Heavy'].count()[0]
+        self.total_avg_olhv_perc = 0
+        self.total_avg_tonperhv = round(
+            ((df3['wheel_mass']).sum()/1000)/df.loc[df['group'] == 'Heavy'].count()[0], 2)
         self.total_avg_cnt_positive_direciton = df.loc[(
             df['group'] == 'Heavy') & (df['direction'] == 'P')].count()[0]
         self.total_avg_olhv_perc_positive_direciton = 0
         self.total_avg_tonperhv_positive_direciton = round(
             ((df3.loc[df3['direction'] == 'P']['wheel_mass']).sum()/1000)/df.loc[df['group'] == 'Heavy'].count()[0], 2)
-        self.worst_steering_single_axle_cnt_negative_direciton = 0
-        self.worst_steering_single_axle_olhv_perc_negative_direciton = 0
-        self.worst_steering_single_axle_tonperhv_negative_direciton = 0
-        self.worst_steering_double_axle_cnt_negative_direciton = 0
-        self.worst_steering_double_axle_olhv_perc_negative_direciton = 0
-        self.worst_steering_double_axle_tonperhv_negative_direciton = 0
-        self.worst_non_steering_single_axle_cnt_negative_direciton = 0
-        self.worst_non_steering_single_axle_olhv_perc_negative_direciton = 0
-        self.worst_non_steering_single_axle_tonperhv_negative_direciton = 0
-        self.worst_non_steering_double_axle_cnt_negative_direciton = 0
-        self.worst_non_steering_double_axle_olhv_perc_negative_direciton = 0
-        self.worst_non_steering_double_axle_tonperhv_negative_direciton = 0
-        self.worst_triple_axle_cnt_negative_direciton = 0
-        self.worst_triple_axle_olhv_perc_negative_direciton = 0
-        self.worst_triple_axle_tonperhv_negative_direciton = 0
-        self.bridge_formula_cnt_negative_direciton = round((18000 + 2.1 * (df2.loc[(df2['axle_spacing_number'] > 1) & (
-            df2['direction'] == 'P')].groupby('id')['axle_spacing_cm'].sum().mean())), 2) or 0
-        self.bridge_formula_olhv_perc_negative_direciton = 0
-        self.bridge_formula_tonperhv_negative_direciton = 0
-        self.gross_formula_cnt_negative_direciton = 0
-        self.gross_formula_olhv_perc_negative_direciton = 0
-        self.gross_formula_tonperhv_negative_direciton = 0
         self.total_avg_cnt_negative_direciton = df.loc[(
             df['group'] == 'Heavy') & (df['direction'] == 'N')].count()[0]
         self.total_avg_olhv_perc_negative_direciton = 0
         self.total_avg_tonperhv_negative_direciton = round(
             ((df3.loc[df3['direction'] == 'N']['wheel_mass']).sum()/1000)/df.loc[df['group'] == 'Heavy'].count()[0], 2)
+              
 
     def summary_header_calcs(self, header: pd.DataFrame, data: pd.DataFrame, type: int) -> pd.DataFrame:
         try:
@@ -1238,7 +1295,7 @@ class Wim():
             where t10.header_id = '{header_id}'
             """
         AXLE_SPACING_SELECT_QRY = f"""SELECT 
-            t10.id,
+             t10.id,
             t10.header_id, 
             t10.start_datetime,
             t10.edit_code,
@@ -1247,10 +1304,16 @@ class Wim():
             t10.direction,
             t10.axle_count,
             axs.axle_spacing_number,
-            axs.axle_spacing_cm
+            axs.axle_spacing_cm,
+            wm.wheel_mass_number,
+            wm.wheel_mass,
+            vm.kg as vehicle_mass_limit_kg,
+            sum(wm.wheel_mass) over(partition by t10.id) as gross_mass
             FROM trafc.electronic_count_data_type_10 t10
-            inner join trafc.traffic_e_type10_axle_spacing axs ON axs.type10_id = t10.data_id
-            where t10.header_id = '{header_id}'
+            left join trafc.traffic_e_type10_wheel_mass wm ON wm.type10_id = t10.data_id
+            left join trafc.traffic_e_type10_axle_spacing axs ON axs.type10_id = t10.data_id and axs.axle_spacing_number = wm.wheel_mass_number
+            Left join traf_lu.gross_vehicle_mass_limits vm on vm.number_of_axles = t10.axle_count
+            where t10.header_id = '{header_id}' and wm.wheel_mass_number is not null
             """
         WHEEL_MASS_SELECT_QRY = f"""SELECT 
             t10.id,

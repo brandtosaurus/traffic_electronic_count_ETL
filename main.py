@@ -76,6 +76,7 @@ class Traffic():
             self.site_id = self.head_df.loc[self.head_df[0]
                                             == "S0", 1].iat[0]
             self.site_id = self.site_id.replace('.rsa', '')
+            self.site_id = self.site_id.upper()
             self.lanes = self.get_lanes(self.head_df)
             self.header_df = self.header(self.head_df)
             self.data_df = self.get_summary_data(self.df)
@@ -1431,6 +1432,9 @@ class Traffic():
                         header['night_adtt'] = data.loc[data['start_datetime'].dt.hour >=
                                                         18 and data['start_datetime'].dt.hour <= 6]['total_heavy_vehicles'].sum()
 
+                        header['number_of_days_counted'] = data.groupby(data['start_datetime'].dt.to_period('D')).count().count()[0]
+                        header['duration_hours'] = data.groupby(data['start_datetime'].dt.to_period('H')).count().count()[0]
+
                         # TODO: add percentile speeds (15th, 30th, 85th)
 
                     except KeyError:
@@ -1555,6 +1559,9 @@ class Traffic():
                     except (KeyError, pd.errors.IntCastingNaNError):
                         pass
 
+                    header['number_of_days_counted'] = data.groupby(data['start_datetime'].dt.to_period('D')).count().count()[0]
+                    header['duration_hours'] = data.groupby(data['start_datetime'].dt.to_period('H')).count().count()[0]
+
                     return header
 
                 elif type == 70:
@@ -1573,6 +1580,9 @@ class Traffic():
                             ).astype(int)
                         except (KeyError, pd.errors.IntCastingNaNError):
                             pass
+
+                        header['number_of_days_counted'] = data.groupby(data['start_datetime'].dt.to_period('D')).count().count()[0]
+                        header['duration_hours'] = data.groupby(data['start_datetime'].dt.to_period('H')).count().count()[0]
                     else:
                         pass
 
