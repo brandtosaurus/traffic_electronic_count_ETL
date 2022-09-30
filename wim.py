@@ -8,6 +8,428 @@ import pdb
 import traceback
 from typing import List
 
+ADD_NEW_COLUMNS_TO_HSWIM_HEADER = """
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_4tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_4tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_4tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_4tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_4tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_4tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_4tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_4tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_4tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_4tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_5tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_5tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_5tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_5tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_5tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_5tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_5tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_5tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_5tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_5tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_6tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_6tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_6tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_6tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_6tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_6tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_6tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_6tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_6tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_6tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_7tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_7tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_7tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_7tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_7tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_7tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_7tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_7tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_7tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_7tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_8tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_8tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_8tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_8tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_8tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_8tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_8tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_8tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_8tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_8tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_9tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_9tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_9tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_9tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_9tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_9tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_9tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_9tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_9tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_9tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_10tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_10tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_10tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_10tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_10tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_10tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_10tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_10tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_10tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_10tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_11tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_11tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_11tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_11tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_11tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_11tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_11tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_11tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_11tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_11tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_12tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_12tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_12tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_12tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_12tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_12tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_12tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_12tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_12tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_12tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_13tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_13tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_13tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_13tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_13tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_13tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_13tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_13tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_13tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_13tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_14tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_14tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_14tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_14tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_14tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_14tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_14tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_14tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_14tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_14tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_15tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_15tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_15tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_15tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_15tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_15tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_15tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_15tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_15tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_15tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_16tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_16tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_16tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_16tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_16tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_16tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_16tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_16tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_16tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_16tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_17tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_17tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_17tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_17tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_17tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_17tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_17tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_17tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_17tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_17tot numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_4p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_4p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_4p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_4p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_4p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_4p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_4p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_4p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_4p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_4p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_5p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_5p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_5p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_5p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_5p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_5p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_5p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_5p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_5p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_5p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_6p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_6p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_6p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_6p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_6p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_6p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_6p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_6p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_6p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_6p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_7p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_7p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_7p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_7p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_7p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_7p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_7p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_7p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_7p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_7p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_8p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_8p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_8p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_8p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_8p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_8p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_8p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_8p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_8p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_8p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_9p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_9p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_9p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_9p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_9p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_9p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_9p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_9p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_9p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_9p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_10p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_10p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_10p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_10p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_10p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_10p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_10p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_10p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_10p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_10p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_11p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_11p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_11p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_11p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_11p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_11p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_11p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_11p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_11p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_11p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_12p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_12p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_12p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_12p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_12p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_12p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_12p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_12p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_12p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_12p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_13p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_13p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_13p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_13p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_13p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_13p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_13p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_13p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_13p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_13p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_14p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_14p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_14p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_14p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_14p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_14p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_14p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_14p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_14p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_14p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_15p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_15p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_15p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_15p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_15p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_15p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_15p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_15p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_15p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_15p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_16p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_16p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_16p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_16p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_16p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_16p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_16p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_16p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_16p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_16p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_17p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_17p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_17p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_17p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_17p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_17p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_17p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_17p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_17p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_17p numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_4n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_4n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_4n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_4n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_4n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_4n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_4n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_4n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_4n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_4n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_5n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_5n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_5n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_5n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_5n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_5n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_5n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_5n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_5n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_5n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_6n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_6n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_6n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_6n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_6n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_6n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_6n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_6n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_6n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_6n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_7n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_7n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_7n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_7n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_7n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_7n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_7n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_7n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_7n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_7n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_8n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_8n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_8n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_8n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_8n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_8n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_8n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_8n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_8n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_8n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_9n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_9n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_9n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_9n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_9n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_9n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_9n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_9n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_9n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_9n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_10n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_10n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_10n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_10n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_10n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_10n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_10n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_10n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_10n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_10n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_11n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_11n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_11n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_11n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_11n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_11n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_11n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_11n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_11n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_11n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_12n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_12n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_12n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_12n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_12n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_12n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_12n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_12n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_12n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_12n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_13n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_13n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_13n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_13n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_13n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_13n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_13n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_13n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_13n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_13n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_14n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_14n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_14n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_14n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_14n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_14n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_14n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_14n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_14n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_14n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_15n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_15n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_15n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_15n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_15n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_15n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_15n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_15n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_15n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_15n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_16n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_16n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_16n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_16n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_16n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_16n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_16n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_16n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_16n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_16n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_vehicles_cls_17n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists weighed_vehicles_cls_17n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists perc_truck_dist_cls_17n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_axles_cls_17n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists axles_over9t_cls_17n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_mass_cls_17n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists cnt_mass_over9t_cls_17n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists eal_pervehicle_cls_17n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_cls_17n numeric;
+alter table trafc.electronic_count_header_hswim add column if not exists total_eal_over9t_cls_17n numeric;
+"""
 
 class Wim():
     def __init__(self, data, head_df, header_id, site_id, pt_cols) -> None:
@@ -28,8 +450,7 @@ class Wim():
             q.SELECT_ELECTRONIC_COUNT_DATA_TYPE_10_LIMIT1, config.ENGINE).columns)
         self.wim_header_cols = list(pd.read_sql_query(
             q.SEELECT_HSWIM_HEADER_COLS, config.ENGINE).columns)
-        self.vm_limits = pd.read_sql_query(
-            f"SELECT * FROM {config.TRAFFIC_LOOKUP_SCHEMA}.gross_vehicle_mass_limits;", config.ENGINE)
+        self.vm_limits = pd.read_sql_query(f"SELECT * FROM {config.TRAFFIC_LOOKUP_SCHEMA}.gross_vehicle_mass_limits;", config.ENGINE)
 
     def type_10(self) -> pd.DataFrame:
         """
@@ -200,6 +621,7 @@ class Wim():
             )[0]+df3.loc[(df3['edit_code'] == 2) & (df3['direction'] == 'N')].count()[0])/df.loc[df['direction'] == 'N'].count()[0]))
         except:
             self.egrw_percent_negative_direction = 1
+
         self.num_weighed = df3.groupby(
             pd.Grouper(key='id')).count().count()[0] or 0
         self.num_weighed_positive_direction = df3.loc[df3['direction'] == 'P'].groupby(
@@ -378,13 +800,31 @@ class Wim():
         self.worst_steering_single_axle_cnt = steering_single_axles.loc[steering_single_axles.wheel_mass > 7500].count()
         self.worst_steering_single_axle_olhv_perc = steering_single_axles.loc[steering_single_axles.wheel_mass > 7500].count() / steering_single_axles.count()
         self.worst_steering_single_axle_tonperhv = steering_single_axles.loc[steering_single_axles.wheel_mass > 7500].sum() / steering_single_axles.loc[steering_single_axles.wheel_mass > 7500].count()
-        self.worst_steering_single_axle_cnt_positive_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir.direction == 'P') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()
-        self.worst_steering_single_axle_olhv_perc_positive_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir.direction == 'P') & (steering_single_axles_per_dir.wheel_mass > 7500)].count() / steering_single_axles_per_dir.loc[(steering_single_axles_per_dir.direction == 'P')].count()
-        self.worst_steering_single_axle_tonperhv_positive_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir.direction == 'P') & (steering_single_axles_per_dir.wheel_mass > 15000)].sum() / steering_single_axles_per_dir.loc[(steering_single_axles_per_dir.direction == 'P') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()
-        self.worst_steering_single_axle_cnt_negative_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir.direction == 'N') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()
-        self.worst_steering_single_axle_olhv_perc_negative_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir.direction == 'N') & (steering_single_axles_per_dir.wheel_mass > 7500)].count() / steering_single_axles_per_dir.loc[(steering_single_axles_per_dir.direction == 'N')].count()
-        self.worst_steering_single_axle_tonperhv_negative_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir.direction == 'N') & (steering_single_axles_per_dir.wheel_mass > 15000)].sum() / steering_single_axles_per_dir.loc[(steering_single_axles_per_dir.direction == 'N') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()
-        
+        try:
+            self.worst_steering_single_axle_cnt_positive_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'P') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()
+        except:
+            self.worst_steering_single_axle_cnt_positive_direciton = 0
+        try:
+            self.worst_steering_single_axle_olhv_perc_positive_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'P') & (steering_single_axles_per_dir.wheel_mass > 7500)].count() / steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'P')].count()
+        except:
+            self.worst_steering_single_axle_olhv_perc_positive_direciton = 0
+        try:
+            self.worst_steering_single_axle_tonperhv_positive_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'P') & (steering_single_axles_per_dir.wheel_mass > 15000)].sum() / steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'P') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()
+        except:
+            self.worst_steering_single_axle_tonperhv_positive_direciton = 0
+        try:
+            self.worst_steering_single_axle_cnt_negative_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'N') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()
+        except:
+            self.worst_steering_single_axle_cnt_negative_direciton = 0
+        try:
+            self.worst_steering_single_axle_olhv_perc_negative_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'N') & (steering_single_axles_per_dir.wheel_mass > 7500)].count() / steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'N')].count()
+        except:
+            self.worst_steering_single_axle_olhv_perc_negative_direciton = 0
+        try:
+            self.worst_steering_single_axle_tonperhv_negative_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'N') & (steering_single_axles_per_dir.wheel_mass > 15000)].sum() / steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'N') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()
+        except:
+            self.worst_steering_single_axle_tonperhv_negative_direciton = 0
+
         
         # The below gets the steering double axle vehicles.
         mask = df2['id'].isin(df2.loc[(df2['axle_spacing_number'] == 1) & (df2['axle_spacing_cm'] <= 220), 'id'].tolist())
@@ -395,12 +835,31 @@ class Wim():
         self.worst_steering_double_axle_cnt = steering_double_axles.loc[steering_double_axles.wheel_mass > 15000].count()
         self.worst_steering_double_axle_olhv_perc = steering_double_axles.loc[steering_double_axles.wheel_mass > 15000].count() / steering_double_axles.count()
         self.worst_steering_double_axle_tonperhv = steering_double_axles.loc[steering_double_axles.wheel_mass > 15000].sum() / steering_double_axles.loc[steering_double_axles.wheel_mass > 15000].count()
-        self.worst_steering_double_axle_cnt_positive_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir.direction == 'P') & (steering_double_axles.wheel_mass > 15000)].count()
-        self.worst_steering_double_axle_olhv_perc_positive_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir.direction == 'P') & (steering_double_axles.wheel_mass > 15000)].count() / steering_double_axles_per_dir.loc[(steering_double_axles_per_dir.direction == 'P')].count()
-        self.worst_steering_double_axle_tonperhv_positive_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir.direction == 'P') & (steering_double_axles.wheel_mass > 15000)].sum() / steering_double_axles_per_dir.loc[(steering_double_axles_per_dir.direction == 'P') & (steering_double_axles_per_dir.wheel_mass > 15000)].count()
-        self.worst_steering_double_axle_cnt_negative_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir.direction == 'N') & (steering_double_axles_per_dir.wheel_mass > 15000)].count()
-        self.worst_steering_double_axle_olhv_perc_negative_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir.direction == 'N') & (steering_double_axles_per_dir.wheel_mass > 15000)].count() / steering_double_axles_per_dir.loc[(steering_double_axles_per_dir.direction == 'N')].count()
-        self.worst_steering_double_axle_tonperhv_negative_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir.direction == 'N') & (steering_double_axles_per_dir.wheel_mass > 15000)].sum() / steering_double_axles_per_dir.loc[(steering_double_axles_per_dir.direction == 'N') & (steering_double_axles_per_dir.wheel_mass > 15000)].count()
+        try:
+            self.worst_steering_double_axle_cnt_positive_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'P') & (steering_double_axles.wheel_mass > 15000)].count()
+        except:
+            self.worst_steering_double_axle_cnt_positive_direciton = 0 
+        try:
+            self.worst_steering_double_axle_olhv_perc_positive_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'P') & (steering_double_axles.wheel_mass > 15000)].count() / steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'P')].count()
+        except:
+            self.worst_steering_double_axle_olhv_perc_positive_direciton = 0 
+        try:
+            self.worst_steering_double_axle_tonperhv_positive_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'P') & (steering_double_axles.wheel_mass > 15000)].sum() / steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'P') & (steering_double_axles_per_dir.wheel_mass > 15000)].count()
+        except:
+            self.worst_steering_double_axle_tonperhv_positive_direciton = 0 
+        try:
+            self.worst_steering_double_axle_cnt_negative_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'N') & (steering_double_axles_per_dir.wheel_mass > 15000)].count()
+        except:
+            self.worst_steering_double_axle_cnt_negative_direciton = 0 
+        try:
+            self.worst_steering_double_axle_olhv_perc_negative_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'N') & (steering_double_axles_per_dir.wheel_mass > 15000)].count() / steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'N')].count()
+        except:
+            self.worst_steering_double_axle_olhv_perc_negative_direciton = 0 
+        try:
+            self.worst_steering_double_axle_tonperhv_negative_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'N') & (steering_double_axles_per_dir.wheel_mass > 15000)].sum() / steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'N') & (steering_double_axles_per_dir.wheel_mass > 15000)].count()
+        except:
+            self.worst_steering_double_axle_tonperhv_negative_direciton = 0 
+        
 
         # The below gets the non-steering single axle vehicles.
         mask = df2['id'].isin(df2.loc[(df2['axle_spacing_number'] == 1) & (df2['axle_spacing_cm'] > 220) & (df2['vehicle_class_code_primary_scheme'].isin([4,5,7])), 'id'].tolist())
@@ -411,19 +870,38 @@ class Wim():
         self.worst_non_steering_single_axle_cnt = non_steering_single_axles.loc[non_steering_single_axles.wheel_mass > 9000].count()
         self.worst_non_steering_single_axle_olhv_perc = non_steering_single_axles.loc[non_steering_single_axles.wheel_mass > 9000].count() / non_steering_single_axles.count()
         self.worst_non_steering_single_axle_tonperhv = non_steering_single_axles.loc[non_steering_single_axles.wheel_mass > 9000].sum() / non_steering_single_axles.loc[non_steering_single_axles.wheel_mass > 9000].count()
-        self.worst_non_steering_single_axle_cnt_positive_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir.direction == 'P') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()
-        self.worst_non_steering_single_axle_olhv_perc_positive_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir.direction == 'P') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count() / non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir.direction == 'P')].count()
-        self.worst_non_steering_single_axle_tonperhv_positive_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir.direction == 'P') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].sum() / non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir.direction == 'P') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()
-        self.worst_non_steering_single_axle_cnt_negative_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir.direction == 'N') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()
-        self.worst_non_steering_single_axle_olhv_perc_negative_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir.direction == 'N') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count() / non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir.direction == 'N')].count()
-        self.worst_non_steering_single_axle_tonperhv_negative_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir.direction == 'N') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].sum() / non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir.direction == 'N') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()
+        try:
+            self.worst_non_steering_single_axle_cnt_positive_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'P') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()
+        except:
+            self.worst_non_steering_single_axle_cnt_positive_direciton = 0
+        try:
+            self.worst_non_steering_single_axle_olhv_perc_positive_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'P') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count() / non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'P')].count()
+        except:
+            self.worst_non_steering_single_axle_olhv_perc_positive_direciton = 0
+        try:
+            self.worst_non_steering_single_axle_tonperhv_positive_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'P') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].sum() / non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'P') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()
+        except:
+            self.worst_non_steering_single_axle_tonperhv_positive_direciton = 0
+        try:
+            self.worst_non_steering_single_axle_cnt_negative_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'N') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()
+        except:
+            self.worst_non_steering_single_axle_cnt_negative_direciton = 0
+        try:
+            self.worst_non_steering_single_axle_olhv_perc_negative_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'N') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count() / non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'N')].count()
+        except:
+            self.worst_non_steering_single_axle_olhv_perc_negative_direciton = 0
+        try:
+            self.worst_non_steering_single_axle_tonperhv_negative_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'N') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].sum() / non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'N') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()
+        except:
+            self.worst_non_steering_single_axle_tonperhv_negative_direciton = 0
 
         # The below gets the non-steering double axle vehicles.
-        mask = df2['id'].isin(df2.loc[(df2['axle_spacing_number'] == 1) & (df2['axle_spacing_cm'] > 220) & (df2['vehicle_class_code_primary_scheme'].isin([6,8,9,10,11,12,13,14,15,16,17])), 'id'].tolist())
-        non_steering_double_axles = df2.loc[mask].copy()
-        non_steering_double_axles_per_dir = non_steering_double_axles.loc[non_steering_double_axles.wheel_mass_number > 1].groupby(['id','direction']).sum()
-        non_steering_double_axles = non_steering_double_axles.loc[non_steering_double_axles.wheel_mass_number > 1].groupby('id').sum()
+        # mask = df2['id'].isin(df2.loc[(df2['axle_spacing_number'] == 1) & (df2['axle_spacing_cm'] > 220) & (df2['vehicle_class_code_primary_scheme'].isin([6,8,9,10,11,12,13,14,15,16,17])), 'id'].tolist())
+        # non_steering_double_axles = df2.loc[mask].copy()
+        # non_steering_double_axles_per_dir = non_steering_double_axles.loc[non_steering_double_axles.wheel_mass_number > 1].groupby(['id','direction']).sum()
+        # non_steering_double_axles = non_steering_double_axles.loc[non_steering_double_axles.wheel_mass_number > 1].groupby('id').sum()
         
+        # TODO:
         self.worst_non_steering_double_axle_cnt = 0
         self.worst_non_steering_double_axle_olhv_perc = 0
         self.worst_non_steering_double_axle_tonperhv = 0
@@ -435,12 +913,13 @@ class Wim():
         self.worst_non_steering_double_axle_tonperhv_negative_direciton = 0
         
         # The below gets the triple axle vehicles.
-        mask = df2['id'].isin(df2.loc[(df2['axle_spacing_number'] > 1) & (df2['axle_spacing_cm'] <= 220), 'id'].tolist())
-        triple_axles = df2.loc[mask].copy()
-        # triple_axles['check'] = triple_axles['axle_spacing_number'].diff().eq(1).any(axis=1).astype(int)
-        triple_axles_per_dir = triple_axles.loc[triple_axles.wheel_mass_number <= 2].groupby(['id','direction']).sum()
-        triple_axles = triple_axles.loc[triple_axles.wheel_mass_number <= 2].groupby('id').sum()
+        # mask = df2['id'].isin(df2.loc[(df2['axle_spacing_number'] > 1) & (df2['axle_spacing_cm'] <= 220), 'id'].tolist())
+        # triple_axles = df2.loc[mask].copy()
+        # # triple_axles['check'] = triple_axles['axle_spacing_number'].diff().eq(1).any(axis=1).astype(int)
+        # triple_axles_per_dir = triple_axles.loc[triple_axles.wheel_mass_number <= 2].groupby(['id','direction']).sum()
+        # triple_axles = triple_axles.loc[triple_axles.wheel_mass_number <= 2].groupby('id').sum()
 
+        # TODO:
         self.worst_triple_axle_cnt = 0
         self.worst_triple_axle_olhv_perc = 0
         self.worst_triple_axle_tonperhv = 0
@@ -464,6 +943,7 @@ class Wim():
         self.bridge_formula_olhv_perc_negative_direciton = 0
         self.bridge_formula_tonperhv_negative_direciton = 0
 
+        # TODO:
         self.gross_formula_cnt = 0
         self.gross_formula_olhv_perc = 0
         self.gross_formula_tonperhv = 0
@@ -488,7 +968,242 @@ class Wim():
         self.total_avg_olhv_perc_negative_direciton = 0
         self.total_avg_tonperhv_negative_direciton = round(
             ((df3.loc[df3['direction'] == 'N']['wheel_mass']).sum()/1000)/df.loc[df['group'] == 'Heavy'].count()[0], 2)
-              
+
+        # FIXME:
+        for i in range(4,18):
+            try:
+                setattr(self,f"total_vehicles_cls_{str(i)+'tot'}",df2.loc[(df2['vehicle_class_code_primary_scheme'] == i)].groupby('id').count().count()[0])
+            except KeyError:
+                setattr(self,f"total_vehicles_cls_{str(i)+'tot'}",0)
+            
+            try:
+                setattr(self,f"weighed_vehicles_cls_{str(i)+'tot'}",df2.loc[(df2['vehicle_class_code_primary_scheme'] == i)].groupby('id').count().count()[0])
+            except KeyError:
+                setattr(self,f"weighed_vehicles_cls_{str(i)+'tot'}",0)
+
+            try:
+                setattr(self,f"perc_truck_dist_cls_{str(i)+'tot'}",(df2.loc[(df2['vehicle_class_code_primary_scheme'] == i)].groupby('id').count().count()[0]
+                / df2.loc[(df2['vehicle_class_code_primary_scheme'] >= 4)].groupby('id').count().count()[0]))
+            except KeyError:
+                setattr(self,f"perc_truck_dist_cls_{str(i)+'tot'}",0)
+            
+            try:
+                setattr(self,f"total_axles_cls_{str(i)+'tot'}",df2.loc[(df2['vehicle_class_code_primary_scheme'] == i)].groupby('id').count().sum()[0])
+            except KeyError:
+                setattr(self,f"total_axles_cls_{str(i)+'tot'}",0)
+            
+            try:
+                setattr(self,f"axles_over9t_cls_{str(i)+'tot'}",df2.loc[(df2['vehicle_class_code_primary_scheme'] == i) & (df2['wheel_mass'] > 9000)].groupby('id').count().count()[0])
+            except KeyError:
+                setattr(self,f"axles_over9t_cls_{str(i)+'tot'}",0)
+            
+            try:
+                setattr(self,f"total_mass_cls_{str(i)+'tot'}",df2.loc[(df2['vehicle_class_code_primary_scheme'] == i)].groupby('id')['wheel_mass'].sum()[0])
+            except KeyError:
+                setattr(self,f"total_mass_cls_{str(i)+'tot'}" ,0)                
+            try:
+                setattr(self,f"cnt_mass_over9t_cls_{str(i)+'tot'}",round(df2.loc[(df2['vehicle_class_code_primary_scheme'] == i),'wheel_mass'].sum()/1000))
+            except KeyError:
+                setattr(self,f"cnt_mass_over9t_cls_{str(i)+'tot'}",0)
+            
+            try:
+                setattr(self,f"eal_pervehicle_cls_{str(i)+'tot'}",(round(df2.loc[(df2['vehicle_class_code_primary_scheme'] == i),'wheel_mass'].sum()/1000)/
+                df2.loc[(df2['vehicle_class_code_primary_scheme'] == i)].groupby('id').count().sum()[0]))
+            except KeyError:
+                setattr(self,f"eal_pervehicle_cls_{str(i)+'tot'}",0)
+            
+            try:
+                setattr(self,f"total_eal_cls_{str(i)+'tot'}",((round(df2.loc[(df2['vehicle_class_code_primary_scheme'] == i),'wheel_mass'].sum()/1000)/
+                df2.loc[(df2['vehicle_class_code_primary_scheme'] == i)].groupby('id').count().sum()[0])
+                *df2.loc[(df2['vehicle_class_code_primary_scheme'] == i)].groupby('id').count().count()[0]))
+            except KeyError:
+                setattr(self,f"total_eal_cls_{str(i)+'tot'}",0)
+            
+            try:
+                setattr(self,f"total_eal_over9t_cls_{str(i)+'tot'}",0)
+            except KeyError:
+                setattr(self,f"total_eal_over9t_cls_{str(i)+'tot'}",0)
+
+            for dir in ['P','N']:
+                try:
+                    setattr(self,f"total_vehicles_cls_{str(i)+dir.lower()}",df2.loc[(df2['vehicle_class_code_primary_scheme'] == i) & (df2['direction'] == dir)].groupby('id').count().count()[0])
+                except KeyError:
+                    setattr(self,f"total_vehicles_cls_{str(i)+dir.lower()}",0)
+                
+                try:
+                    setattr(self,f"weighed_vehicles_cls_{str(i)+dir.lower()}",df2.loc[(df2['vehicle_class_code_primary_scheme'] == i) & (df2['direction'] == dir)].groupby('id').count().count()[0])
+                except KeyError:
+                    setattr(self,f"weighed_vehicles_cls_{str(i)+dir.lower()}",0)
+
+                try:
+                    setattr(self,f"perc_truck_dist_cls_{str(i)+dir.lower()}",(df2.loc[(df2['vehicle_class_code_primary_scheme'] == i) & (df2['direction'] == dir)].groupby('id').count().count()[0]
+                    / df2.loc[(df2['vehicle_class_code_primary_scheme'] >= 4) & (df2['direction'] == dir)].groupby('id').count().count()[0]))
+                except KeyError:
+                    setattr(self,f"perc_truck_dist_cls_{str(i)+dir.lower()}",0)
+                
+                try:
+                    setattr(self,f"total_axles_cls_{str(i)+dir.lower()}",df2.loc[(df2['vehicle_class_code_primary_scheme'] == i) & (df2['direction'] == dir)].groupby('id').count().sum()[0])
+                except KeyError:
+                    setattr(self,f"total_axles_cls_{str(i)+dir.lower()}",0)
+                
+                try:
+                    setattr(self,f"axles_over9t_cls_{str(i)+dir.lower()}",df2.loc[(df2['vehicle_class_code_primary_scheme'] == i) & (df2['direction'] == dir) & (df2['wheel_mass'] > 9000)].groupby('id').count().count()[0])
+                except KeyError:
+                    setattr(self,f"axles_over9t_cls_{str(i)+dir.lower()}",0)
+                
+                try:
+                    setattr(self,f"total_mass_cls_{str(i)+dir.lower()}",df2.loc[(df2['vehicle_class_code_primary_scheme'] == i) & (df2['direction'] == dir)].groupby('id')['wheel_mass'].sum()[0])
+                except KeyError:
+                    setattr(self,f"total_mass_cls_{str(i)+dir.lower()}" ,0)                
+                try:
+                    setattr(self,f"cnt_mass_over9t_cls_{str(i)+dir.lower()}",round(df2.loc[(df2['vehicle_class_code_primary_scheme'] == i) & (df2['direction'] == dir),'wheel_mass'].sum()/1000))
+                except KeyError:
+                    setattr(self,f"cnt_mass_over9t_cls_{str(i)+dir.lower()}",0)
+                
+                try:
+                    setattr(self,f"eal_pervehicle_cls_{str(i)+dir.lower()}",(round(df2.loc[(df2['vehicle_class_code_primary_scheme'] == i) & (df2['direction'] == dir),'wheel_mass'].sum()/1000)/
+                    df2.loc[(df2['vehicle_class_code_primary_scheme'] == i) & (df2['direction'] == dir)].groupby('id').count().sum()[0]))
+                except KeyError:
+                    setattr(self,f"eal_pervehicle_cls_{str(i)+dir.lower()}",0)
+                
+                try:
+                    setattr(self,f"total_eal_cls_{str(i)+dir.lower()}",((round(df2.loc[(df2['vehicle_class_code_primary_scheme'] == i) & (df2['direction'] == dir),'wheel_mass'].sum()/1000)/
+                    df2.loc[(df2['vehicle_class_code_primary_scheme'] == i) & (df2['direction'] == dir)].groupby('id').count().sum()[0])
+                    *df2.loc[(df2['vehicle_class_code_primary_scheme'] == i) & (df2['direction'] == dir)].groupby('id').count().count()[0]))
+                except KeyError:
+                    setattr(self,f"total_eal_cls_{str(i)+dir.lower()}",0)
+                
+                try:
+                    setattr(self,f"total_eal_over9t_cls_{str(i)+dir.lower()}",0)
+                except KeyError:
+                    setattr(self,f"total_eal_over9t_cls_{str(i)+dir.lower()}",0)
+
+        # return pd.DataFrame({
+        #         "header_id": self.header_id ,
+        #         "egrl_percent": self.egrl_percent ,
+        #         "egrw_percent": self.egrw_percent ,
+        #         "mean_equivalent_axle_mass": self.mean_equivalent_axle_mass ,
+        #         "mean_equivalent_axle_mass_positive_direction": self.mean_equivalent_axle_mass_positive_direction ,
+        #         "mean_equivalent_axle_mass_negative_direction": self.mean_equivalent_axle_mass_negative_direction ,
+        #         "mean_axle_spacing": self.mean_axle_spacing ,
+        #         "mean_axle_spacing_positive_direction": self.mean_axle_spacing_positive_direction ,
+        #         "mean_axle_spacing_negative_direction": self.mean_axle_spacing_negative_direction ,
+        #         "e80_per_axle": self.e80_per_axle ,
+        #         "e80_per_axle_positive_direction": self.e80_per_axle_positive_direction ,
+        #         "e80_per_axle_negative_direction": self.e80_per_axle_negative_direction ,
+        #         "olhv": self.olhv ,
+        #         "olhv_positive_direction": self.olhv_positive_direction ,
+        #         "olhv_negative_direction": self.olhv_negative_direction ,
+        #         "olhv_percent": self.olhv_percent ,
+        #         "olhv_percent_positive_direction": self.olhv_percent_positive_direction ,
+        #         "olhv_percent_negative_direction": self.olhv_percent_negative_direction ,
+        #         "tonnage_generated": self.tonnage_generated ,
+        #         "tonnage_generated_positive_direction": self.tonnage_generated_positive_direction ,
+        #         "tonnage_generated_negative_direction": self.tonnage_generated_negative_direction ,
+        #         "olton": self.olton ,
+        #         "olton_positive_direction": self.olton_positive_direction ,
+        #         "olton_negative_direction": self.olton_negative_direction ,
+        #         "olton_percent": self.olton_percent ,
+        #         "olton_percent_positive_direction": self.olton_percent_positive_direction ,
+        #         "olton_percent_negative_direction": self.olton_percent_negative_direction ,
+        #         "ole80": self.ole80 ,
+        #         "ole80_positive_direction": self.ole80_positive_direction ,
+        #         "ole80_negative_direction": self.ole80_negative_direction ,
+        #         "ole80_percent": self.ole80_percent ,
+        #         "ole80_percent_positive_direction": self.ole80_percent_positive_direction ,
+        #         "ole80_percent_negative_direction": self.ole80_percent_negative_direction ,
+        #         "xe80": self.xe80 ,
+        #         "xe80_positive_direction": self.xe80_positive_direction ,
+        #         "xe80_negative_direction": self.xe80_negative_direction ,
+        #         "xe80_percent": self.xe80_percent ,
+        #         "xe80_percent_positive_direction": self.xe80_percent_positive_direction ,
+        #         "xe80_percent_negative_direction": self.xe80_percent_negative_direction ,
+        #         "e80_per_day": self.e80_per_day ,
+        #         "e80_per_day_positive_direction": self.e80_per_day_positive_direction ,
+        #         "e80_per_day_negative_direction": self.e80_per_day_negative_direction ,
+        #         "e80_per_heavy_vehicle": self.e80_per_heavy_vehicle ,
+        #         "e80_per_heavy_vehicle_positive_direction": self.e80_per_heavy_vehicle_positive_direction ,
+        #         "e80_per_heavy_vehicle_negative_direction": self.e80_per_heavy_vehicle_negative_direction ,
+        #         "worst_steering_single_axle_cnt": self.worst_steering_single_axle_cnt ,
+        #         "worst_steering_single_axle_olhv_perc": self.worst_steering_single_axle_olhv_perc ,
+        #         "worst_steering_single_axle_tonperhv": self.worst_steering_single_axle_tonperhv ,
+        #         "worst_steering_double_axle_cnt": self.worst_steering_double_axle_cnt ,
+        #         "worst_steering_double_axle_olhv_perc": self.worst_steering_double_axle_olhv_perc ,
+        #         "worst_steering_double_axle_tonperhv": self.worst_steering_double_axle_tonperhv ,
+        #         "worst_non_steering_single_axle_cnt": self.worst_non_steering_single_axle_cnt ,
+        #         "worst_non_steering_single_axle_olhv_perc": self.worst_non_steering_single_axle_olhv_perc ,
+        #         "worst_non_steering_single_axle_tonperhv": self.worst_non_steering_single_axle_tonperhv ,
+        #         "worst_non_steering_double_axle_cnt": self.worst_non_steering_double_axle_cnt ,
+        #         "worst_non_steering_double_axle_olhv_perc": self.worst_non_steering_double_axle_olhv_perc ,
+        #         "worst_non_steering_double_axle_tonperhv": self.worst_non_steering_double_axle_tonperhv ,
+        #         "worst_triple_axle_cnt": self.worst_triple_axle_cnt ,
+        #         "worst_triple_axle_olhv_perc": self.worst_triple_axle_olhv_perc ,
+        #         "worst_triple_axle_tonperhv": self.worst_triple_axle_tonperhv ,
+        #         "bridge_formula_cnt": self.bridge_formula_cnt ,
+        #         "bridge_formula_olhv_perc": self.bridge_formula_olhv_perc ,
+        #         "bridge_formula_tonperhv": self.bridge_formula_tonperhv ,
+        #         "gross_formula_cnt": self.gross_formula_cnt ,
+        #         "gross_formula_olhv_perc": self.gross_formula_olhv_perc ,
+        #         "gross_formula_tonperhv": self.gross_formula_tonperhv ,
+        #         "total_avg_cnt": self.total_avg_cnt ,
+        #         "total_avg_olhv_perc": self.total_avg_olhv_perc ,
+        #         "total_avg_tonperhv": self.total_avg_tonperhv ,
+        #         "worst_steering_single_axle_cnt_positive_direciton": self.worst_steering_single_axle_cnt_positive_direciton ,
+        #         "worst_steering_single_axle_olhv_perc_positive_direciton": self.worst_steering_single_axle_olhv_perc_positive_direciton ,
+        #         "worst_steering_single_axle_tonperhv_positive_direciton": self.worst_steering_single_axle_tonperhv_positive_direciton ,
+        #         "worst_steering_double_axle_cnt_positive_direciton": self.worst_steering_double_axle_cnt_positive_direciton ,
+        #         "worst_steering_double_axle_olhv_perc_positive_direciton": self.worst_steering_double_axle_olhv_perc_positive_direciton ,
+        #         "worst_steering_double_axle_tonperhv_positive_direciton": self.worst_steering_double_axle_tonperhv_positive_direciton ,
+        #         "worst_non_steering_single_axle_cnt_positive_direciton": self.worst_non_steering_single_axle_cnt_positive_direciton ,
+        #         "worst_non_steering_single_axle_olhv_perc_positive_direciton": self.worst_non_steering_single_axle_olhv_perc_positive_direciton ,
+        #         "worst_non_steering_single_axle_tonperhv_positive_direciton": self.worst_non_steering_single_axle_tonperhv_positive_direciton ,
+        #         "worst_non_steering_double_axle_cnt_positive_direciton": self.worst_non_steering_double_axle_cnt_positive_direciton ,
+        #         "worst_non_steering_double_axle_olhv_perc_positive_direciton": self.worst_non_steering_double_axle_olhv_perc_positive_direciton ,
+        #         "worst_non_steering_double_axle_tonperhv_positive_direciton": self.worst_non_steering_double_axle_tonperhv_positive_direciton ,
+        #         "worst_triple_axle_cnt_positive_direciton": self.worst_triple_axle_cnt_positive_direciton ,
+        #         "worst_triple_axle_olhv_perc_positive_direciton": self.worst_triple_axle_olhv_perc_positive_direciton ,
+        #         "worst_triple_axle_tonperhv_positive_direciton": self.worst_triple_axle_tonperhv_positive_direciton ,
+        #         "bridge_formula_cnt_positive_direciton": self.bridge_formula_cnt_positive_direciton ,
+        #         "bridge_formula_olhv_perc_positive_direciton": self.bridge_formula_olhv_perc_positive_direciton ,
+        #         "bridge_formula_tonperhv_positive_direciton": self.bridge_formula_tonperhv_positive_direciton ,
+        #         "gross_formula_cnt_positive_direciton": self.gross_formula_cnt_positive_direciton ,
+        #         "gross_formula_olhv_perc_positive_direciton": self.gross_formula_olhv_perc_positive_direciton ,
+        #         "gross_formula_tonperhv_positive_direciton": self.gross_formula_tonperhv_positive_direciton ,
+        #         "total_avg_cnt_positive_direciton": self.total_avg_cnt_positive_direciton ,
+        #         "total_avg_olhv_perc_positive_direciton": self.total_avg_olhv_perc_positive_direciton ,
+        #         "total_avg_tonperhv_positive_direciton": self.total_avg_tonperhv_positive_direciton ,
+        #         "worst_steering_single_axle_cnt_negative_direciton": self.worst_steering_single_axle_cnt_negative_direciton ,
+        #         "worst_steering_single_axle_olhv_perc_negative_direciton": self.worst_steering_single_axle_olhv_perc_negative_direciton ,
+        #         "worst_steering_single_axle_tonperhv_negative_direciton": self.worst_steering_single_axle_tonperhv_negative_direciton ,
+        #         "worst_steering_double_axle_cnt_negative_direciton": self.worst_steering_double_axle_cnt_negative_direciton ,
+        #         "worst_steering_double_axle_olhv_perc_negative_direciton": self.worst_steering_double_axle_olhv_perc_negative_direciton ,
+        #         "worst_steering_double_axle_tonperhv_negative_direciton": self.worst_steering_double_axle_tonperhv_negative_direciton ,
+        #         "worst_non_steering_single_axle_cnt_negative_direciton": self.worst_non_steering_single_axle_cnt_negative_direciton ,
+        #         "worst_non_steering_single_axle_olhv_perc_negative_direciton": self.worst_non_steering_single_axle_olhv_perc_negative_direciton ,
+        #         "worst_non_steering_single_axle_tonperhv_negative_direciton": self.worst_non_steering_single_axle_tonperhv_negative_direciton ,
+        #         "worst_non_steering_double_axle_cnt_negative_direciton": self.worst_non_steering_double_axle_cnt_negative_direciton ,
+        #         "worst_non_steering_double_axle_olhv_perc_negative_direciton": self.worst_non_steering_double_axle_olhv_perc_negative_direciton ,
+        #         "worst_non_steering_double_axle_tonperhv_negative_direciton": self.worst_non_steering_double_axle_tonperhv_negative_direciton ,
+        #         "worst_triple_axle_cnt_negative_direciton": self.worst_triple_axle_cnt_negative_direciton ,
+        #         "worst_triple_axle_olhv_perc_negative_direciton": self.worst_triple_axle_olhv_perc_negative_direciton ,
+        #         "worst_triple_axle_tonperhv_negative_direciton": self.worst_triple_axle_tonperhv_negative_direciton ,
+        #         "bridge_formula_cnt_negative_direciton": self.bridge_formula_cnt_negative_direciton ,
+        #         "bridge_formula_olhv_perc_negative_direciton": self.bridge_formula_olhv_perc_negative_direciton ,
+        #         "bridge_formula_tonperhv_negative_direciton": self.bridge_formula_tonperhv_negative_direciton ,
+        #         "gross_formula_cnt_negative_direciton": self.gross_formula_cnt_negative_direciton ,
+        #         "gross_formula_olhv_perc_negative_direciton": self.gross_formula_olhv_perc_negative_direciton ,
+        #         "gross_formula_tonperhv_negative_direciton": self.gross_formula_tonperhv_negative_direciton ,
+        #         "total_avg_cnt_negative_direciton": self.total_avg_cnt_negative_direciton ,
+        #         "total_avg_olhv_perc_negative_direciton": self.total_avg_olhv_perc_negative_direciton ,
+        #         "total_avg_tonperhv_negative_direciton": self.total_avg_tonperhv_negative_direciton ,
+        #         "egrl_percent_positive_direction": self.egrl_percent_positive_direction ,
+        #         "egrl_percent_negative_direction": self.egrl_percent_negative_direction ,
+        #         "egrw_percent_positive_direction": self.egrw_percent_positive_direction ,
+        #         "egrw_percent_negative_direction": self.egrw_percent_negative_direction ,
+        #         "num_weighed": self.num_weighed ,
+        #         "num_weighed_positive_direction": self.num_weighed_positive_direction ,
+        #         "num_weighed_negative_direction": self.num_weighed_negative_direction
+        #     })
 
     def summary_header_calcs(self, header: pd.DataFrame, data: pd.DataFrame, type: int) -> pd.DataFrame:
         try:
@@ -891,7 +1606,427 @@ class Wim():
             egrw_percent_negative_direction,
             num_weighed,
             num_weighed_positive_direction,
-            num_weighed_negative_direction
+            num_weighed_negative_direction,
+            total_vehicles_cls_4tot,
+            weighed_vehicles_cls_4tot,
+            perc_truck_dist_cls_4tot,
+            total_axles_cls_4tot,
+            axles_over9t_cls_4tot,
+            total_mass_cls_4tot,
+            cnt_mass_over9t_cls_4tot,
+            eal_pervehicle_cls_4tot,
+            total_eal_cls_4tot,
+            total_eal_over9t_cls_4tot,
+            total_vehicles_cls_5tot,
+            weighed_vehicles_cls_5tot,
+            perc_truck_dist_cls_5tot,
+            total_axles_cls_5tot,
+            axles_over9t_cls_5tot,
+            total_mass_cls_5tot,
+            cnt_mass_over9t_cls_5tot,
+            eal_pervehicle_cls_5tot,
+            total_eal_cls_5tot,
+            total_eal_over9t_cls_5tot,
+            total_vehicles_cls_6tot,
+            weighed_vehicles_cls_6tot,
+            perc_truck_dist_cls_6tot,
+            total_axles_cls_6tot,
+            axles_over9t_cls_6tot,
+            total_mass_cls_6tot,
+            cnt_mass_over9t_cls_6tot,
+            eal_pervehicle_cls_6tot,
+            total_eal_cls_6tot,
+            total_eal_over9t_cls_6tot,
+            total_vehicles_cls_7tot,
+            weighed_vehicles_cls_7tot,
+            perc_truck_dist_cls_7tot,
+            total_axles_cls_7tot,
+            axles_over9t_cls_7tot,
+            total_mass_cls_7tot,
+            cnt_mass_over9t_cls_7tot,
+            eal_pervehicle_cls_7tot,
+            total_eal_cls_7tot,
+            total_eal_over9t_cls_7tot,
+            total_vehicles_cls_8tot,
+            weighed_vehicles_cls_8tot,
+            perc_truck_dist_cls_8tot,
+            total_axles_cls_8tot,
+            axles_over9t_cls_8tot,
+            total_mass_cls_8tot,
+            cnt_mass_over9t_cls_8tot,
+            eal_pervehicle_cls_8tot,
+            total_eal_cls_8tot,
+            total_eal_over9t_cls_8tot,
+            total_vehicles_cls_9tot,
+            weighed_vehicles_cls_9tot,
+            perc_truck_dist_cls_9tot,
+            total_axles_cls_9tot,
+            axles_over9t_cls_9tot,
+            total_mass_cls_9tot,
+            cnt_mass_over9t_cls_9tot,
+            eal_pervehicle_cls_9tot,
+            total_eal_cls_9tot,
+            total_eal_over9t_cls_9tot,
+            total_vehicles_cls_10tot,
+            weighed_vehicles_cls_10tot,
+            perc_truck_dist_cls_10tot,
+            total_axles_cls_10tot,
+            axles_over9t_cls_10tot,
+            total_mass_cls_10tot,
+            cnt_mass_over9t_cls_10tot,
+            eal_pervehicle_cls_10tot,
+            total_eal_cls_10tot,
+            total_eal_over9t_cls_10tot,
+            total_vehicles_cls_11tot,
+            weighed_vehicles_cls_11tot,
+            perc_truck_dist_cls_11tot,
+            total_axles_cls_11tot,
+            axles_over9t_cls_11tot,
+            total_mass_cls_11tot,
+            cnt_mass_over9t_cls_11tot,
+            eal_pervehicle_cls_11tot,
+            total_eal_cls_11tot,
+            total_eal_over9t_cls_11tot,
+            total_vehicles_cls_12tot,
+            weighed_vehicles_cls_12tot,
+            perc_truck_dist_cls_12tot,
+            total_axles_cls_12tot,
+            axles_over9t_cls_12tot,
+            total_mass_cls_12tot,
+            cnt_mass_over9t_cls_12tot,
+            eal_pervehicle_cls_12tot,
+            total_eal_cls_12tot,
+            total_eal_over9t_cls_12tot,
+            total_vehicles_cls_13tot,
+            weighed_vehicles_cls_13tot,
+            perc_truck_dist_cls_13tot,
+            total_axles_cls_13tot,
+            axles_over9t_cls_13tot,
+            total_mass_cls_13tot,
+            cnt_mass_over9t_cls_13tot,
+            eal_pervehicle_cls_13tot,
+            total_eal_cls_13tot,
+            total_eal_over9t_cls_13tot,
+            total_vehicles_cls_14tot,
+            weighed_vehicles_cls_14tot,
+            perc_truck_dist_cls_14tot,
+            total_axles_cls_14tot,
+            axles_over9t_cls_14tot,
+            total_mass_cls_14tot,
+            cnt_mass_over9t_cls_14tot,
+            eal_pervehicle_cls_14tot,
+            total_eal_cls_14tot,
+            total_eal_over9t_cls_14tot,
+            total_vehicles_cls_15tot,
+            weighed_vehicles_cls_15tot,
+            perc_truck_dist_cls_15tot,
+            total_axles_cls_15tot,
+            axles_over9t_cls_15tot,
+            total_mass_cls_15tot,
+            cnt_mass_over9t_cls_15tot,
+            eal_pervehicle_cls_15tot,
+            total_eal_cls_15tot,
+            total_eal_over9t_cls_15tot,
+            total_vehicles_cls_16tot,
+            weighed_vehicles_cls_16tot,
+            perc_truck_dist_cls_16tot,
+            total_axles_cls_16tot,
+            axles_over9t_cls_16tot,
+            total_mass_cls_16tot,
+            cnt_mass_over9t_cls_16tot,
+            eal_pervehicle_cls_16tot,
+            total_eal_cls_16tot,
+            total_eal_over9t_cls_16tot,
+            total_vehicles_cls_17tot,
+            weighed_vehicles_cls_17tot,
+            perc_truck_dist_cls_17tot,
+            total_axles_cls_17tot,
+            axles_over9t_cls_17tot,
+            total_mass_cls_17tot,
+            cnt_mass_over9t_cls_17tot,
+            eal_pervehicle_cls_17tot,
+            total_eal_cls_17tot,
+            total_eal_over9t_cls_17tot,
+            total_vehicles_cls_4p,
+            weighed_vehicles_cls_4p,
+            perc_truck_dist_cls_4p,
+            total_axles_cls_4p,
+            axles_over9t_cls_4p,
+            total_mass_cls_4p,
+            cnt_mass_over9t_cls_4p,
+            eal_pervehicle_cls_4p,
+            total_eal_cls_4p,
+            total_eal_over9t_cls_4p,
+            total_vehicles_cls_5p,
+            weighed_vehicles_cls_5p,
+            perc_truck_dist_cls_5p,
+            total_axles_cls_5p,
+            axles_over9t_cls_5p,
+            total_mass_cls_5p,
+            cnt_mass_over9t_cls_5p,
+            eal_pervehicle_cls_5p,
+            total_eal_cls_5p,
+            total_eal_over9t_cls_5p,
+            total_vehicles_cls_6p,
+            weighed_vehicles_cls_6p,
+            perc_truck_dist_cls_6p,
+            total_axles_cls_6p,
+            axles_over9t_cls_6p,
+            total_mass_cls_6p,
+            cnt_mass_over9t_cls_6p,
+            eal_pervehicle_cls_6p,
+            total_eal_cls_6p,
+            total_eal_over9t_cls_6p,
+            total_vehicles_cls_7p,
+            weighed_vehicles_cls_7p,
+            perc_truck_dist_cls_7p,
+            total_axles_cls_7p,
+            axles_over9t_cls_7p,
+            total_mass_cls_7p,
+            cnt_mass_over9t_cls_7p,
+            eal_pervehicle_cls_7p,
+            total_eal_cls_7p,
+            total_eal_over9t_cls_7p,
+            total_vehicles_cls_8p,
+            weighed_vehicles_cls_8p,
+            perc_truck_dist_cls_8p,
+            total_axles_cls_8p,
+            axles_over9t_cls_8p,
+            total_mass_cls_8p,
+            cnt_mass_over9t_cls_8p,
+            eal_pervehicle_cls_8p,
+            total_eal_cls_8p,
+            total_eal_over9t_cls_8p,
+            total_vehicles_cls_9p,
+            weighed_vehicles_cls_9p,
+            perc_truck_dist_cls_9p,
+            total_axles_cls_9p,
+            axles_over9t_cls_9p,
+            total_mass_cls_9p,
+            cnt_mass_over9t_cls_9p,
+            eal_pervehicle_cls_9p,
+            total_eal_cls_9p,
+            total_eal_over9t_cls_9p,
+            total_vehicles_cls_10p,
+            weighed_vehicles_cls_10p,
+            perc_truck_dist_cls_10p,
+            total_axles_cls_10p,
+            axles_over9t_cls_10p,
+            total_mass_cls_10p,
+            cnt_mass_over9t_cls_10p,
+            eal_pervehicle_cls_10p,
+            total_eal_cls_10p,
+            total_eal_over9t_cls_10p,
+            total_vehicles_cls_11p,
+            weighed_vehicles_cls_11p,
+            perc_truck_dist_cls_11p,
+            total_axles_cls_11p,
+            axles_over9t_cls_11p,
+            total_mass_cls_11p,
+            cnt_mass_over9t_cls_11p,
+            eal_pervehicle_cls_11p,
+            total_eal_cls_11p,
+            total_eal_over9t_cls_11p,
+            total_vehicles_cls_12p,
+            weighed_vehicles_cls_12p,
+            perc_truck_dist_cls_12p,
+            total_axles_cls_12p,
+            axles_over9t_cls_12p,
+            total_mass_cls_12p,
+            cnt_mass_over9t_cls_12p,
+            eal_pervehicle_cls_12p,
+            total_eal_cls_12p,
+            total_eal_over9t_cls_12p,
+            total_vehicles_cls_13p,
+            weighed_vehicles_cls_13p,
+            perc_truck_dist_cls_13p,
+            total_axles_cls_13p,
+            axles_over9t_cls_13p,
+            total_mass_cls_13p,
+            cnt_mass_over9t_cls_13p,
+            eal_pervehicle_cls_13p,
+            total_eal_cls_13p,
+            total_eal_over9t_cls_13p,
+            total_vehicles_cls_14p,
+            weighed_vehicles_cls_14p,
+            perc_truck_dist_cls_14p,
+            total_axles_cls_14p,
+            axles_over9t_cls_14p,
+            total_mass_cls_14p,
+            cnt_mass_over9t_cls_14p,
+            eal_pervehicle_cls_14p,
+            total_eal_cls_14p,
+            total_eal_over9t_cls_14p,
+            total_vehicles_cls_15p,
+            weighed_vehicles_cls_15p,
+            perc_truck_dist_cls_15p,
+            total_axles_cls_15p,
+            axles_over9t_cls_15p,
+            total_mass_cls_15p,
+            cnt_mass_over9t_cls_15p,
+            eal_pervehicle_cls_15p,
+            total_eal_cls_15p,
+            total_eal_over9t_cls_15p,
+            total_vehicles_cls_16p,
+            weighed_vehicles_cls_16p,
+            perc_truck_dist_cls_16p,
+            total_axles_cls_16p,
+            axles_over9t_cls_16p,
+            total_mass_cls_16p,
+            cnt_mass_over9t_cls_16p,
+            eal_pervehicle_cls_16p,
+            total_eal_cls_16p,
+            total_eal_over9t_cls_16p,
+            total_vehicles_cls_17p,
+            weighed_vehicles_cls_17p,
+            perc_truck_dist_cls_17p,
+            total_axles_cls_17p,
+            axles_over9t_cls_17p,
+            total_mass_cls_17p,
+            cnt_mass_over9t_cls_17p,
+            eal_pervehicle_cls_17p,
+            total_eal_cls_17p,
+            total_eal_over9t_cls_17p,
+            total_vehicles_cls_4n,
+            weighed_vehicles_cls_4n,
+            perc_truck_dist_cls_4n,
+            total_axles_cls_4n,
+            axles_over9t_cls_4n,
+            total_mass_cls_4n,
+            cnt_mass_over9t_cls_4n,
+            eal_pervehicle_cls_4n,
+            total_eal_cls_4n,
+            total_eal_over9t_cls_4n,
+            total_vehicles_cls_5n,
+            weighed_vehicles_cls_5n,
+            perc_truck_dist_cls_5n,
+            total_axles_cls_5n,
+            axles_over9t_cls_5n,
+            total_mass_cls_5n,
+            cnt_mass_over9t_cls_5n,
+            eal_pervehicle_cls_5n,
+            total_eal_cls_5n,
+            total_eal_over9t_cls_5n,
+            total_vehicles_cls_6n,
+            weighed_vehicles_cls_6n,
+            perc_truck_dist_cls_6n,
+            total_axles_cls_6n,
+            axles_over9t_cls_6n,
+            total_mass_cls_6n,
+            cnt_mass_over9t_cls_6n,
+            eal_pervehicle_cls_6n,
+            total_eal_cls_6n,
+            total_eal_over9t_cls_6n,
+            total_vehicles_cls_7n,
+            weighed_vehicles_cls_7n,
+            perc_truck_dist_cls_7n,
+            total_axles_cls_7n,
+            axles_over9t_cls_7n,
+            total_mass_cls_7n,
+            cnt_mass_over9t_cls_7n,
+            eal_pervehicle_cls_7n,
+            total_eal_cls_7n,
+            total_eal_over9t_cls_7n,
+            total_vehicles_cls_8n,
+            weighed_vehicles_cls_8n,
+            perc_truck_dist_cls_8n,
+            total_axles_cls_8n,
+            axles_over9t_cls_8n,
+            total_mass_cls_8n,
+            cnt_mass_over9t_cls_8n,
+            eal_pervehicle_cls_8n,
+            total_eal_cls_8n,
+            total_eal_over9t_cls_8n,
+            total_vehicles_cls_9n,
+            weighed_vehicles_cls_9n,
+            perc_truck_dist_cls_9n,
+            total_axles_cls_9n,
+            axles_over9t_cls_9n,
+            total_mass_cls_9n,
+            cnt_mass_over9t_cls_9n,
+            eal_pervehicle_cls_9n,
+            total_eal_cls_9n,
+            total_eal_over9t_cls_9n,
+            total_vehicles_cls_10n,
+            weighed_vehicles_cls_10n,
+            perc_truck_dist_cls_10n,
+            total_axles_cls_10n,
+            axles_over9t_cls_10n,
+            total_mass_cls_10n,
+            cnt_mass_over9t_cls_10n,
+            eal_pervehicle_cls_10n,
+            total_eal_cls_10n,
+            total_eal_over9t_cls_10n,
+            total_vehicles_cls_11n,
+            weighed_vehicles_cls_11n,
+            perc_truck_dist_cls_11n,
+            total_axles_cls_11n,
+            axles_over9t_cls_11n,
+            total_mass_cls_11n,
+            cnt_mass_over9t_cls_11n,
+            eal_pervehicle_cls_11n,
+            total_eal_cls_11n,
+            total_eal_over9t_cls_11n,
+            total_vehicles_cls_12n,
+            weighed_vehicles_cls_12n,
+            perc_truck_dist_cls_12n,
+            total_axles_cls_12n,
+            axles_over9t_cls_12n,
+            total_mass_cls_12n,
+            cnt_mass_over9t_cls_12n,
+            eal_pervehicle_cls_12n,
+            total_eal_cls_12n,
+            total_eal_over9t_cls_12n,
+            total_vehicles_cls_13n,
+            weighed_vehicles_cls_13n,
+            perc_truck_dist_cls_13n,
+            total_axles_cls_13n,
+            axles_over9t_cls_13n,
+            total_mass_cls_13n,
+            cnt_mass_over9t_cls_13n,
+            eal_pervehicle_cls_13n,
+            total_eal_cls_13n,
+            total_eal_over9t_cls_13n,
+            total_vehicles_cls_14n,
+            weighed_vehicles_cls_14n,
+            perc_truck_dist_cls_14n,
+            total_axles_cls_14n,
+            axles_over9t_cls_14n,
+            total_mass_cls_14n,
+            cnt_mass_over9t_cls_14n,
+            eal_pervehicle_cls_14n,
+            total_eal_cls_14n,
+            total_eal_over9t_cls_14n,
+            total_vehicles_cls_15n,
+            weighed_vehicles_cls_15n,
+            perc_truck_dist_cls_15n,
+            total_axles_cls_15n,
+            axles_over9t_cls_15n,
+            total_mass_cls_15n,
+            cnt_mass_over9t_cls_15n,
+            eal_pervehicle_cls_15n,
+            total_eal_cls_15n,
+            total_eal_over9t_cls_15n,
+            total_vehicles_cls_16n,
+            weighed_vehicles_cls_16n,
+            perc_truck_dist_cls_16n,
+            total_axles_cls_16n,
+            axles_over9t_cls_16n,
+            total_mass_cls_16n,
+            cnt_mass_over9t_cls_16n,
+            eal_pervehicle_cls_16n,
+            total_eal_cls_16n,
+            total_eal_over9t_cls_16n,
+            total_vehicles_cls_17n,
+            weighed_vehicles_cls_17n,
+            perc_truck_dist_cls_17n,
+            total_axles_cls_17n,
+            axles_over9t_cls_17n,
+            total_mass_cls_17n,
+            cnt_mass_over9t_cls_17n,
+            eal_pervehicle_cls_17n,
+            total_eal_cls_17n,
+            total_eal_over9t_cls_17n
             )
         VALUES(
             '{header_id}',
@@ -1017,7 +2152,427 @@ class Wim():
             {self.egrw_percent_negative_direction},
             {self.num_weighed},
             {self.num_weighed_positive_direction},
-            {self.num_weighed_negative_direction})
+            {self.num_weighed_negative_direction},
+            {self.total_vehicles_cls_4tot},
+            {self.weighed_vehicles_cls_4tot},
+            {self.perc_truck_dist_cls_4tot},
+            {self.total_axles_cls_4tot},
+            {self.axles_over9t_cls_4tot},
+            {self.total_mass_cls_4tot},
+            {self.cnt_mass_over9t_cls_4tot},
+            {self.eal_pervehicle_cls_4tot},
+            {self.total_eal_cls_4tot},
+            {self.total_eal_over9t_cls_4tot},
+            {self.total_vehicles_cls_5tot},
+            {self.weighed_vehicles_cls_5tot},
+            {self.perc_truck_dist_cls_5tot},
+            {self.total_axles_cls_5tot},
+            {self.axles_over9t_cls_5tot},
+            {self.total_mass_cls_5tot},
+            {self.cnt_mass_over9t_cls_5tot},
+            {self.eal_pervehicle_cls_5tot},
+            {self.total_eal_cls_5tot},
+            {self.total_eal_over9t_cls_5tot},
+            {self.total_vehicles_cls_6tot},
+            {self.weighed_vehicles_cls_6tot},
+            {self.perc_truck_dist_cls_6tot},
+            {self.total_axles_cls_6tot},
+            {self.axles_over9t_cls_6tot},
+            {self.total_mass_cls_6tot},
+            {self.cnt_mass_over9t_cls_6tot},
+            {self.eal_pervehicle_cls_6tot},
+            {self.total_eal_cls_6tot},
+            {self.total_eal_over9t_cls_6tot},
+            {self.total_vehicles_cls_7tot},
+            {self.weighed_vehicles_cls_7tot},
+            {self.perc_truck_dist_cls_7tot},
+            {self.total_axles_cls_7tot},
+            {self.axles_over9t_cls_7tot},
+            {self.total_mass_cls_7tot},
+            {self.cnt_mass_over9t_cls_7tot},
+            {self.eal_pervehicle_cls_7tot},
+            {self.total_eal_cls_7tot},
+            {self.total_eal_over9t_cls_7tot},
+            {self.total_vehicles_cls_8tot},
+            {self.weighed_vehicles_cls_8tot},
+            {self.perc_truck_dist_cls_8tot},
+            {self.total_axles_cls_8tot},
+            {self.axles_over9t_cls_8tot},
+            {self.total_mass_cls_8tot},
+            {self.cnt_mass_over9t_cls_8tot},
+            {self.eal_pervehicle_cls_8tot},
+            {self.total_eal_cls_8tot},
+            {self.total_eal_over9t_cls_8tot},
+            {self.total_vehicles_cls_9tot},
+            {self.weighed_vehicles_cls_9tot},
+            {self.perc_truck_dist_cls_9tot},
+            {self.total_axles_cls_9tot},
+            {self.axles_over9t_cls_9tot},
+            {self.total_mass_cls_9tot},
+            {self.cnt_mass_over9t_cls_9tot},
+            {self.eal_pervehicle_cls_9tot},
+            {self.total_eal_cls_9tot},
+            {self.total_eal_over9t_cls_9tot},
+            {self.total_vehicles_cls_10tot},
+            {self.weighed_vehicles_cls_10tot},
+            {self.perc_truck_dist_cls_10tot},
+            {self.total_axles_cls_10tot},
+            {self.axles_over9t_cls_10tot},
+            {self.total_mass_cls_10tot},
+            {self.cnt_mass_over9t_cls_10tot},
+            {self.eal_pervehicle_cls_10tot},
+            {self.total_eal_cls_10tot},
+            {self.total_eal_over9t_cls_10tot},
+            {self.total_vehicles_cls_11tot},
+            {self.weighed_vehicles_cls_11tot},
+            {self.perc_truck_dist_cls_11tot},
+            {self.total_axles_cls_11tot},
+            {self.axles_over9t_cls_11tot},
+            {self.total_mass_cls_11tot},
+            {self.cnt_mass_over9t_cls_11tot},
+            {self.eal_pervehicle_cls_11tot},
+            {self.total_eal_cls_11tot},
+            {self.total_eal_over9t_cls_11tot},
+            {self.total_vehicles_cls_12tot},
+            {self.weighed_vehicles_cls_12tot},
+            {self.perc_truck_dist_cls_12tot},
+            {self.total_axles_cls_12tot},
+            {self.axles_over9t_cls_12tot},
+            {self.total_mass_cls_12tot},
+            {self.cnt_mass_over9t_cls_12tot},
+            {self.eal_pervehicle_cls_12tot},
+            {self.total_eal_cls_12tot},
+            {self.total_eal_over9t_cls_12tot},
+            {self.total_vehicles_cls_13tot},
+            {self.weighed_vehicles_cls_13tot},
+            {self.perc_truck_dist_cls_13tot},
+            {self.total_axles_cls_13tot},
+            {self.axles_over9t_cls_13tot},
+            {self.total_mass_cls_13tot},
+            {self.cnt_mass_over9t_cls_13tot},
+            {self.eal_pervehicle_cls_13tot},
+            {self.total_eal_cls_13tot},
+            {self.total_eal_over9t_cls_13tot},
+            {self.total_vehicles_cls_14tot},
+            {self.weighed_vehicles_cls_14tot},
+            {self.perc_truck_dist_cls_14tot},
+            {self.total_axles_cls_14tot},
+            {self.axles_over9t_cls_14tot},
+            {self.total_mass_cls_14tot},
+            {self.cnt_mass_over9t_cls_14tot},
+            {self.eal_pervehicle_cls_14tot},
+            {self.total_eal_cls_14tot},
+            {self.total_eal_over9t_cls_14tot},
+            {self.total_vehicles_cls_15tot},
+            {self.weighed_vehicles_cls_15tot},
+            {self.perc_truck_dist_cls_15tot},
+            {self.total_axles_cls_15tot},
+            {self.axles_over9t_cls_15tot},
+            {self.total_mass_cls_15tot},
+            {self.cnt_mass_over9t_cls_15tot},
+            {self.eal_pervehicle_cls_15tot},
+            {self.total_eal_cls_15tot},
+            {self.total_eal_over9t_cls_15tot},
+            {self.total_vehicles_cls_16tot},
+            {self.weighed_vehicles_cls_16tot},
+            {self.perc_truck_dist_cls_16tot},
+            {self.total_axles_cls_16tot},
+            {self.axles_over9t_cls_16tot},
+            {self.total_mass_cls_16tot},
+            {self.cnt_mass_over9t_cls_16tot},
+            {self.eal_pervehicle_cls_16tot},
+            {self.total_eal_cls_16tot},
+            {self.total_eal_over9t_cls_16tot},
+            {self.total_vehicles_cls_17tot},
+            {self.weighed_vehicles_cls_17tot},
+            {self.perc_truck_dist_cls_17tot},
+            {self.total_axles_cls_17tot},
+            {self.axles_over9t_cls_17tot},
+            {self.total_mass_cls_17tot},
+            {self.cnt_mass_over9t_cls_17tot},
+            {self.eal_pervehicle_cls_17tot},
+            {self.total_eal_cls_17tot},
+            {self.total_eal_over9t_cls_17tot},
+            {self.total_vehicles_cls_4p},
+            {self.weighed_vehicles_cls_4p},
+            {self.perc_truck_dist_cls_4p},
+            {self.total_axles_cls_4p},
+            {self.axles_over9t_cls_4p},
+            {self.total_mass_cls_4p},
+            {self.cnt_mass_over9t_cls_4p},
+            {self.eal_pervehicle_cls_4p},
+            {self.total_eal_cls_4p},
+            {self.total_eal_over9t_cls_4p},
+            {self.total_vehicles_cls_5p},
+            {self.weighed_vehicles_cls_5p},
+            {self.perc_truck_dist_cls_5p},
+            {self.total_axles_cls_5p},
+            {self.axles_over9t_cls_5p},
+            {self.total_mass_cls_5p},
+            {self.cnt_mass_over9t_cls_5p},
+            {self.eal_pervehicle_cls_5p},
+            {self.total_eal_cls_5p},
+            {self.total_eal_over9t_cls_5p},
+            {self.total_vehicles_cls_6p},
+            {self.weighed_vehicles_cls_6p},
+            {self.perc_truck_dist_cls_6p},
+            {self.total_axles_cls_6p},
+            {self.axles_over9t_cls_6p},
+            {self.total_mass_cls_6p},
+            {self.cnt_mass_over9t_cls_6p},
+            {self.eal_pervehicle_cls_6p},
+            {self.total_eal_cls_6p},
+            {self.total_eal_over9t_cls_6p},
+            {self.total_vehicles_cls_7p},
+            {self.weighed_vehicles_cls_7p},
+            {self.perc_truck_dist_cls_7p},
+            {self.total_axles_cls_7p},
+            {self.axles_over9t_cls_7p},
+            {self.total_mass_cls_7p},
+            {self.cnt_mass_over9t_cls_7p},
+            {self.eal_pervehicle_cls_7p},
+            {self.total_eal_cls_7p},
+            {self.total_eal_over9t_cls_7p},
+            {self.total_vehicles_cls_8p},
+            {self.weighed_vehicles_cls_8p},
+            {self.perc_truck_dist_cls_8p},
+            {self.total_axles_cls_8p},
+            {self.axles_over9t_cls_8p},
+            {self.total_mass_cls_8p},
+            {self.cnt_mass_over9t_cls_8p},
+            {self.eal_pervehicle_cls_8p},
+            {self.total_eal_cls_8p},
+            {self.total_eal_over9t_cls_8p},
+            {self.total_vehicles_cls_9p},
+            {self.weighed_vehicles_cls_9p},
+            {self.perc_truck_dist_cls_9p},
+            {self.total_axles_cls_9p},
+            {self.axles_over9t_cls_9p},
+            {self.total_mass_cls_9p},
+            {self.cnt_mass_over9t_cls_9p},
+            {self.eal_pervehicle_cls_9p},
+            {self.total_eal_cls_9p},
+            {self.total_eal_over9t_cls_9p},
+            {self.total_vehicles_cls_10p},
+            {self.weighed_vehicles_cls_10p},
+            {self.perc_truck_dist_cls_10p},
+            {self.total_axles_cls_10p},
+            {self.axles_over9t_cls_10p},
+            {self.total_mass_cls_10p},
+            {self.cnt_mass_over9t_cls_10p},
+            {self.eal_pervehicle_cls_10p},
+            {self.total_eal_cls_10p},
+            {self.total_eal_over9t_cls_10p},
+            {self.total_vehicles_cls_11p},
+            {self.weighed_vehicles_cls_11p},
+            {self.perc_truck_dist_cls_11p},
+            {self.total_axles_cls_11p},
+            {self.axles_over9t_cls_11p},
+            {self.total_mass_cls_11p},
+            {self.cnt_mass_over9t_cls_11p},
+            {self.eal_pervehicle_cls_11p},
+            {self.total_eal_cls_11p},
+            {self.total_eal_over9t_cls_11p},
+            {self.total_vehicles_cls_12p},
+            {self.weighed_vehicles_cls_12p},
+            {self.perc_truck_dist_cls_12p},
+            {self.total_axles_cls_12p},
+            {self.axles_over9t_cls_12p},
+            {self.total_mass_cls_12p},
+            {self.cnt_mass_over9t_cls_12p},
+            {self.eal_pervehicle_cls_12p},
+            {self.total_eal_cls_12p},
+            {self.total_eal_over9t_cls_12p},
+            {self.total_vehicles_cls_13p},
+            {self.weighed_vehicles_cls_13p},
+            {self.perc_truck_dist_cls_13p},
+            {self.total_axles_cls_13p},
+            {self.axles_over9t_cls_13p},
+            {self.total_mass_cls_13p},
+            {self.cnt_mass_over9t_cls_13p},
+            {self.eal_pervehicle_cls_13p},
+            {self.total_eal_cls_13p},
+            {self.total_eal_over9t_cls_13p},
+            {self.total_vehicles_cls_14p},
+            {self.weighed_vehicles_cls_14p},
+            {self.perc_truck_dist_cls_14p},
+            {self.total_axles_cls_14p},
+            {self.axles_over9t_cls_14p},
+            {self.total_mass_cls_14p},
+            {self.cnt_mass_over9t_cls_14p},
+            {self.eal_pervehicle_cls_14p},
+            {self.total_eal_cls_14p},
+            {self.total_eal_over9t_cls_14p},
+            {self.total_vehicles_cls_15p},
+            {self.weighed_vehicles_cls_15p},
+            {self.perc_truck_dist_cls_15p},
+            {self.total_axles_cls_15p},
+            {self.axles_over9t_cls_15p},
+            {self.total_mass_cls_15p},
+            {self.cnt_mass_over9t_cls_15p},
+            {self.eal_pervehicle_cls_15p},
+            {self.total_eal_cls_15p},
+            {self.total_eal_over9t_cls_15p},
+            {self.total_vehicles_cls_16p},
+            {self.weighed_vehicles_cls_16p},
+            {self.perc_truck_dist_cls_16p},
+            {self.total_axles_cls_16p},
+            {self.axles_over9t_cls_16p},
+            {self.total_mass_cls_16p},
+            {self.cnt_mass_over9t_cls_16p},
+            {self.eal_pervehicle_cls_16p},
+            {self.total_eal_cls_16p},
+            {self.total_eal_over9t_cls_16p},
+            {self.total_vehicles_cls_17p},
+            {self.weighed_vehicles_cls_17p},
+            {self.perc_truck_dist_cls_17p},
+            {self.total_axles_cls_17p},
+            {self.axles_over9t_cls_17p},
+            {self.total_mass_cls_17p},
+            {self.cnt_mass_over9t_cls_17p},
+            {self.eal_pervehicle_cls_17p},
+            {self.total_eal_cls_17p},
+            {self.total_eal_over9t_cls_17p},
+            {self.total_vehicles_cls_4n},
+            {self.weighed_vehicles_cls_4n},
+            {self.perc_truck_dist_cls_4n},
+            {self.total_axles_cls_4n},
+            {self.axles_over9t_cls_4n},
+            {self.total_mass_cls_4n},
+            {self.cnt_mass_over9t_cls_4n},
+            {self.eal_pervehicle_cls_4n},
+            {self.total_eal_cls_4n},
+            {self.total_eal_over9t_cls_4n},
+            {self.total_vehicles_cls_5n},
+            {self.weighed_vehicles_cls_5n},
+            {self.perc_truck_dist_cls_5n},
+            {self.total_axles_cls_5n},
+            {self.axles_over9t_cls_5n},
+            {self.total_mass_cls_5n},
+            {self.cnt_mass_over9t_cls_5n},
+            {self.eal_pervehicle_cls_5n},
+            {self.total_eal_cls_5n},
+            {self.total_eal_over9t_cls_5n},
+            {self.total_vehicles_cls_6n},
+            {self.weighed_vehicles_cls_6n},
+            {self.perc_truck_dist_cls_6n},
+            {self.total_axles_cls_6n},
+            {self.axles_over9t_cls_6n},
+            {self.total_mass_cls_6n},
+            {self.cnt_mass_over9t_cls_6n},
+            {self.eal_pervehicle_cls_6n},
+            {self.total_eal_cls_6n},
+            {self.total_eal_over9t_cls_6n},
+            {self.total_vehicles_cls_7n},
+            {self.weighed_vehicles_cls_7n},
+            {self.perc_truck_dist_cls_7n},
+            {self.total_axles_cls_7n},
+            {self.axles_over9t_cls_7n},
+            {self.total_mass_cls_7n},
+            {self.cnt_mass_over9t_cls_7n},
+            {self.eal_pervehicle_cls_7n},
+            {self.total_eal_cls_7n},
+            {self.total_eal_over9t_cls_7n},
+            {self.total_vehicles_cls_8n},
+            {self.weighed_vehicles_cls_8n},
+            {self.perc_truck_dist_cls_8n},
+            {self.total_axles_cls_8n},
+            {self.axles_over9t_cls_8n},
+            {self.total_mass_cls_8n},
+            {self.cnt_mass_over9t_cls_8n},
+            {self.eal_pervehicle_cls_8n},
+            {self.total_eal_cls_8n},
+            {self.total_eal_over9t_cls_8n},
+            {self.total_vehicles_cls_9n},
+            {self.weighed_vehicles_cls_9n},
+            {self.perc_truck_dist_cls_9n},
+            {self.total_axles_cls_9n},
+            {self.axles_over9t_cls_9n},
+            {self.total_mass_cls_9n},
+            {self.cnt_mass_over9t_cls_9n},
+            {self.eal_pervehicle_cls_9n},
+            {self.total_eal_cls_9n},
+            {self.total_eal_over9t_cls_9n},
+            {self.total_vehicles_cls_10n},
+            {self.weighed_vehicles_cls_10n},
+            {self.perc_truck_dist_cls_10n},
+            {self.total_axles_cls_10n},
+            {self.axles_over9t_cls_10n},
+            {self.total_mass_cls_10n},
+            {self.cnt_mass_over9t_cls_10n},
+            {self.eal_pervehicle_cls_10n},
+            {self.total_eal_cls_10n},
+            {self.total_eal_over9t_cls_10n},
+            {self.total_vehicles_cls_11n},
+            {self.weighed_vehicles_cls_11n},
+            {self.perc_truck_dist_cls_11n},
+            {self.total_axles_cls_11n},
+            {self.axles_over9t_cls_11n},
+            {self.total_mass_cls_11n},
+            {self.cnt_mass_over9t_cls_11n},
+            {self.eal_pervehicle_cls_11n},
+            {self.total_eal_cls_11n},
+            {self.total_eal_over9t_cls_11n},
+            {self.total_vehicles_cls_12n},
+            {self.weighed_vehicles_cls_12n},
+            {self.perc_truck_dist_cls_12n},
+            {self.total_axles_cls_12n},
+            {self.axles_over9t_cls_12n},
+            {self.total_mass_cls_12n},
+            {self.cnt_mass_over9t_cls_12n},
+            {self.eal_pervehicle_cls_12n},
+            {self.total_eal_cls_12n},
+            {self.total_eal_over9t_cls_12n},
+            {self.total_vehicles_cls_13n},
+            {self.weighed_vehicles_cls_13n},
+            {self.perc_truck_dist_cls_13n},
+            {self.total_axles_cls_13n},
+            {self.axles_over9t_cls_13n},
+            {self.total_mass_cls_13n},
+            {self.cnt_mass_over9t_cls_13n},
+            {self.eal_pervehicle_cls_13n},
+            {self.total_eal_cls_13n},
+            {self.total_eal_over9t_cls_13n},
+            {self.total_vehicles_cls_14n},
+            {self.weighed_vehicles_cls_14n},
+            {self.perc_truck_dist_cls_14n},
+            {self.total_axles_cls_14n},
+            {self.axles_over9t_cls_14n},
+            {self.total_mass_cls_14n},
+            {self.cnt_mass_over9t_cls_14n},
+            {self.eal_pervehicle_cls_14n},
+            {self.total_eal_cls_14n},
+            {self.total_eal_over9t_cls_14n},
+            {self.total_vehicles_cls_15n},
+            {self.weighed_vehicles_cls_15n},
+            {self.perc_truck_dist_cls_15n},
+            {self.total_axles_cls_15n},
+            {self.axles_over9t_cls_15n},
+            {self.total_mass_cls_15n},
+            {self.cnt_mass_over9t_cls_15n},
+            {self.eal_pervehicle_cls_15n},
+            {self.total_eal_cls_15n},
+            {self.total_eal_over9t_cls_15n},
+            {self.total_vehicles_cls_16n},
+            {self.weighed_vehicles_cls_16n},
+            {self.perc_truck_dist_cls_16n},
+            {self.total_axles_cls_16n},
+            {self.axles_over9t_cls_16n},
+            {self.total_mass_cls_16n},
+            {self.cnt_mass_over9t_cls_16n},
+            {self.eal_pervehicle_cls_16n},
+            {self.total_eal_cls_16n},
+            {self.total_eal_over9t_cls_16n},
+            {self.total_vehicles_cls_17n},
+            {self.weighed_vehicles_cls_17n},
+            {self.perc_truck_dist_cls_17n},
+            {self.total_axles_cls_17n},
+            {self.axles_over9t_cls_17n},
+            {self.total_mass_cls_17n},
+            {self.cnt_mass_over9t_cls_17n},
+            {self.eal_pervehicle_cls_17n},
+            {self.total_eal_cls_17n},
+            {self.total_eal_over9t_cls_17n})
             ON CONFLICT ON CONSTRAINT electronic_count_header_hswim_pkey DO NOTHING 
             -- UPDATE SET 
             -- egrl_percent = COALESCE(EXCLUDED.egrl_percent,egrl_percent),
@@ -1466,3 +3021,10 @@ if __name__ == '__main__':
     header_ids = WIM.header_ids
     print(header_ids)
     WIM.update_existing(header_ids)
+    # SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, WHEEL_MASS_SELECT_QRY = WIM.wim_header_upsert_func1(
+    #     'bba9b8bf-9db6-4970-95d3-80f72393af99')
+    # df, df2, df3 = WIM.wim_header_upsert_func2(
+    #     SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, WHEEL_MASS_SELECT_QRY)
+    # WIM.wim_header_calcs(df, df2, df3)
+    # upsert = WIM.wim_header_upsert('bba9b8bf-9db6-4970-95d3-80f72393af99')
+    # print(upsert)
