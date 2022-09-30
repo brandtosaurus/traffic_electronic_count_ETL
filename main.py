@@ -387,9 +387,9 @@ class Traffic():
         """
         try:
             if type == "indv":
-                lane_col = 5
-            else:
                 lane_col = 6
+            else:
+                lane_col = 5
             try:
                 dir_1 = self.lanes["direction_code"].astype(int).min()
                 dir_2 = self.lanes["direction_code"].astype(int).max()
