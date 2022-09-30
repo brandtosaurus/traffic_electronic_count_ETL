@@ -795,33 +795,34 @@ class Wim():
         mask = df2['id'].isin(df2.loc[(df2['axle_spacing_number'] == 1) & (df2['axle_spacing_cm'] > 220), 'id'].tolist())
         steering_single_axles = df2.loc[mask].copy()
         steering_single_axles_per_dir = steering_single_axles.loc[steering_single_axles.wheel_mass_number <= 2].groupby(['id','direction']).sum()
+        steering_single_axles_per_dir = steering_single_axles_per_dir.reset_index()
         steering_single_axles = steering_single_axles.loc[steering_single_axles.wheel_mass_number <= 2].groupby('id').sum()
 
-        self.worst_steering_single_axle_cnt = steering_single_axles.loc[steering_single_axles.wheel_mass > 7500].count()
-        self.worst_steering_single_axle_olhv_perc = steering_single_axles.loc[steering_single_axles.wheel_mass > 7500].count() / steering_single_axles.count()
-        self.worst_steering_single_axle_tonperhv = steering_single_axles.loc[steering_single_axles.wheel_mass > 7500].sum() / steering_single_axles.loc[steering_single_axles.wheel_mass > 7500].count()
+        self.worst_steering_single_axle_cnt = steering_single_axles.loc[steering_single_axles.wheel_mass > 7500].count()[0]
+        self.worst_steering_single_axle_olhv_perc = steering_single_axles.loc[steering_single_axles.wheel_mass > 7500].count()[0] / steering_single_axles.count()[0]
+        self.worst_steering_single_axle_tonperhv = (steering_single_axles.loc[steering_single_axles.wheel_mass > 7500, 'wheel_mass'].sum() / steering_single_axles.loc[steering_single_axles.wheel_mass > 7500].count()[0])/1000
         try:
-            self.worst_steering_single_axle_cnt_positive_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'P') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()
+            self.worst_steering_single_axle_cnt_positive_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'P') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()[0]
         except:
             self.worst_steering_single_axle_cnt_positive_direciton = 0
         try:
-            self.worst_steering_single_axle_olhv_perc_positive_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'P') & (steering_single_axles_per_dir.wheel_mass > 7500)].count() / steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'P')].count()
+            self.worst_steering_single_axle_olhv_perc_positive_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'P') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()[0] / steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'P')].count()[0]
         except:
             self.worst_steering_single_axle_olhv_perc_positive_direciton = 0
         try:
-            self.worst_steering_single_axle_tonperhv_positive_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'P') & (steering_single_axles_per_dir.wheel_mass > 15000)].sum() / steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'P') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()
+            self.worst_steering_single_axle_tonperhv_positive_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'P') & (steering_single_axles_per_dir.wheel_mass > 7500),'wheel_mass'].sum() / steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'P') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()[0]
         except:
             self.worst_steering_single_axle_tonperhv_positive_direciton = 0
         try:
-            self.worst_steering_single_axle_cnt_negative_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'N') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()
+            self.worst_steering_single_axle_cnt_negative_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'N') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()[0]
         except:
             self.worst_steering_single_axle_cnt_negative_direciton = 0
         try:
-            self.worst_steering_single_axle_olhv_perc_negative_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'N') & (steering_single_axles_per_dir.wheel_mass > 7500)].count() / steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'N')].count()
+            self.worst_steering_single_axle_olhv_perc_negative_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'N') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()[0] / steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'N')].count()[0]
         except:
             self.worst_steering_single_axle_olhv_perc_negative_direciton = 0
         try:
-            self.worst_steering_single_axle_tonperhv_negative_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'N') & (steering_single_axles_per_dir.wheel_mass > 15000)].sum() / steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'N') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()
+            self.worst_steering_single_axle_tonperhv_negative_direciton = steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'N') & (steering_single_axles_per_dir.wheel_mass > 7500),'wheel_mass'].sum() / steering_single_axles_per_dir.loc[(steering_single_axles_per_dir['direction'] == 'N') & (steering_single_axles_per_dir.wheel_mass > 7500)].count()[0]
         except:
             self.worst_steering_single_axle_tonperhv_negative_direciton = 0
 
@@ -830,33 +831,34 @@ class Wim():
         mask = df2['id'].isin(df2.loc[(df2['axle_spacing_number'] == 1) & (df2['axle_spacing_cm'] <= 220), 'id'].tolist())
         steering_double_axles = df2.loc[mask].copy()
         steering_double_axles_per_dir = steering_double_axles.loc[steering_double_axles.wheel_mass_number <= 2].groupby(['id','direction']).sum()
+        steering_double_axles_per_dir = steering_double_axles_per_dir.reset_index()
         steering_double_axles = steering_double_axles.loc[steering_double_axles.wheel_mass_number <= 2].groupby('id').sum()
 
-        self.worst_steering_double_axle_cnt = steering_double_axles.loc[steering_double_axles.wheel_mass > 15000].count()
-        self.worst_steering_double_axle_olhv_perc = steering_double_axles.loc[steering_double_axles.wheel_mass > 15000].count() / steering_double_axles.count()
-        self.worst_steering_double_axle_tonperhv = steering_double_axles.loc[steering_double_axles.wheel_mass > 15000].sum() / steering_double_axles.loc[steering_double_axles.wheel_mass > 15000].count()
+        self.worst_steering_double_axle_cnt = steering_double_axles.loc[steering_double_axles.wheel_mass > 15000].count()[0]
+        self.worst_steering_double_axle_olhv_perc = steering_double_axles.loc[steering_double_axles.wheel_mass > 15000].count()[0] / steering_double_axles.count()[0]
+        self.worst_steering_double_axle_tonperhv = (steering_double_axles.loc[steering_double_axles.wheel_mass > 15000, 'wheel_mass'].sum() / steering_double_axles.loc[steering_double_axles.wheel_mass > 15000].count()[0])/1000
         try:
-            self.worst_steering_double_axle_cnt_positive_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'P') & (steering_double_axles.wheel_mass > 15000)].count()
+            self.worst_steering_double_axle_cnt_positive_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'P') & (steering_double_axles.wheel_mass > 15000)].count()[0]
         except:
             self.worst_steering_double_axle_cnt_positive_direciton = 0 
         try:
-            self.worst_steering_double_axle_olhv_perc_positive_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'P') & (steering_double_axles.wheel_mass > 15000)].count() / steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'P')].count()
+            self.worst_steering_double_axle_olhv_perc_positive_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'P') & (steering_double_axles.wheel_mass > 15000)].count()[0] / steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'P')].count()[0]
         except:
             self.worst_steering_double_axle_olhv_perc_positive_direciton = 0 
         try:
-            self.worst_steering_double_axle_tonperhv_positive_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'P') & (steering_double_axles.wheel_mass > 15000)].sum() / steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'P') & (steering_double_axles_per_dir.wheel_mass > 15000)].count()
+            self.worst_steering_double_axle_tonperhv_positive_direciton = (steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'P') & (steering_double_axles.wheel_mass > 15000), 'wheel_mass'].sum() / steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'P') & (steering_double_axles_per_dir.wheel_mass > 15000)].count()[0])/1000
         except:
             self.worst_steering_double_axle_tonperhv_positive_direciton = 0 
         try:
-            self.worst_steering_double_axle_cnt_negative_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'N') & (steering_double_axles_per_dir.wheel_mass > 15000)].count()
+            self.worst_steering_double_axle_cnt_negative_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'N') & (steering_double_axles_per_dir.wheel_mass > 15000)].count()[0]
         except:
             self.worst_steering_double_axle_cnt_negative_direciton = 0 
         try:
-            self.worst_steering_double_axle_olhv_perc_negative_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'N') & (steering_double_axles_per_dir.wheel_mass > 15000)].count() / steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'N')].count()
+            self.worst_steering_double_axle_olhv_perc_negative_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'N') & (steering_double_axles_per_dir.wheel_mass > 15000)].count()[0] / steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'N')].count()[0]
         except:
             self.worst_steering_double_axle_olhv_perc_negative_direciton = 0 
         try:
-            self.worst_steering_double_axle_tonperhv_negative_direciton = steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'N') & (steering_double_axles_per_dir.wheel_mass > 15000)].sum() / steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'N') & (steering_double_axles_per_dir.wheel_mass > 15000)].count()
+            self.worst_steering_double_axle_tonperhv_negative_direciton = (steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'N') & (steering_double_axles_per_dir.wheel_mass > 15000), 'wheel_mass'].sum() / steering_double_axles_per_dir.loc[(steering_double_axles_per_dir['direction'] == 'N') & (steering_double_axles_per_dir.wheel_mass > 15000)].count()[0])/1000
         except:
             self.worst_steering_double_axle_tonperhv_negative_direciton = 0 
         
@@ -865,33 +867,34 @@ class Wim():
         mask = df2['id'].isin(df2.loc[(df2['axle_spacing_number'] == 1) & (df2['axle_spacing_cm'] > 220) & (df2['vehicle_class_code_primary_scheme'].isin([4,5,7])), 'id'].tolist())
         non_steering_single_axles = df2.loc[mask].copy()
         non_steering_single_axles_per_dir = non_steering_single_axles.loc[non_steering_single_axles.wheel_mass_number > 1].groupby(['id','direction']).sum()
+        non_steering_single_axles_per_dir = non_steering_single_axles_per_dir.reset_index()
         non_steering_single_axles = non_steering_single_axles.loc[non_steering_single_axles.wheel_mass_number > 1].groupby('id').sum()
 
-        self.worst_non_steering_single_axle_cnt = non_steering_single_axles.loc[non_steering_single_axles.wheel_mass > 9000].count()
-        self.worst_non_steering_single_axle_olhv_perc = non_steering_single_axles.loc[non_steering_single_axles.wheel_mass > 9000].count() / non_steering_single_axles.count()
-        self.worst_non_steering_single_axle_tonperhv = non_steering_single_axles.loc[non_steering_single_axles.wheel_mass > 9000].sum() / non_steering_single_axles.loc[non_steering_single_axles.wheel_mass > 9000].count()
+        self.worst_non_steering_single_axle_cnt = non_steering_single_axles.loc[non_steering_single_axles.wheel_mass > 9000].count()[0]
+        self.worst_non_steering_single_axle_olhv_perc = non_steering_single_axles.loc[non_steering_single_axles.wheel_mass > 9000].count()[0] / non_steering_single_axles.count()[0]
+        self.worst_non_steering_single_axle_tonperhv = (non_steering_single_axles.loc[non_steering_single_axles.wheel_mass > 9000, 'wheel_mass'].sum() / non_steering_single_axles.loc[non_steering_single_axles.wheel_mass > 9000].count()[0])/1000
         try:
-            self.worst_non_steering_single_axle_cnt_positive_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'P') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()
+            self.worst_non_steering_single_axle_cnt_positive_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'P') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()[0]
         except:
             self.worst_non_steering_single_axle_cnt_positive_direciton = 0
         try:
-            self.worst_non_steering_single_axle_olhv_perc_positive_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'P') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count() / non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'P')].count()
+            self.worst_non_steering_single_axle_olhv_perc_positive_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'P') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()[0] / non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'P')].count()[0]
         except:
             self.worst_non_steering_single_axle_olhv_perc_positive_direciton = 0
         try:
-            self.worst_non_steering_single_axle_tonperhv_positive_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'P') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].sum() / non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'P') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()
+            self.worst_non_steering_single_axle_tonperhv_positive_direciton = (non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'P') & (non_steering_single_axles_per_dir.wheel_mass > 9000), 'wheel_mass'].sum() / non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'P') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()[0])/1000
         except:
             self.worst_non_steering_single_axle_tonperhv_positive_direciton = 0
         try:
-            self.worst_non_steering_single_axle_cnt_negative_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'N') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()
+            self.worst_non_steering_single_axle_cnt_negative_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'N') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()[0]
         except:
             self.worst_non_steering_single_axle_cnt_negative_direciton = 0
         try:
-            self.worst_non_steering_single_axle_olhv_perc_negative_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'N') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count() / non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'N')].count()
+            self.worst_non_steering_single_axle_olhv_perc_negative_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'N') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()[0] / non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'N')].count()[0]
         except:
             self.worst_non_steering_single_axle_olhv_perc_negative_direciton = 0
         try:
-            self.worst_non_steering_single_axle_tonperhv_negative_direciton = non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'N') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].sum() / non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'N') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()
+            self.worst_non_steering_single_axle_tonperhv_negative_direciton = (non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'N') & (non_steering_single_axles_per_dir.wheel_mass > 9000), 'wheel_mass'].sum() / non_steering_single_axles_per_dir.loc[(non_steering_single_axles_per_dir['direction'] == 'N') & (non_steering_single_axles_per_dir.wheel_mass > 9000)].count()[0])/1000
         except:
             self.worst_non_steering_single_axle_tonperhv_negative_direciton = 0
 
@@ -2030,549 +2033,549 @@ class Wim():
             )
         VALUES(
             '{header_id}',
-            {self.egrl_percent},
-            {self.egrw_percent},
-            {self.mean_equivalent_axle_mass},
-            {self.mean_equivalent_axle_mass_positive_direction},
-            {self.mean_equivalent_axle_mass_negative_direction},
-            {self.mean_axle_spacing},
-            {self.mean_axle_spacing_positive_direction},
-            {self.mean_axle_spacing_negative_direction},
-            {self.e80_per_axle},
-            {self.e80_per_axle_positive_direction},
-            {self.e80_per_axle_negative_direction},
-            {self.olhv},
-            {self.olhv_positive_direction},
-            {self.olhv_negative_direction},
-            {self.olhv_percent},
-            {self.olhv_percent_positive_direction},
-            {self.olhv_percent_negative_direction},
-            {self.tonnage_generated},
-            {self.tonnage_generated_positive_direction},
-            {self.tonnage_generated_negative_direction},
-            {self.olton},
-            {self.olton_positive_direction},
-            {self.olton_negative_direction},
-            {self.olton_percent},
-            {self.olton_percent_positive_direction},
-            {self.olton_percent_negative_direction},
-            {self.ole80},
-            {self.ole80_positive_direction},
-            {self.ole80_negative_direction},
-            {self.ole80_percent},
-            {self.ole80_percent_positive_direction},
-            {self.ole80_percent_negative_direction},
-            {self.xe80},
-            {self.xe80_positive_direction},
-            {self.xe80_negative_direction},
-            {self.xe80_percent},
-            {self.xe80_percent_positive_direction},
-            {self.xe80_percent_negative_direction},
-            {self.e80_per_day},
-            {self.e80_per_day_positive_direction},
-            {self.e80_per_day_negative_direction},
-            {self.e80_per_heavy_vehicle},
-            {self.e80_per_heavy_vehicle_positive_direction},
-            {self.e80_per_heavy_vehicle_negative_direction},
-            {self.worst_steering_single_axle_cnt},
-            {self.worst_steering_single_axle_olhv_perc},
-            {self.worst_steering_single_axle_tonperhv},
-            {self.worst_steering_double_axle_cnt},
-            {self.worst_steering_double_axle_olhv_perc},
-            {self.worst_steering_double_axle_tonperhv},
-            {self.worst_non_steering_single_axle_cnt},
-            {self.worst_non_steering_single_axle_olhv_perc},
-            {self.worst_non_steering_single_axle_tonperhv},
-            {self.worst_non_steering_double_axle_cnt},
-            {self.worst_non_steering_double_axle_olhv_perc},
-            {self.worst_non_steering_double_axle_tonperhv},
-            {self.worst_triple_axle_cnt},
-            {self.worst_triple_axle_olhv_perc},
-            {self.worst_triple_axle_tonperhv},
-            {self.bridge_formula_cnt},
-            {self.bridge_formula_olhv_perc},
-            {self.bridge_formula_tonperhv},
-            {self.gross_formula_cnt},
-            {self.gross_formula_olhv_perc},
-            {self.gross_formula_tonperhv},
-            {self.total_avg_cnt},
-            {self.total_avg_olhv_perc},
-            {self.total_avg_tonperhv},
-            {self.worst_steering_single_axle_cnt_positive_direciton},
-            {self.worst_steering_single_axle_olhv_perc_positive_direciton},
-            {self.worst_steering_single_axle_tonperhv_positive_direciton},
-            {self.worst_steering_double_axle_cnt_positive_direciton},
-            {self.worst_steering_double_axle_olhv_perc_positive_direciton},
-            {self.worst_steering_double_axle_tonperhv_positive_direciton},
-            {self.worst_non_steering_single_axle_cnt_positive_direciton},
-            {self.worst_non_steering_single_axle_olhv_perc_positive_direciton},
-            {self.worst_non_steering_single_axle_tonperhv_positive_direciton},
-            {self.worst_non_steering_double_axle_cnt_positive_direciton},
-            {self.worst_non_steering_double_axle_olhv_perc_positive_direciton},
-            {self.worst_non_steering_double_axle_tonperhv_positive_direciton},
-            {self.worst_triple_axle_cnt_positive_direciton},
-            {self.worst_triple_axle_olhv_perc_positive_direciton},
-            {self.worst_triple_axle_tonperhv_positive_direciton},
-            {self.bridge_formula_cnt_positive_direciton},
-            {self.bridge_formula_olhv_perc_positive_direciton},
-            {self.bridge_formula_tonperhv_positive_direciton},
-            {self.gross_formula_cnt_positive_direciton},
-            {self.gross_formula_olhv_perc_positive_direciton},
-            {self.gross_formula_tonperhv_positive_direciton},
-            {self.total_avg_cnt_positive_direciton},
-            {self.total_avg_olhv_perc_positive_direciton},
-            {self.total_avg_tonperhv_positive_direciton},
-            {self.worst_steering_single_axle_cnt_negative_direciton},
-            {self.worst_steering_single_axle_olhv_perc_negative_direciton},
-            {self.worst_steering_single_axle_tonperhv_negative_direciton},
-            {self.worst_steering_double_axle_cnt_negative_direciton},
-            {self.worst_steering_double_axle_olhv_perc_negative_direciton},
-            {self.worst_steering_double_axle_tonperhv_negative_direciton},
-            {self.worst_non_steering_single_axle_cnt_negative_direciton},
-            {self.worst_non_steering_single_axle_olhv_perc_negative_direciton},
-            {self.worst_non_steering_single_axle_tonperhv_negative_direciton},
-            {self.worst_non_steering_double_axle_cnt_negative_direciton},
-            {self.worst_non_steering_double_axle_olhv_perc_negative_direciton},
-            {self.worst_non_steering_double_axle_tonperhv_negative_direciton},
-            {self.worst_triple_axle_cnt_negative_direciton},
-            {self.worst_triple_axle_olhv_perc_negative_direciton},
-            {self.worst_triple_axle_tonperhv_negative_direciton},
-            {self.bridge_formula_cnt_negative_direciton},
-            {self.bridge_formula_olhv_perc_negative_direciton},
-            {self.bridge_formula_tonperhv_negative_direciton},
-            {self.gross_formula_cnt_negative_direciton},
-            {self.gross_formula_olhv_perc_negative_direciton},
-            {self.gross_formula_tonperhv_negative_direciton},
-            {self.total_avg_cnt_negative_direciton},
-            {self.total_avg_olhv_perc_negative_direciton},
-            {self.total_avg_tonperhv_negative_direciton},
-            {self.egrl_percent_positive_direction},
-            {self.egrl_percent_negative_direction},
-            {self.egrw_percent_positive_direction},
-            {self.egrw_percent_negative_direction},
-            {self.num_weighed},
-            {self.num_weighed_positive_direction},
-            {self.num_weighed_negative_direction},
-            {self.total_vehicles_cls_4tot},
-            {self.weighed_vehicles_cls_4tot},
-            {self.perc_truck_dist_cls_4tot},
-            {self.total_axles_cls_4tot},
-            {self.axles_over9t_cls_4tot},
-            {self.total_mass_cls_4tot},
-            {self.cnt_mass_over9t_cls_4tot},
-            {self.eal_pervehicle_cls_4tot},
-            {self.total_eal_cls_4tot},
-            {self.total_eal_over9t_cls_4tot},
-            {self.total_vehicles_cls_5tot},
-            {self.weighed_vehicles_cls_5tot},
-            {self.perc_truck_dist_cls_5tot},
-            {self.total_axles_cls_5tot},
-            {self.axles_over9t_cls_5tot},
-            {self.total_mass_cls_5tot},
-            {self.cnt_mass_over9t_cls_5tot},
-            {self.eal_pervehicle_cls_5tot},
-            {self.total_eal_cls_5tot},
-            {self.total_eal_over9t_cls_5tot},
-            {self.total_vehicles_cls_6tot},
-            {self.weighed_vehicles_cls_6tot},
-            {self.perc_truck_dist_cls_6tot},
-            {self.total_axles_cls_6tot},
-            {self.axles_over9t_cls_6tot},
-            {self.total_mass_cls_6tot},
-            {self.cnt_mass_over9t_cls_6tot},
-            {self.eal_pervehicle_cls_6tot},
-            {self.total_eal_cls_6tot},
-            {self.total_eal_over9t_cls_6tot},
-            {self.total_vehicles_cls_7tot},
-            {self.weighed_vehicles_cls_7tot},
-            {self.perc_truck_dist_cls_7tot},
-            {self.total_axles_cls_7tot},
-            {self.axles_over9t_cls_7tot},
-            {self.total_mass_cls_7tot},
-            {self.cnt_mass_over9t_cls_7tot},
-            {self.eal_pervehicle_cls_7tot},
-            {self.total_eal_cls_7tot},
-            {self.total_eal_over9t_cls_7tot},
-            {self.total_vehicles_cls_8tot},
-            {self.weighed_vehicles_cls_8tot},
-            {self.perc_truck_dist_cls_8tot},
-            {self.total_axles_cls_8tot},
-            {self.axles_over9t_cls_8tot},
-            {self.total_mass_cls_8tot},
-            {self.cnt_mass_over9t_cls_8tot},
-            {self.eal_pervehicle_cls_8tot},
-            {self.total_eal_cls_8tot},
-            {self.total_eal_over9t_cls_8tot},
-            {self.total_vehicles_cls_9tot},
-            {self.weighed_vehicles_cls_9tot},
-            {self.perc_truck_dist_cls_9tot},
-            {self.total_axles_cls_9tot},
-            {self.axles_over9t_cls_9tot},
-            {self.total_mass_cls_9tot},
-            {self.cnt_mass_over9t_cls_9tot},
-            {self.eal_pervehicle_cls_9tot},
-            {self.total_eal_cls_9tot},
-            {self.total_eal_over9t_cls_9tot},
-            {self.total_vehicles_cls_10tot},
-            {self.weighed_vehicles_cls_10tot},
-            {self.perc_truck_dist_cls_10tot},
-            {self.total_axles_cls_10tot},
-            {self.axles_over9t_cls_10tot},
-            {self.total_mass_cls_10tot},
-            {self.cnt_mass_over9t_cls_10tot},
-            {self.eal_pervehicle_cls_10tot},
-            {self.total_eal_cls_10tot},
-            {self.total_eal_over9t_cls_10tot},
-            {self.total_vehicles_cls_11tot},
-            {self.weighed_vehicles_cls_11tot},
-            {self.perc_truck_dist_cls_11tot},
-            {self.total_axles_cls_11tot},
-            {self.axles_over9t_cls_11tot},
-            {self.total_mass_cls_11tot},
-            {self.cnt_mass_over9t_cls_11tot},
-            {self.eal_pervehicle_cls_11tot},
-            {self.total_eal_cls_11tot},
-            {self.total_eal_over9t_cls_11tot},
-            {self.total_vehicles_cls_12tot},
-            {self.weighed_vehicles_cls_12tot},
-            {self.perc_truck_dist_cls_12tot},
-            {self.total_axles_cls_12tot},
-            {self.axles_over9t_cls_12tot},
-            {self.total_mass_cls_12tot},
-            {self.cnt_mass_over9t_cls_12tot},
-            {self.eal_pervehicle_cls_12tot},
-            {self.total_eal_cls_12tot},
-            {self.total_eal_over9t_cls_12tot},
-            {self.total_vehicles_cls_13tot},
-            {self.weighed_vehicles_cls_13tot},
-            {self.perc_truck_dist_cls_13tot},
-            {self.total_axles_cls_13tot},
-            {self.axles_over9t_cls_13tot},
-            {self.total_mass_cls_13tot},
-            {self.cnt_mass_over9t_cls_13tot},
-            {self.eal_pervehicle_cls_13tot},
-            {self.total_eal_cls_13tot},
-            {self.total_eal_over9t_cls_13tot},
-            {self.total_vehicles_cls_14tot},
-            {self.weighed_vehicles_cls_14tot},
-            {self.perc_truck_dist_cls_14tot},
-            {self.total_axles_cls_14tot},
-            {self.axles_over9t_cls_14tot},
-            {self.total_mass_cls_14tot},
-            {self.cnt_mass_over9t_cls_14tot},
-            {self.eal_pervehicle_cls_14tot},
-            {self.total_eal_cls_14tot},
-            {self.total_eal_over9t_cls_14tot},
-            {self.total_vehicles_cls_15tot},
-            {self.weighed_vehicles_cls_15tot},
-            {self.perc_truck_dist_cls_15tot},
-            {self.total_axles_cls_15tot},
-            {self.axles_over9t_cls_15tot},
-            {self.total_mass_cls_15tot},
-            {self.cnt_mass_over9t_cls_15tot},
-            {self.eal_pervehicle_cls_15tot},
-            {self.total_eal_cls_15tot},
-            {self.total_eal_over9t_cls_15tot},
-            {self.total_vehicles_cls_16tot},
-            {self.weighed_vehicles_cls_16tot},
-            {self.perc_truck_dist_cls_16tot},
-            {self.total_axles_cls_16tot},
-            {self.axles_over9t_cls_16tot},
-            {self.total_mass_cls_16tot},
-            {self.cnt_mass_over9t_cls_16tot},
-            {self.eal_pervehicle_cls_16tot},
-            {self.total_eal_cls_16tot},
-            {self.total_eal_over9t_cls_16tot},
-            {self.total_vehicles_cls_17tot},
-            {self.weighed_vehicles_cls_17tot},
-            {self.perc_truck_dist_cls_17tot},
-            {self.total_axles_cls_17tot},
-            {self.axles_over9t_cls_17tot},
-            {self.total_mass_cls_17tot},
-            {self.cnt_mass_over9t_cls_17tot},
-            {self.eal_pervehicle_cls_17tot},
-            {self.total_eal_cls_17tot},
-            {self.total_eal_over9t_cls_17tot},
-            {self.total_vehicles_cls_4p},
-            {self.weighed_vehicles_cls_4p},
-            {self.perc_truck_dist_cls_4p},
-            {self.total_axles_cls_4p},
-            {self.axles_over9t_cls_4p},
-            {self.total_mass_cls_4p},
-            {self.cnt_mass_over9t_cls_4p},
-            {self.eal_pervehicle_cls_4p},
-            {self.total_eal_cls_4p},
-            {self.total_eal_over9t_cls_4p},
-            {self.total_vehicles_cls_5p},
-            {self.weighed_vehicles_cls_5p},
-            {self.perc_truck_dist_cls_5p},
-            {self.total_axles_cls_5p},
-            {self.axles_over9t_cls_5p},
-            {self.total_mass_cls_5p},
-            {self.cnt_mass_over9t_cls_5p},
-            {self.eal_pervehicle_cls_5p},
-            {self.total_eal_cls_5p},
-            {self.total_eal_over9t_cls_5p},
-            {self.total_vehicles_cls_6p},
-            {self.weighed_vehicles_cls_6p},
-            {self.perc_truck_dist_cls_6p},
-            {self.total_axles_cls_6p},
-            {self.axles_over9t_cls_6p},
-            {self.total_mass_cls_6p},
-            {self.cnt_mass_over9t_cls_6p},
-            {self.eal_pervehicle_cls_6p},
-            {self.total_eal_cls_6p},
-            {self.total_eal_over9t_cls_6p},
-            {self.total_vehicles_cls_7p},
-            {self.weighed_vehicles_cls_7p},
-            {self.perc_truck_dist_cls_7p},
-            {self.total_axles_cls_7p},
-            {self.axles_over9t_cls_7p},
-            {self.total_mass_cls_7p},
-            {self.cnt_mass_over9t_cls_7p},
-            {self.eal_pervehicle_cls_7p},
-            {self.total_eal_cls_7p},
-            {self.total_eal_over9t_cls_7p},
-            {self.total_vehicles_cls_8p},
-            {self.weighed_vehicles_cls_8p},
-            {self.perc_truck_dist_cls_8p},
-            {self.total_axles_cls_8p},
-            {self.axles_over9t_cls_8p},
-            {self.total_mass_cls_8p},
-            {self.cnt_mass_over9t_cls_8p},
-            {self.eal_pervehicle_cls_8p},
-            {self.total_eal_cls_8p},
-            {self.total_eal_over9t_cls_8p},
-            {self.total_vehicles_cls_9p},
-            {self.weighed_vehicles_cls_9p},
-            {self.perc_truck_dist_cls_9p},
-            {self.total_axles_cls_9p},
-            {self.axles_over9t_cls_9p},
-            {self.total_mass_cls_9p},
-            {self.cnt_mass_over9t_cls_9p},
-            {self.eal_pervehicle_cls_9p},
-            {self.total_eal_cls_9p},
-            {self.total_eal_over9t_cls_9p},
-            {self.total_vehicles_cls_10p},
-            {self.weighed_vehicles_cls_10p},
-            {self.perc_truck_dist_cls_10p},
-            {self.total_axles_cls_10p},
-            {self.axles_over9t_cls_10p},
-            {self.total_mass_cls_10p},
-            {self.cnt_mass_over9t_cls_10p},
-            {self.eal_pervehicle_cls_10p},
-            {self.total_eal_cls_10p},
-            {self.total_eal_over9t_cls_10p},
-            {self.total_vehicles_cls_11p},
-            {self.weighed_vehicles_cls_11p},
-            {self.perc_truck_dist_cls_11p},
-            {self.total_axles_cls_11p},
-            {self.axles_over9t_cls_11p},
-            {self.total_mass_cls_11p},
-            {self.cnt_mass_over9t_cls_11p},
-            {self.eal_pervehicle_cls_11p},
-            {self.total_eal_cls_11p},
-            {self.total_eal_over9t_cls_11p},
-            {self.total_vehicles_cls_12p},
-            {self.weighed_vehicles_cls_12p},
-            {self.perc_truck_dist_cls_12p},
-            {self.total_axles_cls_12p},
-            {self.axles_over9t_cls_12p},
-            {self.total_mass_cls_12p},
-            {self.cnt_mass_over9t_cls_12p},
-            {self.eal_pervehicle_cls_12p},
-            {self.total_eal_cls_12p},
-            {self.total_eal_over9t_cls_12p},
-            {self.total_vehicles_cls_13p},
-            {self.weighed_vehicles_cls_13p},
-            {self.perc_truck_dist_cls_13p},
-            {self.total_axles_cls_13p},
-            {self.axles_over9t_cls_13p},
-            {self.total_mass_cls_13p},
-            {self.cnt_mass_over9t_cls_13p},
-            {self.eal_pervehicle_cls_13p},
-            {self.total_eal_cls_13p},
-            {self.total_eal_over9t_cls_13p},
-            {self.total_vehicles_cls_14p},
-            {self.weighed_vehicles_cls_14p},
-            {self.perc_truck_dist_cls_14p},
-            {self.total_axles_cls_14p},
-            {self.axles_over9t_cls_14p},
-            {self.total_mass_cls_14p},
-            {self.cnt_mass_over9t_cls_14p},
-            {self.eal_pervehicle_cls_14p},
-            {self.total_eal_cls_14p},
-            {self.total_eal_over9t_cls_14p},
-            {self.total_vehicles_cls_15p},
-            {self.weighed_vehicles_cls_15p},
-            {self.perc_truck_dist_cls_15p},
-            {self.total_axles_cls_15p},
-            {self.axles_over9t_cls_15p},
-            {self.total_mass_cls_15p},
-            {self.cnt_mass_over9t_cls_15p},
-            {self.eal_pervehicle_cls_15p},
-            {self.total_eal_cls_15p},
-            {self.total_eal_over9t_cls_15p},
-            {self.total_vehicles_cls_16p},
-            {self.weighed_vehicles_cls_16p},
-            {self.perc_truck_dist_cls_16p},
-            {self.total_axles_cls_16p},
-            {self.axles_over9t_cls_16p},
-            {self.total_mass_cls_16p},
-            {self.cnt_mass_over9t_cls_16p},
-            {self.eal_pervehicle_cls_16p},
-            {self.total_eal_cls_16p},
-            {self.total_eal_over9t_cls_16p},
-            {self.total_vehicles_cls_17p},
-            {self.weighed_vehicles_cls_17p},
-            {self.perc_truck_dist_cls_17p},
-            {self.total_axles_cls_17p},
-            {self.axles_over9t_cls_17p},
-            {self.total_mass_cls_17p},
-            {self.cnt_mass_over9t_cls_17p},
-            {self.eal_pervehicle_cls_17p},
-            {self.total_eal_cls_17p},
-            {self.total_eal_over9t_cls_17p},
-            {self.total_vehicles_cls_4n},
-            {self.weighed_vehicles_cls_4n},
-            {self.perc_truck_dist_cls_4n},
-            {self.total_axles_cls_4n},
-            {self.axles_over9t_cls_4n},
-            {self.total_mass_cls_4n},
-            {self.cnt_mass_over9t_cls_4n},
-            {self.eal_pervehicle_cls_4n},
-            {self.total_eal_cls_4n},
-            {self.total_eal_over9t_cls_4n},
-            {self.total_vehicles_cls_5n},
-            {self.weighed_vehicles_cls_5n},
-            {self.perc_truck_dist_cls_5n},
-            {self.total_axles_cls_5n},
-            {self.axles_over9t_cls_5n},
-            {self.total_mass_cls_5n},
-            {self.cnt_mass_over9t_cls_5n},
-            {self.eal_pervehicle_cls_5n},
-            {self.total_eal_cls_5n},
-            {self.total_eal_over9t_cls_5n},
-            {self.total_vehicles_cls_6n},
-            {self.weighed_vehicles_cls_6n},
-            {self.perc_truck_dist_cls_6n},
-            {self.total_axles_cls_6n},
-            {self.axles_over9t_cls_6n},
-            {self.total_mass_cls_6n},
-            {self.cnt_mass_over9t_cls_6n},
-            {self.eal_pervehicle_cls_6n},
-            {self.total_eal_cls_6n},
-            {self.total_eal_over9t_cls_6n},
-            {self.total_vehicles_cls_7n},
-            {self.weighed_vehicles_cls_7n},
-            {self.perc_truck_dist_cls_7n},
-            {self.total_axles_cls_7n},
-            {self.axles_over9t_cls_7n},
-            {self.total_mass_cls_7n},
-            {self.cnt_mass_over9t_cls_7n},
-            {self.eal_pervehicle_cls_7n},
-            {self.total_eal_cls_7n},
-            {self.total_eal_over9t_cls_7n},
-            {self.total_vehicles_cls_8n},
-            {self.weighed_vehicles_cls_8n},
-            {self.perc_truck_dist_cls_8n},
-            {self.total_axles_cls_8n},
-            {self.axles_over9t_cls_8n},
-            {self.total_mass_cls_8n},
-            {self.cnt_mass_over9t_cls_8n},
-            {self.eal_pervehicle_cls_8n},
-            {self.total_eal_cls_8n},
-            {self.total_eal_over9t_cls_8n},
-            {self.total_vehicles_cls_9n},
-            {self.weighed_vehicles_cls_9n},
-            {self.perc_truck_dist_cls_9n},
-            {self.total_axles_cls_9n},
-            {self.axles_over9t_cls_9n},
-            {self.total_mass_cls_9n},
-            {self.cnt_mass_over9t_cls_9n},
-            {self.eal_pervehicle_cls_9n},
-            {self.total_eal_cls_9n},
-            {self.total_eal_over9t_cls_9n},
-            {self.total_vehicles_cls_10n},
-            {self.weighed_vehicles_cls_10n},
-            {self.perc_truck_dist_cls_10n},
-            {self.total_axles_cls_10n},
-            {self.axles_over9t_cls_10n},
-            {self.total_mass_cls_10n},
-            {self.cnt_mass_over9t_cls_10n},
-            {self.eal_pervehicle_cls_10n},
-            {self.total_eal_cls_10n},
-            {self.total_eal_over9t_cls_10n},
-            {self.total_vehicles_cls_11n},
-            {self.weighed_vehicles_cls_11n},
-            {self.perc_truck_dist_cls_11n},
-            {self.total_axles_cls_11n},
-            {self.axles_over9t_cls_11n},
-            {self.total_mass_cls_11n},
-            {self.cnt_mass_over9t_cls_11n},
-            {self.eal_pervehicle_cls_11n},
-            {self.total_eal_cls_11n},
-            {self.total_eal_over9t_cls_11n},
-            {self.total_vehicles_cls_12n},
-            {self.weighed_vehicles_cls_12n},
-            {self.perc_truck_dist_cls_12n},
-            {self.total_axles_cls_12n},
-            {self.axles_over9t_cls_12n},
-            {self.total_mass_cls_12n},
-            {self.cnt_mass_over9t_cls_12n},
-            {self.eal_pervehicle_cls_12n},
-            {self.total_eal_cls_12n},
-            {self.total_eal_over9t_cls_12n},
-            {self.total_vehicles_cls_13n},
-            {self.weighed_vehicles_cls_13n},
-            {self.perc_truck_dist_cls_13n},
-            {self.total_axles_cls_13n},
-            {self.axles_over9t_cls_13n},
-            {self.total_mass_cls_13n},
-            {self.cnt_mass_over9t_cls_13n},
-            {self.eal_pervehicle_cls_13n},
-            {self.total_eal_cls_13n},
-            {self.total_eal_over9t_cls_13n},
-            {self.total_vehicles_cls_14n},
-            {self.weighed_vehicles_cls_14n},
-            {self.perc_truck_dist_cls_14n},
-            {self.total_axles_cls_14n},
-            {self.axles_over9t_cls_14n},
-            {self.total_mass_cls_14n},
-            {self.cnt_mass_over9t_cls_14n},
-            {self.eal_pervehicle_cls_14n},
-            {self.total_eal_cls_14n},
-            {self.total_eal_over9t_cls_14n},
-            {self.total_vehicles_cls_15n},
-            {self.weighed_vehicles_cls_15n},
-            {self.perc_truck_dist_cls_15n},
-            {self.total_axles_cls_15n},
-            {self.axles_over9t_cls_15n},
-            {self.total_mass_cls_15n},
-            {self.cnt_mass_over9t_cls_15n},
-            {self.eal_pervehicle_cls_15n},
-            {self.total_eal_cls_15n},
-            {self.total_eal_over9t_cls_15n},
-            {self.total_vehicles_cls_16n},
-            {self.weighed_vehicles_cls_16n},
-            {self.perc_truck_dist_cls_16n},
-            {self.total_axles_cls_16n},
-            {self.axles_over9t_cls_16n},
-            {self.total_mass_cls_16n},
-            {self.cnt_mass_over9t_cls_16n},
-            {self.eal_pervehicle_cls_16n},
-            {self.total_eal_cls_16n},
-            {self.total_eal_over9t_cls_16n},
-            {self.total_vehicles_cls_17n},
-            {self.weighed_vehicles_cls_17n},
-            {self.perc_truck_dist_cls_17n},
-            {self.total_axles_cls_17n},
-            {self.axles_over9t_cls_17n},
-            {self.total_mass_cls_17n},
-            {self.cnt_mass_over9t_cls_17n},
-            {self.eal_pervehicle_cls_17n},
-            {self.total_eal_cls_17n},
-            {self.total_eal_over9t_cls_17n})
+            {self.egrl_percent}, --self.egrl_percent
+            {self.egrw_percent}, --self.egrw_percent
+            {self.mean_equivalent_axle_mass}, --self.mean_equivalent_axle_mass
+            {self.mean_equivalent_axle_mass_positive_direction}, --self.mean_equivalent_axle_mass_positive_direction
+            {self.mean_equivalent_axle_mass_negative_direction}, --self.mean_equivalent_axle_mass_negative_direction
+            {self.mean_axle_spacing}, --self.mean_axle_spacing
+            {self.mean_axle_spacing_positive_direction}, --self.mean_axle_spacing_positive_direction
+            {self.mean_axle_spacing_negative_direction}, --self.mean_axle_spacing_negative_direction
+            {self.e80_per_axle}, --self.e80_per_axle
+            {self.e80_per_axle_positive_direction}, --self.e80_per_axle_positive_direction
+            {self.e80_per_axle_negative_direction}, --self.e80_per_axle_negative_direction
+            {self.olhv}, --self.olhv
+            {self.olhv_positive_direction}, --self.olhv_positive_direction
+            {self.olhv_negative_direction}, --self.olhv_negative_direction
+            {self.olhv_percent}, --self.olhv_percent
+            {self.olhv_percent_positive_direction}, --self.olhv_percent_positive_direction
+            {self.olhv_percent_negative_direction}, --self.olhv_percent_negative_direction
+            {self.tonnage_generated}, --self.tonnage_generated
+            {self.tonnage_generated_positive_direction}, --self.tonnage_generated_positive_direction
+            {self.tonnage_generated_negative_direction}, --self.tonnage_generated_negative_direction
+            {self.olton}, --self.olton
+            {self.olton_positive_direction}, --self.olton_positive_direction
+            {self.olton_negative_direction}, --self.olton_negative_direction
+            {self.olton_percent}, --self.olton_percent
+            {self.olton_percent_positive_direction}, --self.olton_percent_positive_direction
+            {self.olton_percent_negative_direction}, --self.olton_percent_negative_direction
+            {self.ole80}, --self.ole80
+            {self.ole80_positive_direction}, --self.ole80_positive_direction
+            {self.ole80_negative_direction}, --self.ole80_negative_direction
+            {self.ole80_percent}, --self.ole80_percent
+            {self.ole80_percent_positive_direction}, --self.ole80_percent_positive_direction
+            {self.ole80_percent_negative_direction}, --self.ole80_percent_negative_direction
+            {self.xe80}, --self.xe80
+            {self.xe80_positive_direction}, --self.xe80_positive_direction
+            {self.xe80_negative_direction}, --self.xe80_negative_direction
+            {self.xe80_percent}, --self.xe80_percent
+            {self.xe80_percent_positive_direction}, --self.xe80_percent_positive_direction
+            {self.xe80_percent_negative_direction}, --self.xe80_percent_negative_direction
+            {self.e80_per_day}, --self.e80_per_day
+            {self.e80_per_day_positive_direction}, --self.e80_per_day_positive_direction
+            {self.e80_per_day_negative_direction}, --self.e80_per_day_negative_direction
+            {self.e80_per_heavy_vehicle}, --self.e80_per_heavy_vehicle
+            {self.e80_per_heavy_vehicle_positive_direction}, --self.e80_per_heavy_vehicle_positive_direction
+            {self.e80_per_heavy_vehicle_negative_direction}, --self.e80_per_heavy_vehicle_negative_direction
+            {self.worst_steering_single_axle_cnt}, --self.worst_steering_single_axle_cnt
+            {self.worst_steering_single_axle_olhv_perc}, --self.worst_steering_single_axle_olhv_perc
+            {self.worst_steering_single_axle_tonperhv}, --self.worst_steering_single_axle_tonperhv
+            {self.worst_steering_double_axle_cnt}, --self.worst_steering_double_axle_cnt
+            {self.worst_steering_double_axle_olhv_perc}, --self.worst_steering_double_axle_olhv_perc
+            {self.worst_steering_double_axle_tonperhv}, --self.worst_steering_double_axle_tonperhv
+            {self.worst_non_steering_single_axle_cnt}, --self.worst_non_steering_single_axle_cnt
+            {self.worst_non_steering_single_axle_olhv_perc}, --self.worst_non_steering_single_axle_olhv_perc
+            {self.worst_non_steering_single_axle_tonperhv}, --self.worst_non_steering_single_axle_tonperhv
+            {self.worst_non_steering_double_axle_cnt}, --self.worst_non_steering_double_axle_cnt
+            {self.worst_non_steering_double_axle_olhv_perc}, --self.worst_non_steering_double_axle_olhv_perc
+            {self.worst_non_steering_double_axle_tonperhv}, --self.worst_non_steering_double_axle_tonperhv
+            {self.worst_triple_axle_cnt}, --self.worst_triple_axle_cnt
+            {self.worst_triple_axle_olhv_perc}, --self.worst_triple_axle_olhv_perc
+            {self.worst_triple_axle_tonperhv}, --self.worst_triple_axle_tonperhv
+            {self.bridge_formula_cnt}, --self.bridge_formula_cnt
+            {self.bridge_formula_olhv_perc}, --self.bridge_formula_olhv_perc
+            {self.bridge_formula_tonperhv}, --self.bridge_formula_tonperhv
+            {self.gross_formula_cnt}, --self.gross_formula_cnt
+            {self.gross_formula_olhv_perc}, --self.gross_formula_olhv_perc
+            {self.gross_formula_tonperhv}, --self.gross_formula_tonperhv
+            {self.total_avg_cnt}, --self.total_avg_cnt
+            {self.total_avg_olhv_perc}, --self.total_avg_olhv_perc
+            {self.total_avg_tonperhv}, --self.total_avg_tonperhv
+            {self.worst_steering_single_axle_cnt_positive_direciton}, --self.worst_steering_single_axle_cnt_positive_direciton
+            {self.worst_steering_single_axle_olhv_perc_positive_direciton}, --self.worst_steering_single_axle_olhv_perc_positive_direciton
+            {self.worst_steering_single_axle_tonperhv_positive_direciton}, --self.worst_steering_single_axle_tonperhv_positive_direciton
+            {self.worst_steering_double_axle_cnt_positive_direciton}, --self.worst_steering_double_axle_cnt_positive_direciton
+            {self.worst_steering_double_axle_olhv_perc_positive_direciton}, --self.worst_steering_double_axle_olhv_perc_positive_direciton
+            {self.worst_steering_double_axle_tonperhv_positive_direciton}, --self.worst_steering_double_axle_tonperhv_positive_direciton
+            {self.worst_non_steering_single_axle_cnt_positive_direciton}, --self.worst_non_steering_single_axle_cnt_positive_direciton
+            {self.worst_non_steering_single_axle_olhv_perc_positive_direciton}, --self.worst_non_steering_single_axle_olhv_perc_positive_direciton
+            {self.worst_non_steering_single_axle_tonperhv_positive_direciton}, --self.worst_non_steering_single_axle_tonperhv_positive_direciton
+            {self.worst_non_steering_double_axle_cnt_positive_direciton}, --self.worst_non_steering_double_axle_cnt_positive_direciton
+            {self.worst_non_steering_double_axle_olhv_perc_positive_direciton}, --self.worst_non_steering_double_axle_olhv_perc_positive_direciton
+            {self.worst_non_steering_double_axle_tonperhv_positive_direciton}, --self.worst_non_steering_double_axle_tonperhv_positive_direciton
+            {self.worst_triple_axle_cnt_positive_direciton}, --self.worst_triple_axle_cnt_positive_direciton
+            {self.worst_triple_axle_olhv_perc_positive_direciton}, --self.worst_triple_axle_olhv_perc_positive_direciton
+            {self.worst_triple_axle_tonperhv_positive_direciton}, --self.worst_triple_axle_tonperhv_positive_direciton
+            {self.bridge_formula_cnt_positive_direciton}, --self.bridge_formula_cnt_positive_direciton
+            {self.bridge_formula_olhv_perc_positive_direciton}, --self.bridge_formula_olhv_perc_positive_direciton
+            {self.bridge_formula_tonperhv_positive_direciton}, --self.bridge_formula_tonperhv_positive_direciton
+            {self.gross_formula_cnt_positive_direciton}, --self.gross_formula_cnt_positive_direciton
+            {self.gross_formula_olhv_perc_positive_direciton}, --self.gross_formula_olhv_perc_positive_direciton
+            {self.gross_formula_tonperhv_positive_direciton}, --self.gross_formula_tonperhv_positive_direciton
+            {self.total_avg_cnt_positive_direciton}, --self.total_avg_cnt_positive_direciton
+            {self.total_avg_olhv_perc_positive_direciton}, --self.total_avg_olhv_perc_positive_direciton
+            {self.total_avg_tonperhv_positive_direciton}, --self.total_avg_tonperhv_positive_direciton
+            {self.worst_steering_single_axle_cnt_negative_direciton}, --self.worst_steering_single_axle_cnt_negative_direciton
+            {self.worst_steering_single_axle_olhv_perc_negative_direciton}, --self.worst_steering_single_axle_olhv_perc_negative_direciton
+            {self.worst_steering_single_axle_tonperhv_negative_direciton}, --self.worst_steering_single_axle_tonperhv_negative_direciton
+            {self.worst_steering_double_axle_cnt_negative_direciton}, --self.worst_steering_double_axle_cnt_negative_direciton
+            {self.worst_steering_double_axle_olhv_perc_negative_direciton}, --self.worst_steering_double_axle_olhv_perc_negative_direciton
+            {self.worst_steering_double_axle_tonperhv_negative_direciton}, --self.worst_steering_double_axle_tonperhv_negative_direciton
+            {self.worst_non_steering_single_axle_cnt_negative_direciton}, --self.worst_non_steering_single_axle_cnt_negative_direciton
+            {self.worst_non_steering_single_axle_olhv_perc_negative_direciton}, --self.worst_non_steering_single_axle_olhv_perc_negative_direciton
+            {self.worst_non_steering_single_axle_tonperhv_negative_direciton}, --self.worst_non_steering_single_axle_tonperhv_negative_direciton
+            {self.worst_non_steering_double_axle_cnt_negative_direciton}, --self.worst_non_steering_double_axle_cnt_negative_direciton
+            {self.worst_non_steering_double_axle_olhv_perc_negative_direciton}, --self.worst_non_steering_double_axle_olhv_perc_negative_direciton
+            {self.worst_non_steering_double_axle_tonperhv_negative_direciton}, --self.worst_non_steering_double_axle_tonperhv_negative_direciton
+            {self.worst_triple_axle_cnt_negative_direciton}, --self.worst_triple_axle_cnt_negative_direciton
+            {self.worst_triple_axle_olhv_perc_negative_direciton}, --self.worst_triple_axle_olhv_perc_negative_direciton
+            {self.worst_triple_axle_tonperhv_negative_direciton}, --self.worst_triple_axle_tonperhv_negative_direciton
+            {self.bridge_formula_cnt_negative_direciton}, --self.bridge_formula_cnt_negative_direciton
+            {self.bridge_formula_olhv_perc_negative_direciton}, --self.bridge_formula_olhv_perc_negative_direciton
+            {self.bridge_formula_tonperhv_negative_direciton}, --self.bridge_formula_tonperhv_negative_direciton
+            {self.gross_formula_cnt_negative_direciton}, --self.gross_formula_cnt_negative_direciton
+            {self.gross_formula_olhv_perc_negative_direciton}, --self.gross_formula_olhv_perc_negative_direciton
+            {self.gross_formula_tonperhv_negative_direciton}, --self.gross_formula_tonperhv_negative_direciton
+            {self.total_avg_cnt_negative_direciton}, --self.total_avg_cnt_negative_direciton
+            {self.total_avg_olhv_perc_negative_direciton}, --self.total_avg_olhv_perc_negative_direciton
+            {self.total_avg_tonperhv_negative_direciton}, --self.total_avg_tonperhv_negative_direciton
+            {self.egrl_percent_positive_direction}, --self.egrl_percent_positive_direction
+            {self.egrl_percent_negative_direction}, --self.egrl_percent_negative_direction
+            {self.egrw_percent_positive_direction}, --self.egrw_percent_positive_direction
+            {self.egrw_percent_negative_direction}, --self.egrw_percent_negative_direction
+            {self.num_weighed}, --self.num_weighed
+            {self.num_weighed_positive_direction}, --self.num_weighed_positive_direction
+            {self.num_weighed_negative_direction}, --self.num_weighed_negative_direction
+            {self.total_vehicles_cls_4tot}, --self.total_vehicles_cls_4tot
+            {self.weighed_vehicles_cls_4tot}, --self.weighed_vehicles_cls_4tot
+            {self.perc_truck_dist_cls_4tot}, --self.perc_truck_dist_cls_4tot
+            {self.total_axles_cls_4tot}, --self.total_axles_cls_4tot
+            {self.axles_over9t_cls_4tot}, --self.axles_over9t_cls_4tot
+            {self.total_mass_cls_4tot}, --self.total_mass_cls_4tot
+            {self.cnt_mass_over9t_cls_4tot}, --self.cnt_mass_over9t_cls_4tot
+            {self.eal_pervehicle_cls_4tot}, --self.eal_pervehicle_cls_4tot
+            {self.total_eal_cls_4tot}, --self.total_eal_cls_4tot
+            {self.total_eal_over9t_cls_4tot}, --self.total_eal_over9t_cls_4tot
+            {self.total_vehicles_cls_5tot}, --self.total_vehicles_cls_5tot
+            {self.weighed_vehicles_cls_5tot}, --self.weighed_vehicles_cls_5tot
+            {self.perc_truck_dist_cls_5tot}, --self.perc_truck_dist_cls_5tot
+            {self.total_axles_cls_5tot}, --self.total_axles_cls_5tot
+            {self.axles_over9t_cls_5tot}, --self.axles_over9t_cls_5tot
+            {self.total_mass_cls_5tot}, --self.total_mass_cls_5tot
+            {self.cnt_mass_over9t_cls_5tot}, --self.cnt_mass_over9t_cls_5tot
+            {self.eal_pervehicle_cls_5tot}, --self.eal_pervehicle_cls_5tot
+            {self.total_eal_cls_5tot}, --self.total_eal_cls_5tot
+            {self.total_eal_over9t_cls_5tot}, --self.total_eal_over9t_cls_5tot
+            {self.total_vehicles_cls_6tot}, --self.total_vehicles_cls_6tot
+            {self.weighed_vehicles_cls_6tot}, --self.weighed_vehicles_cls_6tot
+            {self.perc_truck_dist_cls_6tot}, --self.perc_truck_dist_cls_6tot
+            {self.total_axles_cls_6tot}, --self.total_axles_cls_6tot
+            {self.axles_over9t_cls_6tot}, --self.axles_over9t_cls_6tot
+            {self.total_mass_cls_6tot}, --self.total_mass_cls_6tot
+            {self.cnt_mass_over9t_cls_6tot}, --self.cnt_mass_over9t_cls_6tot
+            {self.eal_pervehicle_cls_6tot}, --self.eal_pervehicle_cls_6tot
+            {self.total_eal_cls_6tot}, --self.total_eal_cls_6tot
+            {self.total_eal_over9t_cls_6tot}, --self.total_eal_over9t_cls_6tot
+            {self.total_vehicles_cls_7tot}, --self.total_vehicles_cls_7tot
+            {self.weighed_vehicles_cls_7tot}, --self.weighed_vehicles_cls_7tot
+            {self.perc_truck_dist_cls_7tot}, --self.perc_truck_dist_cls_7tot
+            {self.total_axles_cls_7tot}, --self.total_axles_cls_7tot
+            {self.axles_over9t_cls_7tot}, --self.axles_over9t_cls_7tot
+            {self.total_mass_cls_7tot}, --self.total_mass_cls_7tot
+            {self.cnt_mass_over9t_cls_7tot}, --self.cnt_mass_over9t_cls_7tot
+            {self.eal_pervehicle_cls_7tot}, --self.eal_pervehicle_cls_7tot
+            {self.total_eal_cls_7tot}, --self.total_eal_cls_7tot
+            {self.total_eal_over9t_cls_7tot}, --self.total_eal_over9t_cls_7tot
+            {self.total_vehicles_cls_8tot}, --self.total_vehicles_cls_8tot
+            {self.weighed_vehicles_cls_8tot}, --self.weighed_vehicles_cls_8tot
+            {self.perc_truck_dist_cls_8tot}, --self.perc_truck_dist_cls_8tot
+            {self.total_axles_cls_8tot}, --self.total_axles_cls_8tot
+            {self.axles_over9t_cls_8tot}, --self.axles_over9t_cls_8tot
+            {self.total_mass_cls_8tot}, --self.total_mass_cls_8tot
+            {self.cnt_mass_over9t_cls_8tot}, --self.cnt_mass_over9t_cls_8tot
+            {self.eal_pervehicle_cls_8tot}, --self.eal_pervehicle_cls_8tot
+            {self.total_eal_cls_8tot}, --self.total_eal_cls_8tot
+            {self.total_eal_over9t_cls_8tot}, --self.total_eal_over9t_cls_8tot
+            {self.total_vehicles_cls_9tot}, --self.total_vehicles_cls_9tot
+            {self.weighed_vehicles_cls_9tot}, --self.weighed_vehicles_cls_9tot
+            {self.perc_truck_dist_cls_9tot}, --self.perc_truck_dist_cls_9tot
+            {self.total_axles_cls_9tot}, --self.total_axles_cls_9tot
+            {self.axles_over9t_cls_9tot}, --self.axles_over9t_cls_9tot
+            {self.total_mass_cls_9tot}, --self.total_mass_cls_9tot
+            {self.cnt_mass_over9t_cls_9tot}, --self.cnt_mass_over9t_cls_9tot
+            {self.eal_pervehicle_cls_9tot}, --self.eal_pervehicle_cls_9tot
+            {self.total_eal_cls_9tot}, --self.total_eal_cls_9tot
+            {self.total_eal_over9t_cls_9tot}, --self.total_eal_over9t_cls_9tot
+            {self.total_vehicles_cls_10tot}, --self.total_vehicles_cls_10tot
+            {self.weighed_vehicles_cls_10tot}, --self.weighed_vehicles_cls_10tot
+            {self.perc_truck_dist_cls_10tot}, --self.perc_truck_dist_cls_10tot
+            {self.total_axles_cls_10tot}, --self.total_axles_cls_10tot
+            {self.axles_over9t_cls_10tot}, --self.axles_over9t_cls_10tot
+            {self.total_mass_cls_10tot}, --self.total_mass_cls_10tot
+            {self.cnt_mass_over9t_cls_10tot}, --self.cnt_mass_over9t_cls_10tot
+            {self.eal_pervehicle_cls_10tot}, --self.eal_pervehicle_cls_10tot
+            {self.total_eal_cls_10tot}, --self.total_eal_cls_10tot
+            {self.total_eal_over9t_cls_10tot}, --self.total_eal_over9t_cls_10tot
+            {self.total_vehicles_cls_11tot}, --self.total_vehicles_cls_11tot
+            {self.weighed_vehicles_cls_11tot}, --self.weighed_vehicles_cls_11tot
+            {self.perc_truck_dist_cls_11tot}, --self.perc_truck_dist_cls_11tot
+            {self.total_axles_cls_11tot}, --self.total_axles_cls_11tot
+            {self.axles_over9t_cls_11tot}, --self.axles_over9t_cls_11tot
+            {self.total_mass_cls_11tot}, --self.total_mass_cls_11tot
+            {self.cnt_mass_over9t_cls_11tot}, --self.cnt_mass_over9t_cls_11tot
+            {self.eal_pervehicle_cls_11tot}, --self.eal_pervehicle_cls_11tot
+            {self.total_eal_cls_11tot}, --self.total_eal_cls_11tot
+            {self.total_eal_over9t_cls_11tot}, --self.total_eal_over9t_cls_11tot
+            {self.total_vehicles_cls_12tot}, --self.total_vehicles_cls_12tot
+            {self.weighed_vehicles_cls_12tot}, --self.weighed_vehicles_cls_12tot
+            {self.perc_truck_dist_cls_12tot}, --self.perc_truck_dist_cls_12tot
+            {self.total_axles_cls_12tot}, --self.total_axles_cls_12tot
+            {self.axles_over9t_cls_12tot}, --self.axles_over9t_cls_12tot
+            {self.total_mass_cls_12tot}, --self.total_mass_cls_12tot
+            {self.cnt_mass_over9t_cls_12tot}, --self.cnt_mass_over9t_cls_12tot
+            {self.eal_pervehicle_cls_12tot}, --self.eal_pervehicle_cls_12tot
+            {self.total_eal_cls_12tot}, --self.total_eal_cls_12tot
+            {self.total_eal_over9t_cls_12tot}, --self.total_eal_over9t_cls_12tot
+            {self.total_vehicles_cls_13tot}, --self.total_vehicles_cls_13tot
+            {self.weighed_vehicles_cls_13tot}, --self.weighed_vehicles_cls_13tot
+            {self.perc_truck_dist_cls_13tot}, --self.perc_truck_dist_cls_13tot
+            {self.total_axles_cls_13tot}, --self.total_axles_cls_13tot
+            {self.axles_over9t_cls_13tot}, --self.axles_over9t_cls_13tot
+            {self.total_mass_cls_13tot}, --self.total_mass_cls_13tot
+            {self.cnt_mass_over9t_cls_13tot}, --self.cnt_mass_over9t_cls_13tot
+            {self.eal_pervehicle_cls_13tot}, --self.eal_pervehicle_cls_13tot
+            {self.total_eal_cls_13tot}, --self.total_eal_cls_13tot
+            {self.total_eal_over9t_cls_13tot}, --self.total_eal_over9t_cls_13tot
+            {self.total_vehicles_cls_14tot}, --self.total_vehicles_cls_14tot
+            {self.weighed_vehicles_cls_14tot}, --self.weighed_vehicles_cls_14tot
+            {self.perc_truck_dist_cls_14tot}, --self.perc_truck_dist_cls_14tot
+            {self.total_axles_cls_14tot}, --self.total_axles_cls_14tot
+            {self.axles_over9t_cls_14tot}, --self.axles_over9t_cls_14tot
+            {self.total_mass_cls_14tot}, --self.total_mass_cls_14tot
+            {self.cnt_mass_over9t_cls_14tot}, --self.cnt_mass_over9t_cls_14tot
+            {self.eal_pervehicle_cls_14tot}, --self.eal_pervehicle_cls_14tot
+            {self.total_eal_cls_14tot}, --self.total_eal_cls_14tot
+            {self.total_eal_over9t_cls_14tot}, --self.total_eal_over9t_cls_14tot
+            {self.total_vehicles_cls_15tot}, --self.total_vehicles_cls_15tot
+            {self.weighed_vehicles_cls_15tot}, --self.weighed_vehicles_cls_15tot
+            {self.perc_truck_dist_cls_15tot}, --self.perc_truck_dist_cls_15tot
+            {self.total_axles_cls_15tot}, --self.total_axles_cls_15tot
+            {self.axles_over9t_cls_15tot}, --self.axles_over9t_cls_15tot
+            {self.total_mass_cls_15tot}, --self.total_mass_cls_15tot
+            {self.cnt_mass_over9t_cls_15tot}, --self.cnt_mass_over9t_cls_15tot
+            {self.eal_pervehicle_cls_15tot}, --self.eal_pervehicle_cls_15tot
+            {self.total_eal_cls_15tot}, --self.total_eal_cls_15tot
+            {self.total_eal_over9t_cls_15tot}, --self.total_eal_over9t_cls_15tot
+            {self.total_vehicles_cls_16tot}, --self.total_vehicles_cls_16tot
+            {self.weighed_vehicles_cls_16tot}, --self.weighed_vehicles_cls_16tot
+            {self.perc_truck_dist_cls_16tot}, --self.perc_truck_dist_cls_16tot
+            {self.total_axles_cls_16tot}, --self.total_axles_cls_16tot
+            {self.axles_over9t_cls_16tot}, --self.axles_over9t_cls_16tot
+            {self.total_mass_cls_16tot}, --self.total_mass_cls_16tot
+            {self.cnt_mass_over9t_cls_16tot}, --self.cnt_mass_over9t_cls_16tot
+            {self.eal_pervehicle_cls_16tot}, --self.eal_pervehicle_cls_16tot
+            {self.total_eal_cls_16tot}, --self.total_eal_cls_16tot
+            {self.total_eal_over9t_cls_16tot}, --self.total_eal_over9t_cls_16tot
+            {self.total_vehicles_cls_17tot}, --self.total_vehicles_cls_17tot
+            {self.weighed_vehicles_cls_17tot}, --self.weighed_vehicles_cls_17tot
+            {self.perc_truck_dist_cls_17tot}, --self.perc_truck_dist_cls_17tot
+            {self.total_axles_cls_17tot}, --self.total_axles_cls_17tot
+            {self.axles_over9t_cls_17tot}, --self.axles_over9t_cls_17tot
+            {self.total_mass_cls_17tot}, --self.total_mass_cls_17tot
+            {self.cnt_mass_over9t_cls_17tot}, --self.cnt_mass_over9t_cls_17tot
+            {self.eal_pervehicle_cls_17tot}, --self.eal_pervehicle_cls_17tot
+            {self.total_eal_cls_17tot}, --self.total_eal_cls_17tot
+            {self.total_eal_over9t_cls_17tot}, --self.total_eal_over9t_cls_17tot
+            {self.total_vehicles_cls_4p}, --self.total_vehicles_cls_4p
+            {self.weighed_vehicles_cls_4p}, --self.weighed_vehicles_cls_4p
+            {self.perc_truck_dist_cls_4p}, --self.perc_truck_dist_cls_4p
+            {self.total_axles_cls_4p}, --self.total_axles_cls_4p
+            {self.axles_over9t_cls_4p}, --self.axles_over9t_cls_4p
+            {self.total_mass_cls_4p}, --self.total_mass_cls_4p
+            {self.cnt_mass_over9t_cls_4p}, --self.cnt_mass_over9t_cls_4p
+            {self.eal_pervehicle_cls_4p}, --self.eal_pervehicle_cls_4p
+            {self.total_eal_cls_4p}, --self.total_eal_cls_4p
+            {self.total_eal_over9t_cls_4p}, --self.total_eal_over9t_cls_4p
+            {self.total_vehicles_cls_5p}, --self.total_vehicles_cls_5p
+            {self.weighed_vehicles_cls_5p}, --self.weighed_vehicles_cls_5p
+            {self.perc_truck_dist_cls_5p}, --self.perc_truck_dist_cls_5p
+            {self.total_axles_cls_5p}, --self.total_axles_cls_5p
+            {self.axles_over9t_cls_5p}, --self.axles_over9t_cls_5p
+            {self.total_mass_cls_5p}, --self.total_mass_cls_5p
+            {self.cnt_mass_over9t_cls_5p}, --self.cnt_mass_over9t_cls_5p
+            {self.eal_pervehicle_cls_5p}, --self.eal_pervehicle_cls_5p
+            {self.total_eal_cls_5p}, --self.total_eal_cls_5p
+            {self.total_eal_over9t_cls_5p}, --self.total_eal_over9t_cls_5p
+            {self.total_vehicles_cls_6p}, --self.total_vehicles_cls_6p
+            {self.weighed_vehicles_cls_6p}, --self.weighed_vehicles_cls_6p
+            {self.perc_truck_dist_cls_6p}, --self.perc_truck_dist_cls_6p
+            {self.total_axles_cls_6p}, --self.total_axles_cls_6p
+            {self.axles_over9t_cls_6p}, --self.axles_over9t_cls_6p
+            {self.total_mass_cls_6p}, --self.total_mass_cls_6p
+            {self.cnt_mass_over9t_cls_6p}, --self.cnt_mass_over9t_cls_6p
+            {self.eal_pervehicle_cls_6p}, --self.eal_pervehicle_cls_6p
+            {self.total_eal_cls_6p}, --self.total_eal_cls_6p
+            {self.total_eal_over9t_cls_6p}, --self.total_eal_over9t_cls_6p
+            {self.total_vehicles_cls_7p}, --self.total_vehicles_cls_7p
+            {self.weighed_vehicles_cls_7p}, --self.weighed_vehicles_cls_7p
+            {self.perc_truck_dist_cls_7p}, --self.perc_truck_dist_cls_7p
+            {self.total_axles_cls_7p}, --self.total_axles_cls_7p
+            {self.axles_over9t_cls_7p}, --self.axles_over9t_cls_7p
+            {self.total_mass_cls_7p}, --self.total_mass_cls_7p
+            {self.cnt_mass_over9t_cls_7p}, --self.cnt_mass_over9t_cls_7p
+            {self.eal_pervehicle_cls_7p}, --self.eal_pervehicle_cls_7p
+            {self.total_eal_cls_7p}, --self.total_eal_cls_7p
+            {self.total_eal_over9t_cls_7p}, --self.total_eal_over9t_cls_7p
+            {self.total_vehicles_cls_8p}, --self.total_vehicles_cls_8p
+            {self.weighed_vehicles_cls_8p}, --self.weighed_vehicles_cls_8p
+            {self.perc_truck_dist_cls_8p}, --self.perc_truck_dist_cls_8p
+            {self.total_axles_cls_8p}, --self.total_axles_cls_8p
+            {self.axles_over9t_cls_8p}, --self.axles_over9t_cls_8p
+            {self.total_mass_cls_8p}, --self.total_mass_cls_8p
+            {self.cnt_mass_over9t_cls_8p}, --self.cnt_mass_over9t_cls_8p
+            {self.eal_pervehicle_cls_8p}, --self.eal_pervehicle_cls_8p
+            {self.total_eal_cls_8p}, --self.total_eal_cls_8p
+            {self.total_eal_over9t_cls_8p}, --self.total_eal_over9t_cls_8p
+            {self.total_vehicles_cls_9p}, --self.total_vehicles_cls_9p
+            {self.weighed_vehicles_cls_9p}, --self.weighed_vehicles_cls_9p
+            {self.perc_truck_dist_cls_9p}, --self.perc_truck_dist_cls_9p
+            {self.total_axles_cls_9p}, --self.total_axles_cls_9p
+            {self.axles_over9t_cls_9p}, --self.axles_over9t_cls_9p
+            {self.total_mass_cls_9p}, --self.total_mass_cls_9p
+            {self.cnt_mass_over9t_cls_9p}, --self.cnt_mass_over9t_cls_9p
+            {self.eal_pervehicle_cls_9p}, --self.eal_pervehicle_cls_9p
+            {self.total_eal_cls_9p}, --self.total_eal_cls_9p
+            {self.total_eal_over9t_cls_9p}, --self.total_eal_over9t_cls_9p
+            {self.total_vehicles_cls_10p}, --self.total_vehicles_cls_10p
+            {self.weighed_vehicles_cls_10p}, --self.weighed_vehicles_cls_10p
+            {self.perc_truck_dist_cls_10p}, --self.perc_truck_dist_cls_10p
+            {self.total_axles_cls_10p}, --self.total_axles_cls_10p
+            {self.axles_over9t_cls_10p}, --self.axles_over9t_cls_10p
+            {self.total_mass_cls_10p}, --self.total_mass_cls_10p
+            {self.cnt_mass_over9t_cls_10p}, --self.cnt_mass_over9t_cls_10p
+            {self.eal_pervehicle_cls_10p}, --self.eal_pervehicle_cls_10p
+            {self.total_eal_cls_10p}, --self.total_eal_cls_10p
+            {self.total_eal_over9t_cls_10p}, --self.total_eal_over9t_cls_10p
+            {self.total_vehicles_cls_11p}, --self.total_vehicles_cls_11p
+            {self.weighed_vehicles_cls_11p}, --self.weighed_vehicles_cls_11p
+            {self.perc_truck_dist_cls_11p}, --self.perc_truck_dist_cls_11p
+            {self.total_axles_cls_11p}, --self.total_axles_cls_11p
+            {self.axles_over9t_cls_11p}, --self.axles_over9t_cls_11p
+            {self.total_mass_cls_11p}, --self.total_mass_cls_11p
+            {self.cnt_mass_over9t_cls_11p}, --self.cnt_mass_over9t_cls_11p
+            {self.eal_pervehicle_cls_11p}, --self.eal_pervehicle_cls_11p
+            {self.total_eal_cls_11p}, --self.total_eal_cls_11p
+            {self.total_eal_over9t_cls_11p}, --self.total_eal_over9t_cls_11p
+            {self.total_vehicles_cls_12p}, --self.total_vehicles_cls_12p
+            {self.weighed_vehicles_cls_12p}, --self.weighed_vehicles_cls_12p
+            {self.perc_truck_dist_cls_12p}, --self.perc_truck_dist_cls_12p
+            {self.total_axles_cls_12p}, --self.total_axles_cls_12p
+            {self.axles_over9t_cls_12p}, --self.axles_over9t_cls_12p
+            {self.total_mass_cls_12p}, --self.total_mass_cls_12p
+            {self.cnt_mass_over9t_cls_12p}, --self.cnt_mass_over9t_cls_12p
+            {self.eal_pervehicle_cls_12p}, --self.eal_pervehicle_cls_12p
+            {self.total_eal_cls_12p}, --self.total_eal_cls_12p
+            {self.total_eal_over9t_cls_12p}, --self.total_eal_over9t_cls_12p
+            {self.total_vehicles_cls_13p}, --self.total_vehicles_cls_13p
+            {self.weighed_vehicles_cls_13p}, --self.weighed_vehicles_cls_13p
+            {self.perc_truck_dist_cls_13p}, --self.perc_truck_dist_cls_13p
+            {self.total_axles_cls_13p}, --self.total_axles_cls_13p
+            {self.axles_over9t_cls_13p}, --self.axles_over9t_cls_13p
+            {self.total_mass_cls_13p}, --self.total_mass_cls_13p
+            {self.cnt_mass_over9t_cls_13p}, --self.cnt_mass_over9t_cls_13p
+            {self.eal_pervehicle_cls_13p}, --self.eal_pervehicle_cls_13p
+            {self.total_eal_cls_13p}, --self.total_eal_cls_13p
+            {self.total_eal_over9t_cls_13p}, --self.total_eal_over9t_cls_13p
+            {self.total_vehicles_cls_14p}, --self.total_vehicles_cls_14p
+            {self.weighed_vehicles_cls_14p}, --self.weighed_vehicles_cls_14p
+            {self.perc_truck_dist_cls_14p}, --self.perc_truck_dist_cls_14p
+            {self.total_axles_cls_14p}, --self.total_axles_cls_14p
+            {self.axles_over9t_cls_14p}, --self.axles_over9t_cls_14p
+            {self.total_mass_cls_14p}, --self.total_mass_cls_14p
+            {self.cnt_mass_over9t_cls_14p}, --self.cnt_mass_over9t_cls_14p
+            {self.eal_pervehicle_cls_14p}, --self.eal_pervehicle_cls_14p
+            {self.total_eal_cls_14p}, --self.total_eal_cls_14p
+            {self.total_eal_over9t_cls_14p}, --self.total_eal_over9t_cls_14p
+            {self.total_vehicles_cls_15p}, --self.total_vehicles_cls_15p
+            {self.weighed_vehicles_cls_15p}, --self.weighed_vehicles_cls_15p
+            {self.perc_truck_dist_cls_15p}, --self.perc_truck_dist_cls_15p
+            {self.total_axles_cls_15p}, --self.total_axles_cls_15p
+            {self.axles_over9t_cls_15p}, --self.axles_over9t_cls_15p
+            {self.total_mass_cls_15p}, --self.total_mass_cls_15p
+            {self.cnt_mass_over9t_cls_15p}, --self.cnt_mass_over9t_cls_15p
+            {self.eal_pervehicle_cls_15p}, --self.eal_pervehicle_cls_15p
+            {self.total_eal_cls_15p}, --self.total_eal_cls_15p
+            {self.total_eal_over9t_cls_15p}, --self.total_eal_over9t_cls_15p
+            {self.total_vehicles_cls_16p}, --self.total_vehicles_cls_16p
+            {self.weighed_vehicles_cls_16p}, --self.weighed_vehicles_cls_16p
+            {self.perc_truck_dist_cls_16p}, --self.perc_truck_dist_cls_16p
+            {self.total_axles_cls_16p}, --self.total_axles_cls_16p
+            {self.axles_over9t_cls_16p}, --self.axles_over9t_cls_16p
+            {self.total_mass_cls_16p}, --self.total_mass_cls_16p
+            {self.cnt_mass_over9t_cls_16p}, --self.cnt_mass_over9t_cls_16p
+            {self.eal_pervehicle_cls_16p}, --self.eal_pervehicle_cls_16p
+            {self.total_eal_cls_16p}, --self.total_eal_cls_16p
+            {self.total_eal_over9t_cls_16p}, --self.total_eal_over9t_cls_16p
+            {self.total_vehicles_cls_17p}, --self.total_vehicles_cls_17p
+            {self.weighed_vehicles_cls_17p}, --self.weighed_vehicles_cls_17p
+            {self.perc_truck_dist_cls_17p}, --self.perc_truck_dist_cls_17p
+            {self.total_axles_cls_17p}, --self.total_axles_cls_17p
+            {self.axles_over9t_cls_17p}, --self.axles_over9t_cls_17p
+            {self.total_mass_cls_17p}, --self.total_mass_cls_17p
+            {self.cnt_mass_over9t_cls_17p}, --self.cnt_mass_over9t_cls_17p
+            {self.eal_pervehicle_cls_17p}, --self.eal_pervehicle_cls_17p
+            {self.total_eal_cls_17p}, --self.total_eal_cls_17p
+            {self.total_eal_over9t_cls_17p}, --self.total_eal_over9t_cls_17p
+            {self.total_vehicles_cls_4n}, --self.total_vehicles_cls_4n
+            {self.weighed_vehicles_cls_4n}, --self.weighed_vehicles_cls_4n
+            {self.perc_truck_dist_cls_4n}, --self.perc_truck_dist_cls_4n
+            {self.total_axles_cls_4n}, --self.total_axles_cls_4n
+            {self.axles_over9t_cls_4n}, --self.axles_over9t_cls_4n
+            {self.total_mass_cls_4n}, --self.total_mass_cls_4n
+            {self.cnt_mass_over9t_cls_4n}, --self.cnt_mass_over9t_cls_4n
+            {self.eal_pervehicle_cls_4n}, --self.eal_pervehicle_cls_4n
+            {self.total_eal_cls_4n}, --self.total_eal_cls_4n
+            {self.total_eal_over9t_cls_4n}, --self.total_eal_over9t_cls_4n
+            {self.total_vehicles_cls_5n}, --self.total_vehicles_cls_5n
+            {self.weighed_vehicles_cls_5n}, --self.weighed_vehicles_cls_5n
+            {self.perc_truck_dist_cls_5n}, --self.perc_truck_dist_cls_5n
+            {self.total_axles_cls_5n}, --self.total_axles_cls_5n
+            {self.axles_over9t_cls_5n}, --self.axles_over9t_cls_5n
+            {self.total_mass_cls_5n}, --self.total_mass_cls_5n
+            {self.cnt_mass_over9t_cls_5n}, --self.cnt_mass_over9t_cls_5n
+            {self.eal_pervehicle_cls_5n}, --self.eal_pervehicle_cls_5n
+            {self.total_eal_cls_5n}, --self.total_eal_cls_5n
+            {self.total_eal_over9t_cls_5n}, --self.total_eal_over9t_cls_5n
+            {self.total_vehicles_cls_6n}, --self.total_vehicles_cls_6n
+            {self.weighed_vehicles_cls_6n}, --self.weighed_vehicles_cls_6n
+            {self.perc_truck_dist_cls_6n}, --self.perc_truck_dist_cls_6n
+            {self.total_axles_cls_6n}, --self.total_axles_cls_6n
+            {self.axles_over9t_cls_6n}, --self.axles_over9t_cls_6n
+            {self.total_mass_cls_6n}, --self.total_mass_cls_6n
+            {self.cnt_mass_over9t_cls_6n}, --self.cnt_mass_over9t_cls_6n
+            {self.eal_pervehicle_cls_6n}, --self.eal_pervehicle_cls_6n
+            {self.total_eal_cls_6n}, --self.total_eal_cls_6n
+            {self.total_eal_over9t_cls_6n}, --self.total_eal_over9t_cls_6n
+            {self.total_vehicles_cls_7n}, --self.total_vehicles_cls_7n
+            {self.weighed_vehicles_cls_7n}, --self.weighed_vehicles_cls_7n
+            {self.perc_truck_dist_cls_7n}, --self.perc_truck_dist_cls_7n
+            {self.total_axles_cls_7n}, --self.total_axles_cls_7n
+            {self.axles_over9t_cls_7n}, --self.axles_over9t_cls_7n
+            {self.total_mass_cls_7n}, --self.total_mass_cls_7n
+            {self.cnt_mass_over9t_cls_7n}, --self.cnt_mass_over9t_cls_7n
+            {self.eal_pervehicle_cls_7n}, --self.eal_pervehicle_cls_7n
+            {self.total_eal_cls_7n}, --self.total_eal_cls_7n
+            {self.total_eal_over9t_cls_7n}, --self.total_eal_over9t_cls_7n
+            {self.total_vehicles_cls_8n}, --self.total_vehicles_cls_8n
+            {self.weighed_vehicles_cls_8n}, --self.weighed_vehicles_cls_8n
+            {self.perc_truck_dist_cls_8n}, --self.perc_truck_dist_cls_8n
+            {self.total_axles_cls_8n}, --self.total_axles_cls_8n
+            {self.axles_over9t_cls_8n}, --self.axles_over9t_cls_8n
+            {self.total_mass_cls_8n}, --self.total_mass_cls_8n
+            {self.cnt_mass_over9t_cls_8n}, --self.cnt_mass_over9t_cls_8n
+            {self.eal_pervehicle_cls_8n}, --self.eal_pervehicle_cls_8n
+            {self.total_eal_cls_8n}, --self.total_eal_cls_8n
+            {self.total_eal_over9t_cls_8n}, --self.total_eal_over9t_cls_8n
+            {self.total_vehicles_cls_9n}, --self.total_vehicles_cls_9n
+            {self.weighed_vehicles_cls_9n}, --self.weighed_vehicles_cls_9n
+            {self.perc_truck_dist_cls_9n}, --self.perc_truck_dist_cls_9n
+            {self.total_axles_cls_9n}, --self.total_axles_cls_9n
+            {self.axles_over9t_cls_9n}, --self.axles_over9t_cls_9n
+            {self.total_mass_cls_9n}, --self.total_mass_cls_9n
+            {self.cnt_mass_over9t_cls_9n}, --self.cnt_mass_over9t_cls_9n
+            {self.eal_pervehicle_cls_9n}, --self.eal_pervehicle_cls_9n
+            {self.total_eal_cls_9n}, --self.total_eal_cls_9n
+            {self.total_eal_over9t_cls_9n}, --self.total_eal_over9t_cls_9n
+            {self.total_vehicles_cls_10n}, --self.total_vehicles_cls_10n
+            {self.weighed_vehicles_cls_10n}, --self.weighed_vehicles_cls_10n
+            {self.perc_truck_dist_cls_10n}, --self.perc_truck_dist_cls_10n
+            {self.total_axles_cls_10n}, --self.total_axles_cls_10n
+            {self.axles_over9t_cls_10n}, --self.axles_over9t_cls_10n
+            {self.total_mass_cls_10n}, --self.total_mass_cls_10n
+            {self.cnt_mass_over9t_cls_10n}, --self.cnt_mass_over9t_cls_10n
+            {self.eal_pervehicle_cls_10n}, --self.eal_pervehicle_cls_10n
+            {self.total_eal_cls_10n}, --self.total_eal_cls_10n
+            {self.total_eal_over9t_cls_10n}, --self.total_eal_over9t_cls_10n
+            {self.total_vehicles_cls_11n}, --self.total_vehicles_cls_11n
+            {self.weighed_vehicles_cls_11n}, --self.weighed_vehicles_cls_11n
+            {self.perc_truck_dist_cls_11n}, --self.perc_truck_dist_cls_11n
+            {self.total_axles_cls_11n}, --self.total_axles_cls_11n
+            {self.axles_over9t_cls_11n}, --self.axles_over9t_cls_11n
+            {self.total_mass_cls_11n}, --self.total_mass_cls_11n
+            {self.cnt_mass_over9t_cls_11n}, --self.cnt_mass_over9t_cls_11n
+            {self.eal_pervehicle_cls_11n}, --self.eal_pervehicle_cls_11n
+            {self.total_eal_cls_11n}, --self.total_eal_cls_11n
+            {self.total_eal_over9t_cls_11n}, --self.total_eal_over9t_cls_11n
+            {self.total_vehicles_cls_12n}, --self.total_vehicles_cls_12n
+            {self.weighed_vehicles_cls_12n}, --self.weighed_vehicles_cls_12n
+            {self.perc_truck_dist_cls_12n}, --self.perc_truck_dist_cls_12n
+            {self.total_axles_cls_12n}, --self.total_axles_cls_12n
+            {self.axles_over9t_cls_12n}, --self.axles_over9t_cls_12n
+            {self.total_mass_cls_12n}, --self.total_mass_cls_12n
+            {self.cnt_mass_over9t_cls_12n}, --self.cnt_mass_over9t_cls_12n
+            {self.eal_pervehicle_cls_12n}, --self.eal_pervehicle_cls_12n
+            {self.total_eal_cls_12n}, --self.total_eal_cls_12n
+            {self.total_eal_over9t_cls_12n}, --self.total_eal_over9t_cls_12n
+            {self.total_vehicles_cls_13n}, --self.total_vehicles_cls_13n
+            {self.weighed_vehicles_cls_13n}, --self.weighed_vehicles_cls_13n
+            {self.perc_truck_dist_cls_13n}, --self.perc_truck_dist_cls_13n
+            {self.total_axles_cls_13n}, --self.total_axles_cls_13n
+            {self.axles_over9t_cls_13n}, --self.axles_over9t_cls_13n
+            {self.total_mass_cls_13n}, --self.total_mass_cls_13n
+            {self.cnt_mass_over9t_cls_13n}, --self.cnt_mass_over9t_cls_13n
+            {self.eal_pervehicle_cls_13n}, --self.eal_pervehicle_cls_13n
+            {self.total_eal_cls_13n}, --self.total_eal_cls_13n
+            {self.total_eal_over9t_cls_13n}, --self.total_eal_over9t_cls_13n
+            {self.total_vehicles_cls_14n}, --self.total_vehicles_cls_14n
+            {self.weighed_vehicles_cls_14n}, --self.weighed_vehicles_cls_14n
+            {self.perc_truck_dist_cls_14n}, --self.perc_truck_dist_cls_14n
+            {self.total_axles_cls_14n}, --self.total_axles_cls_14n
+            {self.axles_over9t_cls_14n}, --self.axles_over9t_cls_14n
+            {self.total_mass_cls_14n}, --self.total_mass_cls_14n
+            {self.cnt_mass_over9t_cls_14n}, --self.cnt_mass_over9t_cls_14n
+            {self.eal_pervehicle_cls_14n}, --self.eal_pervehicle_cls_14n
+            {self.total_eal_cls_14n}, --self.total_eal_cls_14n
+            {self.total_eal_over9t_cls_14n}, --self.total_eal_over9t_cls_14n
+            {self.total_vehicles_cls_15n}, --self.total_vehicles_cls_15n
+            {self.weighed_vehicles_cls_15n}, --self.weighed_vehicles_cls_15n
+            {self.perc_truck_dist_cls_15n}, --self.perc_truck_dist_cls_15n
+            {self.total_axles_cls_15n}, --self.total_axles_cls_15n
+            {self.axles_over9t_cls_15n}, --self.axles_over9t_cls_15n
+            {self.total_mass_cls_15n}, --self.total_mass_cls_15n
+            {self.cnt_mass_over9t_cls_15n}, --self.cnt_mass_over9t_cls_15n
+            {self.eal_pervehicle_cls_15n}, --self.eal_pervehicle_cls_15n
+            {self.total_eal_cls_15n}, --self.total_eal_cls_15n
+            {self.total_eal_over9t_cls_15n}, --self.total_eal_over9t_cls_15n
+            {self.total_vehicles_cls_16n}, --self.total_vehicles_cls_16n
+            {self.weighed_vehicles_cls_16n}, --self.weighed_vehicles_cls_16n
+            {self.perc_truck_dist_cls_16n}, --self.perc_truck_dist_cls_16n
+            {self.total_axles_cls_16n}, --self.total_axles_cls_16n
+            {self.axles_over9t_cls_16n}, --self.axles_over9t_cls_16n
+            {self.total_mass_cls_16n}, --self.total_mass_cls_16n
+            {self.cnt_mass_over9t_cls_16n}, --self.cnt_mass_over9t_cls_16n
+            {self.eal_pervehicle_cls_16n}, --self.eal_pervehicle_cls_16n
+            {self.total_eal_cls_16n}, --self.total_eal_cls_16n
+            {self.total_eal_over9t_cls_16n}, --self.total_eal_over9t_cls_16n
+            {self.total_vehicles_cls_17n}, --self.total_vehicles_cls_17n
+            {self.weighed_vehicles_cls_17n}, --self.weighed_vehicles_cls_17n
+            {self.perc_truck_dist_cls_17n}, --self.perc_truck_dist_cls_17n
+            {self.total_axles_cls_17n}, --self.total_axles_cls_17n
+            {self.axles_over9t_cls_17n}, --self.axles_over9t_cls_17n
+            {self.total_mass_cls_17n}, --self.total_mass_cls_17n
+            {self.cnt_mass_over9t_cls_17n}, --self.cnt_mass_over9t_cls_17n
+            {self.eal_pervehicle_cls_17n}, --self.eal_pervehicle_cls_17n
+            {self.total_eal_cls_17n}, --self.total_eal_cls_17n
+            {self.total_eal_over9t_cls_17n}) --self.total_eal_over9t_cls_17n
             ON CONFLICT ON CONSTRAINT electronic_count_header_hswim_pkey DO NOTHING 
             -- UPDATE SET 
             -- egrl_percent = COALESCE(EXCLUDED.egrl_percent,egrl_percent),
@@ -2826,6 +2829,8 @@ class Wim():
             -- wst_8_or_more_axle_multi_trailer_tonperhv = COALESCE(EXCLUDED.wst_8_or_more_axle_multi_trailer_tonperhv,wst_8_or_more_axle_multi_trailer_tonperhv)
             ;
         """
+
+        UPSERT_STRING = UPSERT_STRING.replace('nan,','0,')
         return UPSERT_STRING
 
     def get_headers_to_update(self) -> pd.DataFrame:
@@ -3018,9 +3023,12 @@ class Wim():
 
 if __name__ == '__main__':
     WIM = Wim(None, None, None, None, None)
+
     header_ids = WIM.header_ids
     print(header_ids)
     WIM.update_existing(header_ids)
+
+    ## below is fot testing
     # SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, WHEEL_MASS_SELECT_QRY = WIM.wim_header_upsert_func1(
     #     'bba9b8bf-9db6-4970-95d3-80f72393af99')
     # df, df2, df3 = WIM.wim_header_upsert_func2(
