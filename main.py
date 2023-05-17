@@ -14,8 +14,8 @@ import multiprocessing as mp
 import traceback
 import tqdm
 import config
-import queries as q
-import wim
+import docs.queries as q
+import traffic_wim
 import tools
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -141,7 +141,7 @@ class Traffic():
             ]).dropna(axis=1, how="all").reset_index(drop=True).copy()
             return df
         except KeyError as exc:
-            traceback.print_exc()
+            traceback.print_exc(exc)
             with open(os.path.expanduser(config.FILES_FAILED), "a", newline="") as f:
                 write = csv.writer(f)
                 write.writerows([[self.file]])
@@ -172,7 +172,7 @@ class Traffic():
             print(f"gat_data func: check filtering and file {self.file}")
             print(exc)
         except Exception as exc:
-            traceback.print_exc()
+            traceback.print_exc(exc)
             with open(os.path.expanduser(config.FILES_FAILED), "a", newline="") as f:
                 write = csv.writer(f)
                 write.writerows([[self.file]])
@@ -201,7 +201,7 @@ class Traffic():
             print(f"gat_data func: check filtering and file {self.file}")
             print(exc)
         except Exception as exc:
-            traceback.print_exc()
+            traceback.print_exc(exc)
             with open(os.path.expanduser(config.FILES_FAILED), "a", newline="") as f:
                 write = csv.writer(f)
                 write.writerows([[self.file]])
@@ -1943,7 +1943,7 @@ def main(file: str):
                 pass
             else:
                 try:
-                    W = wim.Wim(
+                    W = traffic_wim.Wim(
                         data=indv_data_df,
                         head_df=head_df,
                         header_id=header_id,

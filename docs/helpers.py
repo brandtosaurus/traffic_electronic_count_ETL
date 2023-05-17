@@ -9,7 +9,7 @@ import csv
 import os
 import zipfile
 from io import StringIO
-import queries as q
+import docs.queries as q
 
 
 #### DATA TOOLS ####
@@ -71,8 +71,7 @@ def join_header_id(d2, header):
     else:
         data = data_join(d2, header)
         # data.drop("station_name", axis=1, inplace=True)
-        data["start_datetime"] = data["start_datetime"].astype(
-            "datetime64[ns]")
+        data["start_datetime"] = data["start_datetime"].astype("datetime64[ns]")
         d2["start_datetime"] = d2["start_datetime"].astype("datetime64[ns]")
         data = data.merge(
             d2, how="outer", on=["site_id", "start_datetime", "lane_number"]
@@ -101,7 +100,10 @@ def join(header: pd.DataFrame, data: pd.DataFrame) -> pd.DataFrame:
         LEFT JOIN data ON data.start_datetime WHERE data.start_datetime >= header.start_datetime AND data.end_datetime <= header.end_datetime;
         """
         q2 = """UPDATE data set header_id = (SELECT header_id from header WHERE data.start_datetime >= header.start_datetime AND data.counttime_end <= header.enddate)"""
-        def pysqldf(q): return sqldf(q, globals())
+
+        def pysqldf(q):
+            return sqldf(q, globals())
+
         df = sqldf(q, locals())
         df = pd.DataFrame(df)
     return df
@@ -203,10 +205,10 @@ def save_to_temp_csv(df: pd.DataFrame, label: str):
 
 
 def push_to_partitioned_table(df, table, subset) -> None:
-    yr = df['year'].unique()[0]
+    yr = df["year"].unique()[0]
     try:
         df.to_sql(
-            table+'_'+str(yr),
+            table + "_" + str(yr),
             con=config.ENGINE,
             schema="trafc",
             if_exists="append",
@@ -216,7 +218,7 @@ def push_to_partitioned_table(df, table, subset) -> None:
     except Exception:
         df = df.drop_duplicates(subset=subset)
         df.to_sql(
-            table+'_'+yr,
+            table + "_" + yr,
             con=config.ENGINE,
             schema="trafc",
             if_exists="append",
@@ -253,5 +255,5 @@ def create_database_tables():
 
 def convert_float_to_int(df):
     m = df.select_dtypes(np.number)
-    df[m.columns] = m.round().astype('Int64')
+    df[m.columns] = m.round().astype("Int64")
     return df

@@ -1,4 +1,4 @@
-import queries as q
+import docs.queries as q
 import config
 import main
 import pandas as pd

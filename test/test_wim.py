@@ -1,6 +1,6 @@
 from pandas import DataFrame
 from pandas.testing import assert_frame_equal
-import wim
+import traffic_wim
 
 def wim_test():
 
@@ -557,7 +557,7 @@ def wim_test():
         if header_id is None:
             pass
         else:
-            WIM = wim.Wim(None, None, None, None, None)
+            WIM = traffic_wim.Wim(None, None, None, None, None)
             SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, WHEEL_MASS_SELECT_QRY = WIM.wim_header_upsert_func1(header_id)
             df, df2, df3 = WIM.wim_header_upsert_func2(
                 SELECT_TYPE10_QRY, AXLE_SPACING_SELECT_QRY, WHEEL_MASS_SELECT_QRY)
